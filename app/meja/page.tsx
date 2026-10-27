@@ -15,12 +15,12 @@ function OrderContent() {
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'game' | 'profile'>('menu')
   const [selectedGame, setSelectedGame] = useState<number>(1)
 
-  // Store Config & Kasir Profile
+  // Profile Warkop & QRIS dari Kasir
   const [storeName, setStoreName] = useState('Warung Kopi Kita')
   const [storeAvatar, setStoreAvatar] = useState('')
   const [qrisUrl, setQrisUrl] = useState('')
 
-  // State Data
+  // Data State
   const [menuItems, setMenuItems] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [cart, setCart] = useState<{ [key: string]: number }>({})
@@ -37,7 +37,7 @@ function OrderContent() {
   const [uploadingBukti, setUploadingBukti] = useState(false)
   const [buktiFile, setBuktiFile] = useState<File | null>(null)
 
-  // Status & Profile Data
+  // Status & Profile Data Pelanggan
   const [myOrders, setMyOrders] = useState<any[]>([])
   const [userData, setUserData] = useState<{ name: string; phone: string; email: string; avatarUrl: string }>({
     name: 'Tamu',
@@ -48,42 +48,31 @@ function OrderContent() {
   const [editingName, setEditingName] = useState('')
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [soundOption, setSoundOption] = useState<number>(1)
+  const [audioUnlocked, setAudioUnlocked] = useState(false)
 
-  // --- 10 GAMES STATES ---
+  // 10 Games State
   const [tttBoard, setTttBoard] = useState(Array(9).fill(null))
   const [tttIsX, setTttIsX] = useState(true)
-
   const [guessTarget, setGuessTarget] = useState(Math.floor(Math.random() * 20) + 1)
   const [guessInput, setGuessInput] = useState('')
   const [guessMsg, setGuessMsg] = useState('Tebak angka 1 - 20!')
-
   const [rpsResult, setRpsResult] = useState('Pilih salah satu!')
-
   const [cards, setCards] = useState(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5))
   const [flipped, setFlipped] = useState<number[]>([])
   const [matched, setMatched] = useState<number[]>([])
-
   const [clicks, setClicks] = useState(0)
 
-  const [mathA, setMathA] = useState(Math.floor(Math.random() * 10) + 1)
-  const [mathB, setMathB] = useState(Math.floor(Math.random() * 10) + 1)
-  const [mathAns, setMathAns] = useState('')
-  const [mathMsg, setMathMsg] = useState('Jawab pertanyaan matematika!')
+  // Audio Functions
+  const unlockAudio = () => {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      ctx.resume()
+      setAudioUnlocked(true)
+    } catch (e) {
+      console.log(e)
+    }
+  }
 
-  const [coinResult, setCoinResult] = useState('Tekan tombol untuk lempar koin!')
-
-  const [colorTarget, setColorTarget] = useState('#EF4444')
-  const [colorMsg, setColorMsg] = useState('Pilih warna yang sesuai!')
-
-  const [scrambleWord] = useState('WARKOP')
-  const [scrambleInput, setScrambleInput] = useState('')
-  const [scrambleMsg, setScrambleMsg] = useState('Susun kata: A K R P O W')
-
-  const [reactState, setReactState] = useState<'idle' | 'waiting' | 'ready'>('idle')
-  const [reactTime, setReactTime] = useState<number | null>(null)
-  const [startTime, setStartTime] = useState<number>(0)
-
-  // TTS & Audio
   const speakText = (text: string, loop: boolean = false) => {
     if (!('speechSynthesis' in window)) return
     window.speechSynthesis.cancel()
@@ -119,6 +108,7 @@ function OrderContent() {
   }
 
   const triggerSoundByOption = (opt: number) => {
+    unlockAudio()
     if (opt === 1) playBellSound(false)
     if (opt === 2) playBellSound(true)
     if (opt === 3) speakText('Pesanan anda sudah selesai', false)
@@ -130,13 +120,13 @@ function OrderContent() {
     loadUserProfile()
     fetchStoreConfig()
 
-    // Realtime Listener Bel Meja & Status Pesanan
+    // Realtime Broadcast Bel Spesifik Meja
     const channel = supabase
       .channel('meja-customer-realtime')
       .on('broadcast', { event: 'ring-table-bell' }, (payload: any) => {
         if (payload.payload?.tableNo?.toString() === selectedTable?.toString()) {
           triggerSoundByOption(soundOption)
-          alert(`🔔 Pesanan kamu Meja #${selectedTable} dipanggil kasir!`)
+          alert(`🔔 Meja #${selectedTable}: Pesanan kamu dipanggil kasir!`)
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload: any) => {
@@ -155,11 +145,11 @@ function OrderContent() {
   }, [selectedTable, soundOption, userData.name])
 
   const fetchStoreConfig = async () => {
-    const { data } = await supabase.from('profiles').select('store_name, avatar_url, qris_url').eq('role', 'cashier').limit(1).single()
-    if (data) {
-      if (data.store_name) setStoreName(data.store_name)
-      if (data.avatar_url) setStoreAvatar(data.avatar_url)
-      if (data.qris_url) setQrisUrl(data.qris_url)
+    const { data } = await supabase.from('profiles').select('store_name, avatar_url, qris_url').eq('role', 'cashier').limit(1)
+    if (data && data.length > 0) {
+      if (data[0].store_name) setStoreName(data[0].store_name)
+      if (data[0].avatar_url) setStoreAvatar(data[0].avatar_url)
+      if (data[0].qris_url) setQrisUrl(data[0].qris_url)
     }
   }
 
@@ -290,7 +280,16 @@ function OrderContent() {
     }
   }
 
-  // Upload Bukti Pembayaran
+  // Panggil Kasir dari Pelanggan (Berbunyi di Kasir)
+  const handleNudgeKasir = async () => {
+    await supabase.channel('kasir-dashboard-realtime').send({
+      type: 'broadcast',
+      event: 'customer-ring-bell',
+      payload: { tableNo: selectedTable || '??', customerName: userData.name },
+    })
+    alert(`🔔 Bel Meja #${selectedTable} telah dibunyikan di Kasir!`)
+  }
+
   const handleUploadBukti = async (orderId: string) => {
     if (!buktiFile) {
       alert('Pilih file foto bukti transfer terlebih dahulu.')
@@ -309,36 +308,15 @@ function OrderContent() {
         bukti_pembayaran_url: data.publicUrl,
       }).eq('id', orderId)
 
-      alert('✅ Bukti pembayaran berhasil dikirim ke kasir!')
+      alert('✅ Bukti pembayaran berhasil terkirim ke kasir!')
       setBuktiFile(null)
       setShowQrisModal(false)
       fetchMyOrders()
     } catch (e: any) {
-      alert(e.message || 'Gagal mengunggah bukti pembayaran.')
+      alert(e.message || 'Gagal mengirim bukti pembayaran.')
     } finally {
       setUploadingBukti(false)
     }
-  }
-
-  // Download QRIS File
-  const handleDownloadQris = () => {
-    if (!qrisUrl) return
-    const a = document.createElement('a')
-    a.href = qrisUrl
-    a.download = `QRIS_${storeName}.png`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-  }
-
-  const handleNudgeKasir = async () => {
-    playBellSound(false)
-    await supabase.channel('meja-customer-realtime').send({
-      type: 'broadcast',
-      event: 'customer-ring-bell',
-      payload: { tableNo: selectedTable || '??', customerName: userData.name },
-    })
-    alert(`🔔 Bel meja #${selectedTable} berhasil dibunyikan ke Kasir!`)
   }
 
   const handleSaveProfile = async () => {
@@ -346,7 +324,7 @@ function OrderContent() {
       let avatarUrl = userData.avatarUrl
       if (avatarFile) {
         const fileExt = avatarFile.name.split('.').pop()
-        const filePath = `avatars/${Date.now()}.${fileExt}`
+        const filePath = `avatars/cust_${Date.now()}.${fileExt}`
         await supabase.storage.from('menu-images').upload(filePath, avatarFile)
         const { data } = supabase.storage.from('menu-images').getPublicUrl(filePath)
         avatarUrl = data.publicUrl
@@ -380,7 +358,7 @@ function OrderContent() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 pb-28 font-sans">
-      {/* Top Bar Header */}
+      {/* Top Bar Header dengan Logo & Nama Warkop Kasir */}
       <div className="sticky top-0 z-20 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80 p-4">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -388,7 +366,7 @@ function OrderContent() {
               {storeAvatar ? <img src={storeAvatar} alt="Logo" className="w-full h-full object-cover" /> : '☕'}
             </div>
             <div>
-              <span className="text-[9px] font-bold tracking-wider text-emerald-400 uppercase">Warkop POS</span>
+              <span className="text-[9px] font-bold tracking-wider text-emerald-400 uppercase">Warkop Digital</span>
               <h1 className="text-base font-extrabold text-white line-clamp-1">{storeName}</h1>
             </div>
           </div>
@@ -479,9 +457,19 @@ function OrderContent() {
         {/* TAB 2: STATUS PESANAN */}
         {activeNav === 'status' && (
           <div className="space-y-4">
+            {/* Tombol Pembuka Izin Audio */}
+            {!audioUnlocked && (
+              <button
+                onClick={unlockAudio}
+                className="w-full py-2 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold rounded-2xl animate-pulse"
+              >
+                🔊 Klik di sini 1x untuk mengaktifkan Suara Bel Pesanan
+              </button>
+            )}
+
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-2">
               <label className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                <span>🔊</span> Nada Dering Pesanan Selesai:
+                <span>🔊</span> Pilih Nada Dering Selesai Pelanggan:
               </label>
               <select
                 value={soundOption}
@@ -495,11 +483,11 @@ function OrderContent() {
               </select>
             </div>
 
-            <div className="bg-emerald-950/40 border border-emerald-500/30 p-3.5 rounded-2xl text-center space-y-1">
-              <p className="text-xs font-bold text-emerald-300">🔔 Jika pesanan belum diproses, pencetlah bel!</p>
+            <div className="bg-amber-950/30 border border-amber-500/30 p-3.5 rounded-2xl text-center space-y-1">
+              <p className="text-xs font-bold text-amber-300">🔔 Jika pesanan belum diproses, pencetlah bel!</p>
               <button
                 onClick={handleNudgeKasir}
-                className="px-4 py-2 bg-amber-500 text-slate-950 text-xs font-black rounded-xl active:scale-95 transition mt-1"
+                className="px-4 py-2 bg-amber-500 text-slate-950 text-xs font-black rounded-xl active:scale-95 transition mt-1 shadow-lg shadow-amber-500/20"
               >
                 🔔 Pencet Bel Panggil Kasir
               </button>
@@ -508,7 +496,7 @@ function OrderContent() {
             <h2 className="text-base font-bold text-white flex items-center gap-2"><span>📡</span> Status Pesanan Kamu</h2>
 
             {myOrders.length === 0 ? (
-              <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-2xl text-xs text-slate-400">Belum ada pesanan aktif.</div>
+              <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-2xl text-xs text-slate-400">Belum ada pesanan aktif saat ini.</div>
             ) : (
               myOrders.map((ord) => (
                 <div key={ord.id} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
@@ -526,7 +514,6 @@ function OrderContent() {
                     </span>
                   </div>
 
-                  {/* Tombol QRIS & Bukti Transfer Samping Pesanan */}
                   <div className="flex gap-2 pt-1 border-t border-b border-slate-800/80 py-2">
                     <button
                       onClick={() => {
@@ -535,7 +522,7 @@ function OrderContent() {
                       }}
                       className="flex-1 py-1.5 bg-emerald-950 text-emerald-300 border border-emerald-800/80 text-xs font-bold rounded-xl flex items-center justify-center gap-1"
                     >
-                      <span>📲</span> QRIS & Download
+                      <span>📲</span> Lihat QRIS Toko
                     </button>
                     <button
                       onClick={() => {
@@ -574,7 +561,7 @@ function OrderContent() {
           <div className="space-y-4 text-center">
             <h2 className="text-base font-bold text-white">🎮 Arena 10 Games Anti-Bosan</h2>
             <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[11px]">
-              {[{ id: 1, name: '1. TicTacToe' }, { id: 2, name: '2. Tebak Angka' }, { id: 3, name: '3. Su-Wit' }, { id: 4, name: '4. Memory' }, { id: 5, name: '5. Clicker' }, { id: 6, name: '6. Math Quiz' }, { id: 7, name: '7. Color' }, { id: 8, name: '8. Koin' }, { id: 9, name: '9. Acak Kata' }, { id: 10, name: '10. Reaksi' }].map((g) => (
+              {[{ id: 1, name: '1. TicTacToe' }, { id: 2, name: '2. Tebak Angka' }, { id: 3, name: '3. Su-Wit' }, { id: 4, name: '4. Memory' }, { id: 5, name: '5. Clicker' }].map((g) => (
                 <button key={g.id} onClick={() => setSelectedGame(g.id)} className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap ${selectedGame === g.id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 border border-slate-800 text-slate-400'}`}>
                   {g.name}
                 </button>
@@ -612,7 +599,7 @@ function OrderContent() {
 
               <div className="space-y-3 text-left">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Ubah Foto Profil</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Ubah Foto Profil Pelanggan</label>
                   <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-xl file:bg-emerald-950 file:text-emerald-300" />
                 </div>
 
@@ -652,23 +639,17 @@ function OrderContent() {
         </div>
       )}
 
-      {/* Modal Popup QRIS & Upload Bukti Pembayaran */}
+      {/* Modal Popup QRIS Toko */}
       {showQrisModal && activeOrderForQris && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-6 text-center space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-base font-bold text-emerald-400">📲 Pembayaran QRIS</h3>
+            <h3 className="text-base font-bold text-emerald-400">📲 Pembayaran QRIS Toko</h3>
             
             <div className="w-56 h-56 mx-auto bg-white p-2 rounded-2xl flex items-center justify-center">
-              {qrisUrl ? <img src={qrisUrl} alt="QRIS" className="w-full h-full object-contain" /> : <p className="text-xs text-slate-500">QRIS belum diupload kasir</p>}
+              {qrisUrl ? <img src={qrisUrl} alt="QRIS" className="w-full h-full object-contain" /> : <p className="text-xs text-slate-500">QRIS belum diupload oleh kasir</p>}
             </div>
 
-            {qrisUrl && (
-              <button onClick={handleDownloadQris} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-xl text-emerald-300">
-                📥 Download Gambar QRIS
-              </button>
-            )}
-
-            {/* Form Upload Bukti Pembayaran */}
+            {/* Form Upload Bukti Transfer */}
             <div className="pt-2 border-t border-slate-800 text-left space-y-2">
               <label className="text-[10px] font-bold text-slate-400 uppercase">Kirim Bukti Pembayaran (Transfer/Struk)</label>
               <input type="file" accept="image/*" onChange={(e) => setBuktiFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-400 file:py-1 file:px-3 file:rounded-xl file:bg-emerald-950 file:text-emerald-300" />
@@ -687,7 +668,7 @@ function OrderContent() {
         </div>
       )}
 
-      {/* Bottom Navigation */}
+      {/* Bottom Nav */}
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800 p-2 z-40">
         <div className="max-w-md mx-auto grid grid-cols-4 gap-1 text-center">
           <button onClick={() => setActiveNav('menu')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'menu' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>☕ Menu</button>
