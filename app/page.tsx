@@ -79,7 +79,8 @@ export default function EntryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between p-6 relative overflow-hidden font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-6 relative overflow-hidden font-sans">
+      {/* Visual Background Glow */}
       <div className="absolute -top-24 -left-24 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -93,6 +94,7 @@ export default function EntryPage() {
         </p>
 
         <div className="w-full bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-5 rounded-3xl shadow-2xl">
+          {/* Switcher Masuk / Daftar */}
           <div className="w-full bg-slate-950 p-1 rounded-2xl flex mb-5 border border-slate-800">
             <button
               type="button"
@@ -122,6 +124,7 @@ export default function EntryPage() {
             </button>
           </div>
 
+          {/* Alert Message */}
           {errorMsg && (
             <div className="mb-4 p-3 bg-red-950/80 border border-red-800 text-red-300 text-xs rounded-xl">
               {errorMsg}
@@ -133,6 +136,7 @@ export default function EntryPage() {
             </div>
           )}
 
+          {/* Form Auth */}
           <form onSubmit={handleAuth} className="space-y-3">
             {isRegister && (
               <>
@@ -195,12 +199,6 @@ export default function EntryPage() {
             </button>
           </form>
         </div>
-      </div>
-
-      <div className="text-center text-xs text-slate-500 z-10">
-        <a href="/kasir/login" className="hover:text-emerald-400 transition-colors font-medium">
-          Portal Kasir Warkop →
-        </a>
       </div>
     </div>
   )
