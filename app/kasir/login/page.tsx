@@ -1,9 +1,6 @@
-export const dynamic = 'force-dynamic'
+'use client'
 
-'use client'
-import { useState } from 'react'
-// ... sisa kode di bawahnya tetap sama
-'use client'
+export const dynamic = 'force-dynamic'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -30,7 +27,6 @@ export default function KasirLoginPage() {
 
       if (error) throw error
 
-      // Cek apakah role user adalah cashier/admin
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
