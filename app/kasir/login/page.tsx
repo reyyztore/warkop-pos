@@ -47,56 +47,60 @@ export default function KasirLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-900 text-white">
-      <div className="w-full max-w-sm bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6 relative overflow-hidden font-sans">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="w-full max-w-sm bg-slate-900/80 backdrop-blur-xl p-6 rounded-3xl border border-slate-800 shadow-2xl relative z-10">
         <div className="text-center mb-6">
-          <span className="text-4xl">🔑</span>
-          <h1 className="text-xl font-bold mt-2">Portal Kasir</h1>
+          <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-3 shadow-lg shadow-emerald-950/50">
+            🔑
+          </div>
+          <h1 className="text-xl font-black text-white">Portal Kasir</h1>
           <p className="text-xs text-slate-400 mt-1">Masuk untuk mengelola pesanan & toko</p>
         </div>
 
         {errorMsg && (
-          <div className="mb-4 p-3 bg-red-900/50 border border-red-700 text-red-200 text-xs rounded-xl">
+          <div className="mb-4 p-3 bg-red-950/80 border border-red-800 text-red-300 text-xs rounded-xl">
             {errorMsg}
           </div>
         )}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Email Kasir</label>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email Kasir</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="kasir@warkop.com"
               required
-              className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-emerald-500 transition-all"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Password</label>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
-              className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-emerald-500 transition-all"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold rounded-xl transition shadow-lg shadow-emerald-900/50 disabled:opacity-50"
+            className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl active:scale-95 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
           >
-            {loading ? 'Memverifikasi...' : 'Masuk Dashboard Kasir'}
+            {loading ? 'Memverifikasi...' : 'Masuk Dashboard Kasir →'}
           </button>
         </form>
 
         <div className="mt-6 text-center">
-          <a href="/" className="text-xs text-slate-400 hover:text-white">
+          <a href="/" className="text-xs text-slate-500 hover:text-white transition-colors">
             ← Kembali ke Tampilan Pelanggan
           </a>
         </div>
