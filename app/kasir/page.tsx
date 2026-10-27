@@ -12,24 +12,60 @@ export default function KasirDashboardPage() {
   const [activeTab, setActiveTab] = useState<string>('semua')
   const [selectedOrderForPrint, setSelectedOrderForPrint] = useState<any | null>(null)
 
+  // Kasir Sound Option (1: Bel Biasa, 2: Ada Pesanan Masuk Bos, 3: Pesanan Masuk Nih, 4: Loop Random 1-3)
+  const [kasirSoundOption, setKasirSoundOption] = useState<number>(2)
+
   const supabase = createClient()
 
-  // Suara Bel Notifikasi
-  const playNotificationBell = () => {
+  const speakText = (text: string, loop: boolean = false) => {
+    if (!('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'id-ID'
+    utterance.pitch = 1
+    utterance.rate = 1
+    if (loop) {
+      utterance.onend = () => {
+        window.speechSynthesis.speak(utterance)
+      }
+    }
+    window.speechSynthesis.speak(utterance)
+  }
+
+  const playBellSound = (loop: boolean = false) => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
-      const osc = audioCtx.createOscillator()
-      const gain = audioCtx.createGain()
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(880, audioCtx.currentTime) // Bell tone (A5)
-      gain.gain.setValueAtTime(0.3, audioCtx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.2)
-      osc.connect(gain)
-      gain.connect(audioCtx.destination)
-      osc.start()
-      osc.stop(audioCtx.currentTime + 1.2)
+      const playTone = () => {
+        const osc = audioCtx.createOscillator()
+        const gain = audioCtx.createGain()
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime)
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1)
+        osc.connect(gain)
+        gain.connect(audioCtx.destination)
+        osc.start()
+        osc.stop(audioCtx.currentTime + 1)
+      }
+      playTone()
+      if (loop) {
+        const interval = setInterval(playTone, 5000)
+        setTimeout(() => clearInterval(interval), 15000)
+      }
     } catch (e) {
-      console.log('Audio autoplay restriction', e)
+      console.log(e)
+    }
+  }
+
+  const playIncomingOrderSound = () => {
+    if (kasirSoundOption === 1) playBellSound(false)
+    if (kasirSoundOption === 2) speakText('Ada pesanan masuk bos', false)
+    if (kasirSoundOption === 3) speakText('Pesanan masuk nih', false)
+    if (kasirSoundOption === 4) {
+      const rand = Math.floor(Math.random() * 3) + 1
+      if (rand === 1) playBellSound(true)
+      if (rand === 2) speakText('Ada pesanan masuk bos', true)
+      if (rand === 3) speakText('Pesanan masuk nih', true)
     }
   }
 
@@ -57,14 +93,14 @@ export default function KasirDashboardPage() {
 
     checkAuthAndFetch()
 
-    // Realtime Listener & Play Bell Sound
+    // Realtime Order Listener
     const channel = supabase
-      .channel('realtime-orders-kasir-feminine')
+      .channel('realtime-orders-kasir-advanced')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'orders' },
         () => {
-          playNotificationBell()
+          playIncomingOrderSound()
           fetchOrders()
         }
       )
@@ -80,7 +116,7 @@ export default function KasirDashboardPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [kasirSoundOption])
 
   const fetchOrders = async () => {
     setLoading(true)
@@ -96,6 +132,10 @@ export default function KasirDashboardPage() {
   const updateStatus = async (orderId: string, status: string) => {
     await supabase.from('orders').update({ status }).eq('id', orderId)
     fetchOrders()
+  }
+
+  const ringOrderBell = () => {
+    playBellSound(false)
   }
 
   const isToday = (dateStr: string) => {
@@ -116,7 +156,6 @@ export default function KasirDashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 font-sans pb-16 relative overflow-hidden">
-      {/* Visual Feminine Soft Glow Background */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -144,14 +183,28 @@ export default function KasirDashboardPage() {
           <Link href="/kasir/meja" className="px-4 py-2 bg-purple-950/40 border border-purple-800/40 text-xs font-bold text-purple-200 hover:bg-purple-900/40 rounded-2xl transition">
             🪑 Kelola Meja
           </Link>
-          <button onClick={fetchOrders} className="px-3 py-2 bg-pink-500/10 border border-pink-500/30 text-pink-300 text-xs font-bold rounded-2xl">
-            🔔 Bunyi Bel
-          </button>
         </div>
       </div>
 
+      {/* Setting Nada Kasir */}
+      <div className="max-w-5xl mx-auto mt-4 bg-slate-900/80 border border-rose-900/30 p-3.5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+        <span className="text-xs font-bold text-rose-300 flex items-center gap-2">
+          <span>🔊</span> Sound Pesanan Masuk Kasir:
+        </span>
+        <select
+          value={kasirSoundOption}
+          onChange={(e) => setKasirSoundOption(Number(e.target.value))}
+          className="bg-slate-950 border border-slate-800 text-xs text-white p-2 rounded-xl focus:outline-none"
+        >
+          <option value={1}>1. Bel Biasa</option>
+          <option value={2}>2. "Ada pesanan masuk bos"</option>
+          <option value={3}>3. "Pesanan masuk nih"</option>
+          <option value={4}>4. Berulang Random (1-3)</option>
+        </select>
+      </div>
+
       {/* Omzet Cards */}
-      <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 relative z-10">
+      <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4 relative z-10">
         <div className="bg-slate-900/80 backdrop-blur-xl border border-rose-500/20 p-4 rounded-3xl">
           <p className="text-[10px] font-bold text-rose-300 uppercase tracking-wider">Omzet Hari Ini</p>
           <p className="text-xl font-black text-rose-300 mt-1">Rp {totalOmzetHariIni.toLocaleString('id-ID')}</p>
@@ -208,11 +261,16 @@ export default function KasirDashboardPage() {
                       <span className="text-sm font-black text-rose-300">Meja #{ord.tables?.nomor || '-'}</span>
                       <p className="text-xs font-bold text-white mt-0.5">👤 {ord.nama_pemesan}</p>
                     </div>
-                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${
-                      ord.status === 'pending' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
-                      ord.status === 'diproses' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
-                      ord.status === 'selesai' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300'
-                    }`}>{ord.status}</span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${
+                        ord.status === 'pending' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                        ord.status === 'diproses' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                        ord.status === 'selesai' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300'
+                      }`}>{ord.status}</span>
+                      <button onClick={ringOrderBell} className="text-xs bg-slate-800 p-1 rounded-lg border border-slate-700 hover:bg-rose-900 transition" title="Bunyikan Bel">
+                        🔔 Bel
+                      </button>
+                    </div>
                   </div>
 
                   <ul className="mt-3 space-y-1 text-xs text-slate-300">
