@@ -96,13 +96,13 @@ export default function KasirDashboardPage() {
 
     checkAuthAndFetch()
 
-    // Realtime Listener
+    // Realtime Listener Bel Pelanggan Ke Kasir
     const channel = supabase
       .channel('kasir-dashboard-realtime')
       .on('broadcast', { event: 'customer-ring-bell' }, (payload: any) => {
         playBellSound(false)
         const table = payload.payload?.tableNo || '??'
-        setCustomerBellAlert(`🔔 Meja #${table} menekan bel!`)
+        setCustomerBellAlert(`🔔 Meja #${table} memanggil kasir!`)
         setTimeout(() => setCustomerBellAlert(null), 8000)
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
@@ -146,7 +146,7 @@ export default function KasirDashboardPage() {
       event: 'ring-table-bell',
       payload: { tableNo },
     })
-    alert(`🔔 Bel berbunyi di Meja #${tableNo}`)
+    alert(`🔔 Bel terkirim ke Meja #${tableNo}`)
   }
 
   const handleSaveStoreProfile = async () => {
@@ -182,7 +182,7 @@ export default function KasirDashboardPage() {
       setAvatarUrl(newAvatarUrl)
       setQrisUrl(newQrisUrl)
       setShowProfileModal(false)
-      alert('Profil toko & QRIS berhasil diperbarui!')
+      alert('Profil warkop & foto QRIS berhasil diperbarui! Tampilan pelanggan otomatis terupdate.')
     } catch (e: any) {
       alert(e.message)
     }
@@ -208,7 +208,7 @@ export default function KasirDashboardPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 font-sans pb-16 relative overflow-hidden">
       <div className="absolute top-0 right-0 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Top Bar */}
+      {/* Top Bar Navigation */}
       <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-rose-900/30 relative z-10">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-500 to-pink-400 p-0.5 shadow-lg">
@@ -218,7 +218,7 @@ export default function KasirDashboardPage() {
           </div>
           <div>
             <h1 className="text-xl font-black text-rose-200">{storeName}</h1>
-            <p className="text-xs text-rose-300/60 font-medium">Dashboard Pos & Kasir Realtime</p>
+            <p className="text-xs text-rose-300/60 font-medium">Dashboard POS & Kasir Realtime</p>
           </div>
         </div>
 
@@ -298,7 +298,7 @@ export default function KasirDashboardPage() {
               <div className="flex flex-col items-end gap-1">
                 <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-300' : ord.status === 'diproses' ? 'bg-blue-500/20 text-blue-300' : ord.status === 'selesai' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>{ord.status}</span>
                 
-                {/* Tombol Bel Spesifik Meja */}
+                {/* Bel Berulang Meja Spesifik */}
                 <button onClick={() => ringSpecificTableBell(ord.tables?.nomor)} className="text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 px-2 py-1 rounded-md font-bold hover:bg-amber-500 hover:text-slate-950 transition">
                   🔔 Ring Meja #{ord.tables?.nomor}
                 </button>
