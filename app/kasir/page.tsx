@@ -15,9 +15,34 @@ export default function KasirDashboardPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    fetchOrders()
+    const checkAuthAndFetch = async () => {
+      // 1. Cek Sesi Login Kasir
+      const { data: { session } } = await supabase.auth.getSession()
 
-    // Realtime listener untuk pesanan baru/perubahan status
+      if (!session) {
+        window.location.href = '/kasir/login'
+        return
+      }
+
+      // 2. Cek Role Akun Kasir / Admin
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single()
+
+      if (!profile || (profile.role !== 'cashier' && profile.role !== 'admin')) {
+        window.location.href = '/kasir/login'
+        return
+      }
+
+      // 3. Jika Valid, Ambil Data Pesanan
+      fetchOrders()
+    }
+
+    checkAuthAndFetch()
+
+    // Realtime Listener
     const channel = supabase
       .channel('realtime-orders-kasir')
       .on(
@@ -50,7 +75,7 @@ export default function KasirDashboardPage() {
     fetchOrders()
   }
 
-  // Hitung Laporan Ringkas Harian
+  // Rekap Laporan Harian
   const isToday = (dateStr: string) => {
     const d = new Date(dateStr)
     const now = new Date()
@@ -62,20 +87,19 @@ export default function KasirDashboardPage() {
   const totalOmzetHariIni = todayCompleted.reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
   const totalPesananAktif = orders.filter((o) => o.status === 'pending' || o.status === 'diproses').length
 
-  // Filter Data Sesuai Tab
+  // Filter Data Tab
   const filteredOrders = orders.filter((ord) => {
     if (activeTab === 'semua') return true
     return ord.status === activeTab
   })
 
-  // Trigger Print Struk
   const handlePrint = () => {
     window.print()
   }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 font-sans pb-16">
-      {/* Top Nav Bar */}
+      {/* Top Bar Navigation */}
       <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-xl text-emerald-400 shadow-sm">
@@ -90,7 +114,6 @@ export default function KasirDashboardPage() {
           </div>
         </div>
 
-        {/* Menu Navigasi */}
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
           <Link
             href="/kasir/menu"
@@ -180,7 +203,6 @@ export default function KasirDashboardPage() {
                 className="bg-slate-900/80 backdrop-blur-md border border-slate-800 hover:border-slate-700 p-4 rounded-2xl flex flex-col justify-between space-y-4 shadow-sm transition-all"
               >
                 <div>
-                  {/* Header Order Card */}
                   <div className="flex items-start justify-between pb-3 border-b border-slate-800">
                     <div>
                       <span className="text-sm font-black text-emerald-400">
@@ -214,7 +236,6 @@ export default function KasirDashboardPage() {
                     </div>
                   </div>
 
-                  {/* List Item Pesanan */}
                   <ul className="mt-3 space-y-1 text-xs text-slate-300">
                     {ord.order_items?.map((item: any) => (
                       <li key={item.id} className="flex justify-between items-center">
@@ -228,7 +249,6 @@ export default function KasirDashboardPage() {
                     ))}
                   </ul>
 
-                  {/* Total Pembayaran */}
                   <div className="mt-4 pt-2 border-t border-slate-800/80 flex justify-between items-center text-xs font-black">
                     <span className="text-slate-400">Total Harga</span>
                     <span className="text-emerald-400 text-sm">
@@ -237,7 +257,6 @@ export default function KasirDashboardPage() {
                   </div>
                 </div>
 
-                {/* Tombol Aksi Kasir & Cetak Struk */}
                 <div className="pt-2 flex flex-col gap-2">
                   <div className="flex gap-1.5">
                     {ord.status === 'pending' && (
@@ -264,7 +283,6 @@ export default function KasirDashboardPage() {
                     </button>
                   </div>
 
-                  {/* Tombol Print Struk */}
                   <button
                     onClick={() => setSelectedOrderForPrint(ord)}
                     className="w-full py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold rounded-xl active:scale-95 transition-all flex items-center justify-center gap-1.5"
@@ -278,11 +296,10 @@ export default function KasirDashboardPage() {
         )}
       </div>
 
-      {/* MODAL POP-UP CETAK STRUK / NOTA KASIR */}
+      {/* MODAL POP-UP CETAK STRUK */}
       {selectedOrderForPrint && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white text-slate-900 w-full max-w-sm rounded-2xl p-6 shadow-2xl space-y-4 print:shadow-none font-mono text-xs">
-            {/* Header Struk */}
             <div className="text-center space-y-1 pb-3 border-b border-dashed border-slate-300">
               <h2 className="text-base font-bold tracking-tight">☕ WARUNG KOPI KITA</h2>
               <p className="text-[10px] text-slate-500">Jl. Warkop No. 1 • Telp/WA: {selectedOrderForPrint.phone_pemesan || '0812-XXXX-XXXX'}</p>
@@ -291,7 +308,6 @@ export default function KasirDashboardPage() {
               </p>
             </div>
 
-            {/* Info Meja & Pelanggan */}
             <div className="space-y-1 border-b border-dashed border-slate-300 pb-3">
               <div className="flex justify-between">
                 <span>No. Meja:</span>
@@ -307,7 +323,6 @@ export default function KasirDashboardPage() {
               </div>
             </div>
 
-            {/* Itemized List */}
             <div className="space-y-2 border-b border-dashed border-slate-300 pb-3">
               {selectedOrderForPrint.order_items?.map((item: any) => (
                 <div key={item.id} className="flex justify-between">
@@ -324,7 +339,6 @@ export default function KasirDashboardPage() {
               ))}
             </div>
 
-            {/* Total Pembayaran */}
             <div className="flex justify-between text-sm font-bold pt-1">
               <span>TOTAL:</span>
               <span>Rp {selectedOrderForPrint.total_harga?.toLocaleString('id-ID')}</span>
@@ -335,7 +349,6 @@ export default function KasirDashboardPage() {
               <p>Selamat menikmati santapan warkop kami.</p>
             </div>
 
-            {/* Action Buttons Modal */}
             <div className="pt-3 flex gap-2 print:hidden">
               <button
                 onClick={handlePrint}
