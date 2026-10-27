@@ -4,10 +4,11 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 
 export default function KelolaMejaPage() {
   const [tables, setTables] = useState<any[]>([])
-  const [nomor, setNomor] = useState('')
+  const [nomorMeja, setNomorMeja] = useState('')
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -24,80 +25,78 @@ export default function KelolaMejaPage() {
 
   const handleAddTable = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!nomor) return
-    const { error } = await supabase.from('tables').insert({ nomor: parseInt(nomor), aktif: true })
+    if (!nomorMeja) return
 
-    if (error) {
-      alert(error.message)
-    } else {
-      setNomor('')
+    const { error } = await supabase.from('tables').insert({
+      nomor: parseInt(nomorMeja),
+      aktif: true,
+    })
+
+    if (error) alert(error.message)
+    else {
+      setNomorMeja('')
       fetchTables()
     }
   }
 
-  const toggleMeja = async (id: string, aktif: boolean) => {
+  const toggleStatus = async (id: string, aktif: boolean) => {
     await supabase.from('tables').update({ aktif: !aktif }).eq('id', id)
     fetchTables()
   }
 
-  const deleteMeja = async (id: string) => {
-    if (confirm('Hapus meja ini?')) {
+  const deleteTable = async (id: string) => {
+    if (confirm('Yakin hapus meja ini?')) {
       await supabase.from('tables').delete().eq('id', id)
       fetchTables()
     }
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 text-white p-4">
-      <h1 className="text-xl font-bold">🪑 Kelola Nomor Meja</h1>
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 font-sans pb-16">
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="flex justify-between items-center pb-4 border-b border-purple-900/30">
+          <h1 className="text-xl font-bold text-purple-300">🪑 Kelola & Tambah No. Meja Kasir</h1>
+          <Link href="/kasir" className="text-xs bg-slate-900 border border-slate-800 px-3.5 py-2 rounded-xl text-slate-300">
+            ← Kembali ke Dashboard
+          </Link>
+        </div>
 
-      <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-        <form onSubmit={handleAddTable} className="flex gap-2">
-          <input
-            type="number"
-            value={nomor}
-            onChange={(e) => setNomor(e.target.value)}
-            placeholder="Nomor Meja Baru (misal: 4)"
-            required
-            className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
-          />
-          <button type="submit" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold rounded-lg">
-            + Tambah Meja
-          </button>
-        </form>
-      </div>
+        <div className="bg-slate-900/80 border border-purple-900/30 p-5 rounded-3xl">
+          <form onSubmit={handleAddTable} className="flex gap-2">
+            <input
+              type="number"
+              value={nomorMeja}
+              onChange={(e) => setNomorMeja(e.target.value)}
+              placeholder="Nomor Meja Baru (Contoh: 1, 2, 3)"
+              required
+              className="flex-1 px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+            />
+            <button type="submit" className="px-5 py-2.5 bg-purple-500 text-slate-950 font-black text-xs rounded-xl">
+              + Tambah Meja
+            </button>
+          </form>
+        </div>
 
-      <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-        <h2 className="text-sm font-semibold mb-3 text-slate-300">Daftar Meja Warkop</h2>
-        {loading ? (
-          <p className="text-xs text-slate-400">Memuat...</p>
-        ) : tables.length === 0 ? (
-          <p className="text-xs text-slate-500">Belum ada data meja.</p>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {tables.map((tbl) => (
-              <div
-                key={tbl.id}
-                className="bg-slate-900 p-3 rounded-xl border border-slate-700 flex flex-col justify-between space-y-2"
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-sm text-emerald-400">Meja #{tbl.nomor}</span>
-                  <button onClick={() => deleteMeja(tbl.id)} className="text-xs text-slate-500 hover:text-red-400">
-                    ✕
-                  </button>
+        <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-3xl space-y-3">
+          <h2 className="text-sm font-bold text-slate-300">Daftar Meja Warkop</h2>
+          {loading ? (
+            <p className="text-xs text-slate-500">Memuat meja...</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {tables.map((t) => (
+                <div key={t.id} className="bg-slate-950 border border-slate-800 p-3 rounded-2xl flex flex-col justify-between space-y-2">
+                  <span className="text-sm font-black text-purple-300">Meja #{t.nomor}</span>
+                  <div className="flex gap-1">
+                    <button onClick={() => toggleStatus(t.id, t.aktif)} className={`flex-1 py-1 rounded-lg text-[10px] font-bold ${t.aktif ? 'bg-emerald-950 text-emerald-300' : 'bg-red-950 text-red-300'}`}>
+                      {t.aktif ? 'Aktif' : 'Non-Aktif'}
+                    </button>
+                    <button onClick={() => deleteTable(t.id)} className="px-2 py-1 bg-slate-800 text-slate-400 hover:text-red-400 rounded-lg text-xs">🗑️</button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => toggleMeja(tbl.id, tbl.aktif)}
-                  className={`w-full py-1 rounded-lg text-[10px] font-bold ${
-                    tbl.aktif ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-slate-800 text-slate-500'
-                  }`}
-                >
-                  {tbl.aktif ? '● Aktif' : '○ Nonaktif'}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
