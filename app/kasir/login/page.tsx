@@ -1,3 +1,8 @@
+export const dynamic = 'force-dynamic'
+
+'use client'
+import { useState } from 'react'
+// ... sisa kode di bawahnya tetap sama
 'use client'
 
 import { useState } from 'react'
