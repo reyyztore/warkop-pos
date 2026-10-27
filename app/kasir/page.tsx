@@ -11,6 +11,7 @@ export default function KasirDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<string>('semua')
   const [selectedOrderForPrint, setSelectedOrderForPrint] = useState<any | null>(null)
+  const [selectedBuktiUrl, setSelectedBuktiUrl] = useState<string | null>(null)
 
   // Profile Toko & QRIS State
   const [storeName, setStoreName] = useState('Warung Kopi Kita')
@@ -20,7 +21,7 @@ export default function KasirDashboardPage() {
   const [qrisUrl, setQrisUrl] = useState('')
   const [showProfileModal, setShowProfileModal] = useState(false)
 
-  // Kasir Sound Option
+  // Sound Options
   const [kasirSoundOption, setKasirSoundOption] = useState<number>(2)
   const [customerBellAlert, setCustomerBellAlert] = useState<string | null>(null)
 
@@ -97,7 +98,7 @@ export default function KasirDashboardPage() {
 
     // Realtime Listener
     const channel = supabase
-      .channel('kasir-realtime-channel')
+      .channel('kasir-dashboard-realtime')
       .on('broadcast', { event: 'customer-ring-bell' }, (payload: any) => {
         playBellSound(false)
         const table = payload.payload?.tableNo || '??'
@@ -140,12 +141,12 @@ export default function KasirDashboardPage() {
   }
 
   const ringSpecificTableBell = async (tableNo: any) => {
-    await supabase.channel('meja-realtime-channel').send({
+    await supabase.channel('meja-customer-realtime').send({
       type: 'broadcast',
       event: 'ring-table-bell',
       payload: { tableNo },
     })
-    alert(`🔔 Bel terkirim ke Meja #${tableNo}`)
+    alert(`🔔 Bel berbunyi di Meja #${tableNo}`)
   }
 
   const handleSaveStoreProfile = async () => {
@@ -234,9 +235,9 @@ export default function KasirDashboardPage() {
         </div>
       </div>
 
-      {/* Customer Bell Alert Toast */}
+      {/* Alert Customer Bell */}
       {customerBellAlert && (
-        <div className="max-w-5xl mx-auto mt-4 p-3.5 bg-amber-500 text-slate-950 text-xs font-black rounded-2xl shadow-xl animate-bounce flex justify-between items-center">
+        <div className="max-w-5xl mx-auto mt-4 p-3.5 bg-amber-500 text-slate-950 text-xs font-black rounded-2xl shadow-xl flex justify-between items-center">
           <span>{customerBellAlert}</span>
           <button onClick={() => setCustomerBellAlert(null)} className="text-xs px-2 py-1 bg-slate-950 text-white rounded-lg">Tutup</button>
         </div>
@@ -292,11 +293,15 @@ export default function KasirDashboardPage() {
               <div>
                 <span className="text-sm font-black text-rose-300">Meja #{ord.tables?.nomor || '-'}</span>
                 <p className="text-xs font-bold text-white mt-0.5">👤 {ord.nama_pemesan}</p>
-                <span className="text-[10px] text-slate-400">Bayar via: <strong className="text-emerald-400">{ord.metode_pembayaran?.toUpperCase()}</strong></span>
+                <span className="text-[10px] text-slate-400">Bayar: <strong className="text-emerald-400">{ord.metode_pembayaran?.toUpperCase()}</strong></span>
               </div>
               <div className="flex flex-col items-end gap-1">
                 <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-300' : ord.status === 'diproses' ? 'bg-blue-500/20 text-blue-300' : ord.status === 'selesai' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-red-500/20 text-red-300'}`}>{ord.status}</span>
-                <button onClick={() => ringSpecificTableBell(ord.tables?.nomor)} className="text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 px-2 py-0.5 rounded-md font-bold">🔔 Ring Meja</button>
+                
+                {/* Tombol Bel Spesifik Meja */}
+                <button onClick={() => ringSpecificTableBell(ord.tables?.nomor)} className="text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 px-2 py-1 rounded-md font-bold hover:bg-amber-500 hover:text-slate-950 transition">
+                  🔔 Ring Meja #{ord.tables?.nomor}
+                </button>
               </div>
             </div>
 
@@ -308,6 +313,16 @@ export default function KasirDashboardPage() {
                 </li>
               ))}
             </ul>
+
+            {/* Bukti Transfer Section */}
+            {ord.bukti_pembayaran_url && (
+              <div className="p-2 bg-blue-950/40 border border-blue-800/60 rounded-xl flex justify-between items-center text-xs">
+                <span className="text-blue-300 font-bold">📷 Bukti Transfer Pelanggan</span>
+                <button onClick={() => setSelectedBuktiUrl(ord.bukti_pembayaran_url)} className="px-2.5 py-1 bg-blue-500 text-slate-950 font-black rounded-lg text-[10px]">
+                  🖼️ Lihat Bukti
+                </button>
+              </div>
+            )}
 
             <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs font-black">
               <span>Total: <strong className="text-rose-300">Rp {ord.total_harga?.toLocaleString('id-ID')}</strong></span>
@@ -324,6 +339,19 @@ export default function KasirDashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* Modal View Bukti Transfer */}
+      {selectedBuktiUrl && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-5 text-center space-y-3">
+            <h3 className="text-sm font-bold text-blue-300">📷 Bukti Transfer Pelanggan</h3>
+            <div className="w-full h-64 bg-slate-950 rounded-2xl overflow-hidden border border-slate-800">
+              <img src={selectedBuktiUrl} alt="Bukti Transfer" className="w-full h-full object-contain" />
+            </div>
+            <button onClick={() => setSelectedBuktiUrl(null)} className="w-full py-2 bg-slate-800 font-bold text-xs rounded-xl">Tutup</button>
+          </div>
+        </div>
+      )}
 
       {/* Modal Profile Toko & QRIS */}
       {showProfileModal && (
