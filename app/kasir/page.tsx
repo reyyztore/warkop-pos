@@ -14,17 +14,33 @@ export default function KasirDashboardPage() {
 
   const supabase = createClient()
 
+  // Suara Bel Notifikasi
+  const playNotificationBell = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const osc = audioCtx.createOscillator()
+      const gain = audioCtx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime) // Bell tone (A5)
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.2)
+      osc.connect(gain)
+      gain.connect(audioCtx.destination)
+      osc.start()
+      osc.stop(audioCtx.currentTime + 1.2)
+    } catch (e) {
+      console.log('Audio autoplay restriction', e)
+    }
+  }
+
   useEffect(() => {
     const checkAuthAndFetch = async () => {
-      // 1. Cek Sesi Login Kasir
       const { data: { session } } = await supabase.auth.getSession()
-
       if (!session) {
         window.location.href = '/kasir/login'
         return
       }
 
-      // 2. Cek Role Akun Kasir / Admin
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
@@ -36,18 +52,25 @@ export default function KasirDashboardPage() {
         return
       }
 
-      // 3. Jika Valid, Ambil Data Pesanan
       fetchOrders()
     }
 
     checkAuthAndFetch()
 
-    // Realtime Listener
+    // Realtime Listener & Play Bell Sound
     const channel = supabase
-      .channel('realtime-orders-kasir')
+      .channel('realtime-orders-kasir-feminine')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
+        { event: 'INSERT', schema: 'public', table: 'orders' },
+        () => {
+          playNotificationBell()
+          fetchOrders()
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
         () => {
           fetchOrders()
         }
@@ -75,7 +98,6 @@ export default function KasirDashboardPage() {
     fetchOrders()
   }
 
-  // Rekap Laporan Harian
   const isToday = (dateStr: string) => {
     const d = new Date(dateStr)
     const now = new Date()
@@ -87,80 +109,68 @@ export default function KasirDashboardPage() {
   const totalOmzetHariIni = todayCompleted.reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
   const totalPesananAktif = orders.filter((o) => o.status === 'pending' || o.status === 'diproses').length
 
-  // Filter Data Tab
   const filteredOrders = orders.filter((ord) => {
     if (activeTab === 'semua') return true
     return ord.status === activeTab
   })
 
-  const handlePrint = () => {
-    window.print()
-  }
-
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 font-sans pb-16">
-      {/* Top Bar Navigation */}
-      <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 font-sans pb-16 relative overflow-hidden">
+      {/* Visual Feminine Soft Glow Background */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Top Bar */}
+      <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-rose-900/30 relative z-10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-xl text-emerald-400 shadow-sm">
-            ☕
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-500 to-pink-400 p-0.5 shadow-lg shadow-rose-950/50">
+            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-xl text-rose-300">
+              🌸
+            </div>
           </div>
           <div>
-            <h1 className="text-lg font-black text-white flex items-center gap-2">
-              Kasir & Pos Warkop
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-rose-200 via-pink-300 to-purple-200 flex items-center gap-2">
+              Kasir Modern POS
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-400 animate-ping"></span>
             </h1>
-            <p className="text-[11px] text-slate-400">Dashboard Manajemen Operasional Realtime</p>
+            <p className="text-xs text-rose-300/60 font-medium">Manajemen Pesanan Realtime Warkop</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-          <Link
-            href="/kasir/menu"
-            className="px-3 py-2 bg-slate-900 border border-slate-800 hover:border-emerald-500/40 text-xs font-bold text-slate-300 hover:text-white rounded-xl active:scale-95 transition-all"
-          >
-            📋 Kelola Menu
+        <div className="flex items-center gap-2">
+          <Link href="/kasir/menu" className="px-4 py-2 bg-rose-950/40 border border-rose-800/40 text-xs font-bold text-rose-200 hover:bg-rose-900/40 rounded-2xl transition">
+            🌸 Kelola Menu
           </Link>
-          <Link
-            href="/kasir/meja"
-            className="px-3 py-2 bg-slate-900 border border-slate-800 hover:border-emerald-500/40 text-xs font-bold text-slate-300 hover:text-white rounded-xl active:scale-95 transition-all"
-          >
+          <Link href="/kasir/meja" className="px-4 py-2 bg-purple-950/40 border border-purple-800/40 text-xs font-bold text-purple-200 hover:bg-purple-900/40 rounded-2xl transition">
             🪑 Kelola Meja
           </Link>
-          <button
-            onClick={fetchOrders}
-            className="px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-xl active:scale-95 transition-all"
-          >
-            🔄 Refresh
+          <button onClick={fetchOrders} className="px-3 py-2 bg-pink-500/10 border border-pink-500/30 text-pink-300 text-xs font-bold rounded-2xl">
+            🔔 Bunyi Bel
           </button>
         </div>
       </div>
 
-      {/* Grid Ringkasan Laporan Harian */}
-      <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-        <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-3.5 rounded-2xl">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Omzet Hari Ini</p>
-          <p className="text-lg font-black text-emerald-400 mt-1">
-            Rp {totalOmzetHariIni.toLocaleString('id-ID')}
-          </p>
-          <p className="text-[10px] text-slate-500 mt-0.5">{todayCompleted.length} pesanan selesai</p>
+      {/* Omzet Cards */}
+      <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 relative z-10">
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-rose-500/20 p-4 rounded-3xl">
+          <p className="text-[10px] font-bold text-rose-300 uppercase tracking-wider">Omzet Hari Ini</p>
+          <p className="text-xl font-black text-rose-300 mt-1">Rp {totalOmzetHariIni.toLocaleString('id-ID')}</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">{todayCompleted.length} Pesanan Selesai</p>
         </div>
-
-        <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-3.5 rounded-2xl">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pesanan Aktif</p>
-          <p className="text-lg font-black text-amber-400 mt-1">{totalPesananAktif} Antrean</p>
-          <p className="text-[10px] text-slate-500 mt-0.5">Perlu diproses / diselesaikan</p>
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-pink-500/20 p-4 rounded-3xl">
+          <p className="text-[10px] font-bold text-pink-300 uppercase tracking-wider">Antrean Aktif</p>
+          <p className="text-xl font-black text-pink-300 mt-1">{totalPesananAktif} Pesanan</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">Perlu Diproses</p>
         </div>
-
-        <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-3.5 rounded-2xl">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Transaksi</p>
-          <p className="text-lg font-black text-blue-400 mt-1">{todayOrders.length} Pesanan</p>
-          <p className="text-[10px] text-slate-500 mt-0.5">Masuk hari ini</p>
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-purple-500/20 p-4 rounded-3xl">
+          <p className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Total Transaksi</p>
+          <p className="text-xl font-black text-purple-300 mt-1">{todayOrders.length} Pesanan</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">Masuk Hari Ini</p>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="max-w-5xl mx-auto flex gap-2 overflow-x-auto mt-6 pb-1 no-scrollbar">
+      <div className="max-w-5xl mx-auto flex gap-2 overflow-x-auto mt-6 pb-1 no-scrollbar relative z-10">
         {[
           { id: 'semua', label: 'Semua Status' },
           { id: 'pending', label: '⏳ Baru' },
@@ -171,10 +181,8 @@ export default function KasirDashboardPage() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 active:scale-95 ${
-              activeTab === tab.id
-                ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-white'
+            className={`px-4 py-2 rounded-2xl text-xs font-bold transition ${
+              activeTab === tab.id ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-slate-950 shadow-lg shadow-rose-950/40' : 'bg-slate-900 text-slate-400 border border-slate-800'
             }`}
           >
             {tab.label}
@@ -182,113 +190,57 @@ export default function KasirDashboardPage() {
         ))}
       </div>
 
-      {/* Daftar Pesanan Cards */}
-      <div className="max-w-5xl mx-auto mt-4">
+      {/* Orders Grid */}
+      <div className="max-w-5xl mx-auto mt-4 relative z-10">
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map((n) => (
-              <div key={n} className="h-44 bg-slate-900/60 rounded-2xl animate-pulse border border-slate-800/50" />
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((n) => <div key={n} className="h-44 bg-slate-900/50 rounded-3xl animate-pulse border border-slate-800" />)}
           </div>
         ) : filteredOrders.length === 0 ? (
-          <div className="p-12 text-center bg-slate-900/40 border border-slate-800/80 rounded-3xl max-w-md mx-auto my-8">
-            <span className="text-3xl block mb-2">📥</span>
-            <p className="text-xs font-bold text-slate-400">Tidak ada pesanan pada tab ini.</p>
-          </div>
+          <div className="p-12 text-center bg-slate-900/40 border border-slate-800 rounded-3xl text-xs text-slate-400">Tidak ada pesanan di tab ini.</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredOrders.map((ord) => (
-              <div
-                key={ord.id}
-                className="bg-slate-900/80 backdrop-blur-md border border-slate-800 hover:border-slate-700 p-4 rounded-2xl flex flex-col justify-between space-y-4 shadow-sm transition-all"
-              >
+              <div key={ord.id} className="bg-slate-900/80 backdrop-blur-xl border border-rose-900/30 p-4 rounded-3xl flex flex-col justify-between space-y-4">
                 <div>
-                  <div className="flex items-start justify-between pb-3 border-b border-slate-800">
+                  <div className="flex justify-between items-start pb-3 border-b border-slate-800">
                     <div>
-                      <span className="text-sm font-black text-emerald-400">
-                        Meja #{ord.tables?.nomor || '-'}
-                      </span>
-                      <p className="text-[11px] text-slate-300 font-bold mt-0.5">
-                        👤 {ord.nama_pemesan || 'Tamu'}
-                      </p>
-                      {ord.phone_pemesan && (
-                        <p className="text-[10px] text-slate-500 font-mono">📱 {ord.phone_pemesan}</p>
-                      )}
+                      <span className="text-sm font-black text-rose-300">Meja #{ord.tables?.nomor || '-'}</span>
+                      <p className="text-xs font-bold text-white mt-0.5">👤 {ord.nama_pemesan}</p>
                     </div>
-
-                    <div className="flex flex-col items-end gap-1">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                          ord.status === 'pending'
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                            : ord.status === 'diproses'
-                            ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
-                            : ord.status === 'selesai'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-red-500/10 text-red-400 border border-red-500/30'
-                        }`}
-                      >
-                        {ord.status}
-                      </span>
-                      <span className="text-[9px] text-slate-500">
-                        {new Date(ord.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
+                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${
+                      ord.status === 'pending' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                      ord.status === 'diproses' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' :
+                      ord.status === 'selesai' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300'
+                    }`}>{ord.status}</span>
                   </div>
 
                   <ul className="mt-3 space-y-1 text-xs text-slate-300">
                     {ord.order_items?.map((item: any) => (
-                      <li key={item.id} className="flex justify-between items-center">
-                        <span className="font-medium">
-                          <strong className="text-emerald-400 font-bold">{item.qty}x</strong> {item.menu_items?.nama || 'Menu'}
-                        </span>
-                        <span className="text-slate-500 text-[11px]">
-                          Rp {(item.harga_satuan * item.qty).toLocaleString('id-ID')}
-                        </span>
+                      <li key={item.id} className="flex justify-between">
+                        <span><strong className="text-pink-400">{item.qty}x</strong> {item.menu_items?.nama}</span>
+                        <span className="text-slate-500">Rp {(item.harga_satuan * item.qty).toLocaleString('id-ID')}</span>
                       </li>
                     ))}
                   </ul>
 
-                  <div className="mt-4 pt-2 border-t border-slate-800/80 flex justify-between items-center text-xs font-black">
-                    <span className="text-slate-400">Total Harga</span>
-                    <span className="text-emerald-400 text-sm">
-                      Rp {ord.total_harga?.toLocaleString('id-ID')}
-                    </span>
+                  <div className="mt-4 pt-2 border-t border-slate-800 flex justify-between text-xs font-black">
+                    <span className="text-slate-400">Total Pembayaran</span>
+                    <span className="text-rose-300 text-sm">Rp {ord.total_harga?.toLocaleString('id-ID')}</span>
                   </div>
                 </div>
 
                 <div className="pt-2 flex flex-col gap-2">
                   <div className="flex gap-1.5">
                     {ord.status === 'pending' && (
-                      <button
-                        onClick={() => updateStatus(ord.id, 'diproses')}
-                        className="flex-1 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black rounded-xl active:scale-95 transition-all shadow-md shadow-amber-500/20"
-                      >
-                        Proses Pesanan
-                      </button>
+                      <button onClick={() => updateStatus(ord.id, 'diproses')} className="flex-1 py-2 bg-amber-500 text-slate-950 text-xs font-black rounded-xl">Proses Pesanan</button>
                     )}
                     {ord.status === 'diproses' && (
-                      <button
-                        onClick={() => updateStatus(ord.id, 'selesai')}
-                        className="flex-1 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl active:scale-95 transition-all shadow-md shadow-emerald-500/20"
-                      >
-                        Selesaikan Pesanan
-                      </button>
+                      <button onClick={() => updateStatus(ord.id, 'selesai')} className="flex-1 py-2 bg-pink-500 text-slate-950 text-xs font-black rounded-xl">Selesaikan Pesanan</button>
                     )}
-                    <button
-                      onClick={() => updateStatus(ord.id, 'dibatalkan')}
-                      className="px-3 py-2 bg-slate-950 hover:bg-red-950/80 text-red-400 border border-slate-800 hover:border-red-800 text-xs font-bold rounded-xl active:scale-95 transition-all"
-                    >
-                      Batal
-                    </button>
+                    <button onClick={() => updateStatus(ord.id, 'dibatalkan')} className="px-3 py-2 bg-slate-950 text-red-400 border border-slate-800 text-xs font-bold rounded-xl">Batal</button>
                   </div>
-
-                  <button
-                    onClick={() => setSelectedOrderForPrint(ord)}
-                    className="w-full py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold rounded-xl active:scale-95 transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <span>🖨️</span> Cetak Struk / Nota
-                  </button>
+                  <button onClick={() => setSelectedOrderForPrint(ord)} className="w-full py-2 bg-slate-800 text-rose-200 text-xs font-bold rounded-xl border border-slate-700">🖨️ Cetak Struk</button>
                 </div>
               </div>
             ))}
@@ -296,72 +248,33 @@ export default function KasirDashboardPage() {
         )}
       </div>
 
-      {/* MODAL POP-UP CETAK STRUK */}
+      {/* Modal Struk */}
       {selectedOrderForPrint && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white text-slate-900 w-full max-w-sm rounded-2xl p-6 shadow-2xl space-y-4 print:shadow-none font-mono text-xs">
-            <div className="text-center space-y-1 pb-3 border-b border-dashed border-slate-300">
-              <h2 className="text-base font-bold tracking-tight">☕ WARUNG KOPI KITA</h2>
-              <p className="text-[10px] text-slate-500">Jl. Warkop No. 1 • Telp/WA: {selectedOrderForPrint.phone_pemesan || '0812-XXXX-XXXX'}</p>
-              <p className="text-[10px] text-slate-400 mt-1">
-                {new Date(selectedOrderForPrint.created_at).toLocaleString('id-ID')}
-              </p>
+          <div className="bg-white text-slate-900 w-full max-w-sm rounded-3xl p-6 font-mono text-xs space-y-3">
+            <div className="text-center pb-2 border-b border-dashed border-slate-300">
+              <h2 className="text-base font-bold">🌸 WARUNG KOPI KITA</h2>
+              <p className="text-[10px] text-slate-400">{new Date(selectedOrderForPrint.created_at).toLocaleString('id-ID')}</p>
             </div>
-
-            <div className="space-y-1 border-b border-dashed border-slate-300 pb-3">
-              <div className="flex justify-between">
-                <span>No. Meja:</span>
-                <span className="font-bold">Meja #{selectedOrderForPrint.tables?.nomor || '-'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Pelanggan:</span>
-                <span className="font-bold">{selectedOrderForPrint.nama_pemesan || 'Tamu'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Status:</span>
-                <span className="font-bold uppercase">{selectedOrderForPrint.status}</span>
-              </div>
+            <div className="space-y-1 border-b border-dashed border-slate-300 pb-2">
+              <p>Pelanggan: <strong>{selectedOrderForPrint.nama_pemesan}</strong></p>
+              <p>Meja: <strong>#{selectedOrderForPrint.tables?.nomor}</strong></p>
             </div>
-
-            <div className="space-y-2 border-b border-dashed border-slate-300 pb-3">
-              {selectedOrderForPrint.order_items?.map((item: any) => (
-                <div key={item.id} className="flex justify-between">
-                  <div>
-                    <p className="font-bold">{item.menu_items?.nama}</p>
-                    <p className="text-[10px] text-slate-500">
-                      {item.qty} x Rp {item.harga_satuan?.toLocaleString('id-ID')}
-                    </p>
-                  </div>
-                  <span className="font-bold">
-                    Rp {(item.harga_satuan * item.qty).toLocaleString('id-ID')}
-                  </span>
+            <div className="space-y-1 border-b border-dashed border-slate-300 pb-2">
+              {selectedOrderForPrint.order_items?.map((it: any) => (
+                <div key={it.id} className="flex justify-between">
+                  <span>{it.qty}x {it.menu_items?.nama}</span>
+                  <span>Rp {(it.harga_satuan * it.qty).toLocaleString('id-ID')}</span>
                 </div>
               ))}
             </div>
-
-            <div className="flex justify-between text-sm font-bold pt-1">
+            <div className="flex justify-between text-sm font-bold">
               <span>TOTAL:</span>
               <span>Rp {selectedOrderForPrint.total_harga?.toLocaleString('id-ID')}</span>
             </div>
-
-            <div className="text-center pt-2 text-[10px] text-slate-400">
-              <p>Terima kasih atas kunjungan Anda! 🙏</p>
-              <p>Selamat menikmati santapan warkop kami.</p>
-            </div>
-
-            <div className="pt-3 flex gap-2 print:hidden">
-              <button
-                onClick={handlePrint}
-                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-sans text-xs font-bold rounded-xl transition"
-              >
-                🖨️ Cetak Nota
-              </button>
-              <button
-                onClick={() => setSelectedOrderForPrint(null)}
-                className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-sans text-xs font-bold rounded-xl transition"
-              >
-                Tutup
-              </button>
+            <div className="flex gap-2 pt-2 print:hidden font-sans">
+              <button onClick={() => window.print()} className="flex-1 py-2.5 bg-rose-600 text-white font-bold rounded-xl">🖨️ Cetak</button>
+              <button onClick={() => setSelectedOrderForPrint(null)} className="px-4 py-2.5 bg-slate-200 text-slate-800 font-bold rounded-xl">Tutup</button>
             </div>
           </div>
         </div>
