@@ -12,9 +12,11 @@ function OrderContent() {
   const router = useRouter()
   const supabase = createClient()
 
-  // Tab Active: 'menu' | 'status' | 'game' | 'profile'
+  // Tab Active
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'game' | 'profile'>('menu')
+  const [selectedGame, setSelectedGame] = useState<number>(1)
 
+  // Data State
   const [menuItems, setMenuItems] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [cart, setCart] = useState<{ [key: string]: number }>({})
@@ -26,45 +28,135 @@ function OrderContent() {
 
   // Status & Profile Data
   const [myOrders, setMyOrders] = useState<any[]>([])
-  const [userData, setUserData] = useState<{ name: string; phone: string; email: string }>({
+  const [userData, setUserData] = useState<{ name: string; phone: string; email: string; avatarUrl: string }>({
     name: 'Tamu',
     phone: '',
     email: '',
+    avatarUrl: '',
   })
+  const [editingName, setEditingName] = useState('')
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
 
-  // Game Tic-Tac-Toe State
-  const [board, setBoard] = useState(Array(9).fill(null))
-  const [isXNext, setIsXNext] = useState(true)
+  // Sound Options State (1: Bel Biasa, 2: Bel 10s Loop, 3: Voice Selesai, 4: Voice Selesai Loop)
+  const [soundOption, setSoundOption] = useState<number>(1)
+
+  // Games State
+  // Game 1: Tic Tac Toe
+  const [tttBoard, setTttBoard] = useState(Array(9).fill(null))
+  const [tttIsX, setTttIsX] = useState(true)
+
+  // Game 2: Tebak Angka
+  const [guessTarget, setGuessTarget] = useState(Math.floor(Math.random() * 20) + 1)
+  const [guessInput, setGuessInput] = useState('')
+  const [guessMsg, setGuessMsg] = useState('Tebak angka 1 - 20!')
+
+  // Game 3: RPS
+  const [rpsResult, setRpsResult] = useState('Pilih salah satu!')
+
+  // Game 4: Memory Cards
+  const initialCards = ['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5)
+  const [cards, setCards] = useState(initialCards)
+  const [flipped, setFlipped] = useState<number[]>([])
+  const [matched, setMatched] = useState<number[]>([])
+
+  // Game 5: Clicker Speed Test
+  const [clicks, setClicks] = useState(0)
+
+  // --- TTS & AUDIO HELPER ---
+  const speakText = (text: string, loop: boolean = false) => {
+    if (!('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'id-ID'
+    utterance.pitch = 1
+    utterance.rate = 1
+    if (loop) {
+      utterance.onend = () => {
+        window.speechSynthesis.speak(utterance)
+      }
+    }
+    window.speechSynthesis.speak(utterance)
+  }
+
+  const playBellSound = (loop: boolean = false) => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const playTone = () => {
+        const osc = audioCtx.createOscillator()
+        const gain = audioCtx.createGain()
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime)
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1)
+        osc.connect(gain)
+        gain.connect(audioCtx.destination)
+        osc.start()
+        osc.stop(audioCtx.currentTime + 1)
+      }
+      playTone()
+      if (loop) {
+        const interval = setInterval(playTone, 10000)
+        setTimeout(() => clearInterval(interval), 30000)
+      }
+    } catch (e) {
+      console.log(e)
+    }
+  }
+
+  const triggerSoundByOption = (opt: number, forceProcess: boolean = false) => {
+    if (forceProcess) {
+      playBellSound(false)
+      return
+    }
+    if (opt === 1) playBellSound(false)
+    if (opt === 2) playBellSound(true)
+    if (opt === 3) speakText('Pesanan anda sudah selesai', false)
+    if (opt === 4) speakText('Pesanan anda sudah selesai', true)
+  }
 
   useEffect(() => {
     initData()
     loadUserProfile()
 
-    // Realtime Listener untuk Status Pesanan Pelanggan
+    // Realtime Listener
     const channel = supabase
       .channel('my-orders-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        fetchMyOrders()
-      })
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders' },
+        (payload: any) => {
+          if (payload.new && payload.new.nama_pemesan === userData.name) {
+            if (payload.new.status === 'diproses') {
+              triggerSoundByOption(soundOption, true)
+            } else if (payload.new.status === 'selesai') {
+              triggerSoundByOption(soundOption, false)
+            }
+            fetchMyOrders()
+          }
+        }
+      )
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [userData.name, soundOption])
 
   const loadUserProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession()
     if (session) {
-      const name = session.user.user_metadata?.full_name || localStorage.getItem('customer_name') || 'Pelanggan Warkop'
+      const name = session.user.user_metadata?.full_name || localStorage.getItem('customer_name') || 'Pelanggan'
       const phone = session.user.user_metadata?.phone || localStorage.getItem('customer_phone') || '-'
       const email = session.user.email || ''
-      setUserData({ name, phone, email })
+      const avatarUrl = session.user.user_metadata?.avatar_url || ''
+      setUserData({ name, phone, email, avatarUrl })
+      setEditingName(name)
       fetchMyOrders(name)
     } else {
       const name = localStorage.getItem('customer_name') || 'Tamu'
       const phone = localStorage.getItem('customer_phone') || '-'
-      setUserData({ name, phone, email: '-' })
+      setUserData({ name, phone, email: '-', avatarUrl: '' })
+      setEditingName(name)
       fetchMyOrders(name)
     }
   }
@@ -169,27 +261,47 @@ function OrderContent() {
     }
   }
 
+  // Panggil Kasir Manual
+  const handleNudgeKasir = async () => {
+    playBellSound(false)
+    alert('🔔 Memanggil kasir! Notifikasi bel panggil dikirim ke kasir.')
+  }
+
+  // Update Profil
+  const handleSaveProfile = async () => {
+    try {
+      let avatarUrl = userData.avatarUrl
+
+      if (avatarFile) {
+        const fileExt = avatarFile.name.split('.').pop()
+        const fileName = `${Date.now()}.${fileExt}`
+        const filePath = `avatars/${fileName}`
+        await supabase.storage.from('menu-images').upload(filePath, avatarFile)
+        const { data } = supabase.storage.from('menu-images').getPublicUrl(filePath)
+        avatarUrl = data.publicUrl
+      }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        await supabase.auth.updateUser({
+          data: { full_name: editingName, avatar_url: avatarUrl },
+        })
+      }
+
+      localStorage.setItem('customer_name', editingName)
+      setUserData((prev) => ({ ...prev, name: editingName, avatarUrl }))
+      alert('Profil berhasil diperbarui!')
+    } catch (e: any) {
+      alert(e.message)
+    }
+  }
+
   const handleLogout = async () => {
+    window.speechSynthesis.cancel()
     await supabase.auth.signOut()
     localStorage.clear()
     router.push('/')
   }
-
-  // Tic-Tac-Toe Game Logic
-  const handleGameClick = (index: number) => {
-    if (board[index] || calculateWinner(board)) return
-    const newBoard = [...board]
-    newBoard[index] = isXNext ? '❌' : '⭕'
-    setBoard(newBoard)
-    setIsXNext(!isXNext)
-  }
-
-  const resetGame = () => {
-    setBoard(Array(9).fill(null))
-    setIsXNext(true)
-  }
-
-  const winner = calculateWinner(board)
 
   const filteredMenuItems = activeCategory === 'all' 
     ? menuItems 
@@ -224,10 +336,9 @@ function OrderContent() {
       {/* Main Container Content */}
       <div className="max-w-md mx-auto p-4">
         
-        {/* --- TAB MENU KATALOG --- */}
+        {/* TAB 1: MENU KATALOG */}
         {activeNav === 'menu' && (
           <div className="space-y-4">
-            {/* Category Filter */}
             <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
               <button
                 onClick={() => setActiveCategory('all')}
@@ -250,7 +361,6 @@ function OrderContent() {
               ))}
             </div>
 
-            {/* Menu List */}
             {loading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map((n) => (
@@ -292,10 +402,36 @@ function OrderContent() {
           </div>
         )}
 
-        {/* --- TAB STATUS PESANAN --- */}
+        {/* TAB 2: STATUS PESANAN & NOTIFIKASI SUARA */}
         {activeNav === 'status' && (
           <div className="space-y-4">
-            <h2 className="text-base font-bold text-white flex items-center gap-2"><span>📡</span> Status Pesanan Kamu</h2>
+            {/* Setting Nada Dering */}
+            <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-2">
+              <label className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                <span>🔊</span> Pilih Nada Dering Selesai:
+              </label>
+              <select
+                value={soundOption}
+                onChange={(e) => setSoundOption(Number(e.target.value))}
+                className="w-full bg-slate-950 border border-slate-800 text-xs text-white p-2.5 rounded-xl focus:outline-none"
+              >
+                <option value={1}>1. Bel Biasa</option>
+                <option value={2}>2. Bel Berulang 10 Detik</option>
+                <option value={3}>3. "Pesanan anda sudah selesai"</option>
+                <option value={4}>4. "Pesanan anda sudah selesai" (Berulang)</option>
+              </select>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <h2 className="text-base font-bold text-white flex items-center gap-2"><span>📡</span> Status Pesanan Kamu</h2>
+              <button
+                onClick={handleNudgeKasir}
+                className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold rounded-xl active:scale-95"
+              >
+                🔔 Panggil Kasir
+              </button>
+            </div>
+
             {myOrders.length === 0 ? (
               <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-2xl text-xs text-slate-400">Belum ada pesanan aktif saat ini.</div>
             ) : (
@@ -334,58 +470,187 @@ function OrderContent() {
           </div>
         )}
 
-        {/* --- TAB MINI GAME ANTI-BOSAN --- */}
+        {/* TAB 3: 5 GAME ANTI-BOSAN */}
         {activeNav === 'game' && (
           <div className="space-y-4 text-center">
-            <h2 className="text-base font-bold text-white">🎮 Game Anti-Bosan (Tic-Tac-Toe)</h2>
-            <p className="text-xs text-slate-400">Main sejenak sambil menunggu racikan kopimu diantar!</p>
-
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl inline-block max-w-xs w-full">
-              <div className="grid grid-cols-3 gap-2">
-                {board.map((cell, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleGameClick(idx)}
-                    className="h-20 bg-slate-950 border border-slate-800 text-2xl font-black rounded-xl hover:bg-slate-800 flex items-center justify-center transition"
-                  >
-                    {cell}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-4 flex justify-between items-center text-xs font-bold">
-                <span className="text-emerald-400">{winner ? `Pemenang: ${winner}` : `Giliran: ${isXNext ? '❌' : '⭕'}`}</span>
-                <button onClick={resetGame} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg">Reset Game</button>
-              </div>
+            <h2 className="text-base font-bold text-white">🎮 Arena Game Anti-Bosan</h2>
+            
+            {/* Game Selector Tab */}
+            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+              {[
+                { id: 1, name: '❌⭕ TicTacToe' },
+                { id: 2, name: '🔢 Tebak Angka' },
+                { id: 3, name: '✂️ Su-Wit' },
+                { id: 4, name: '🃏 Memory Card' },
+                { id: 5, name: '⚡ Clicker Speed' },
+              ].map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => setSelectedGame(g.id)}
+                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap ${selectedGame === g.id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 border border-slate-800 text-slate-400'}`}
+                >
+                  {g.name}
+                </button>
+              ))}
             </div>
+
+            {/* Game 1: Tic Tac Toe */}
+            {selectedGame === 1 && (
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl inline-block max-w-xs w-full">
+                <div className="grid grid-cols-3 gap-2">
+                  {tttBoard.map((cell, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        if (cell || calculateWinner(tttBoard)) return
+                        const next = [...tttBoard]
+                        next[idx] = tttIsX ? '❌' : '⭕'
+                        setTttBoard(next)
+                        setTttIsX(!tttIsX)
+                      }}
+                      className="h-20 bg-slate-950 border border-slate-800 text-2xl font-black rounded-xl hover:bg-slate-800 flex items-center justify-center"
+                    >
+                      {cell}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => { setTttBoard(Array(9).fill(null)); setTttIsX(true); }} className="mt-4 px-4 py-2 bg-slate-800 text-xs font-bold text-white rounded-xl">Reset Game</button>
+              </div>
+            )}
+
+            {/* Game 2: Tebak Angka */}
+            {selectedGame === 2 && (
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">{guessMsg}</p>
+                <input
+                  type="number"
+                  value={guessInput}
+                  onChange={(e) => setGuessInput(e.target.value)}
+                  placeholder="Masukkan angka (1-20)"
+                  className="w-full p-2.5 bg-slate-950 border border-slate-800 text-center text-xs font-bold rounded-xl"
+                />
+                <button
+                  onClick={() => {
+                    const num = parseInt(guessInput)
+                    if (num === guessTarget) setGuessMsg('🎉 BENAR KAN! Kamu menang!')
+                    else if (num < guessTarget) setGuessMsg('Too low! Angka lebih besar.')
+                    else setGuessMsg('Too high! Angka lebih kecil.')
+                  }}
+                  className="w-full py-2 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl"
+                >
+                  Tebak!
+                </button>
+              </div>
+            )}
+
+            {/* Game 3: Su-wit (RPS) */}
+            {selectedGame === 3 && (
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4">
+                <p className="text-xs font-bold text-emerald-400">{rpsResult}</p>
+                <div className="flex justify-center gap-3">
+                  {['✊ Batu', '✋ Kertas', '✌️ Gunting'].map((choice, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        const bot = ['✊ Batu', '✋ Kertas', '✌️ Gunting'][Math.floor(Math.random() * 3)]
+                        if (choice === bot) setRpsResult(`Seri! Bot pilih ${bot}`)
+                        else setRpsResult(`Kamu: ${choice} vs Bot: ${bot}`)
+                      }}
+                      className="px-3 py-2 bg-slate-950 border border-slate-800 text-xs font-bold rounded-xl"
+                    >
+                      {choice}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Game 4: Memory Cards */}
+            {selectedGame === 4 && (
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-3">
+                <div className="grid grid-cols-4 gap-2">
+                  {cards.map((card, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        if (flipped.length < 2 && !flipped.includes(idx)) {
+                          const nextFlipped = [...flipped, idx]
+                          setFlipped(nextFlipped)
+                          if (nextFlipped.length === 2) {
+                            if (cards[nextFlipped[0]] === cards[nextFlipped[1]]) {
+                              setMatched((m) => [...m, nextFlipped[0], nextFlipped[1]])
+                            }
+                            setTimeout(() => setFlipped([]), 800)
+                          }
+                        }
+                      }}
+                      className="h-16 bg-slate-950 border border-slate-800 text-xl font-bold rounded-xl"
+                    >
+                      {flipped.includes(idx) || matched.includes(idx) ? card : '❓'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Game 5: Clicker Speed */}
+            {selectedGame === 5 && (
+              <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">Total Klik Kamu: {clicks}</p>
+                <button
+                  onClick={() => setClicks(clicks + 1)}
+                  className="w-full py-8 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xl rounded-2xl active:scale-95 transition"
+                >
+                  ⚡ KLIK SECEPAT MUNGKIN!
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        {/* --- TAB PROFIL PELANGGAN --- */}
+        {/* TAB 4: PROFIL PELANGGAN (EDIT NAMA & FOTO) */}
         {activeNav === 'profile' && (
           <div className="space-y-4">
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl text-center space-y-3">
-              <div className="w-20 h-20 bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400 rounded-full flex items-center justify-center text-3xl mx-auto shadow-lg shadow-emerald-950/50">
-                👤
-              </div>
-              <div>
-                <h2 className="text-lg font-black text-white">{userData.name}</h2>
-                <p className="text-xs text-slate-400 font-mono mt-0.5">{userData.phone}</p>
-                {userData.email !== '-' && <p className="text-[11px] text-slate-500">{userData.email}</p>}
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4 text-center">
+              {/* Foto Profil */}
+              <div className="relative w-24 h-24 mx-auto">
+                <div className="w-full h-full rounded-full overflow-hidden bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center text-3xl">
+                  {userData.avatarUrl ? (
+                    <img src={userData.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    '👤'
+                  )}
+                </div>
               </div>
 
-              {/* Statistik Pemesanan */}
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-800 text-left">
-                <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800/80">
-                  <p className="text-[10px] text-slate-500 font-bold uppercase">Total Pesanan</p>
-                  <p className="text-lg font-black text-emerald-400">{myOrders.length} Kali</p>
+              {/* Form Upload Foto & Edit Nama */}
+              <div className="space-y-3 text-left">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Ubah Foto Profil</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+                    className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-xl file:border-0 file:bg-emerald-950 file:text-emerald-300"
+                  />
                 </div>
-                <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800/80">
-                  <p className="text-[10px] text-slate-500 font-bold uppercase">Pemesanan Terakhir</p>
-                  <p className="text-xs font-bold text-slate-300 mt-1">
-                    {myOrders.length > 0 ? new Date(myOrders[0].created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}
-                  </p>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Ganti Nama Pelanggan</label>
+                  <input
+                    type="text"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs font-bold text-white rounded-xl focus:outline-none focus:border-emerald-500"
+                  />
                 </div>
+
+                <button
+                  onClick={handleSaveProfile}
+                  className="w-full py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl active:scale-95 transition"
+                >
+                  💾 Simpan Perubahan Profil
+                </button>
               </div>
 
               <button
@@ -399,7 +664,7 @@ function OrderContent() {
         )}
       </div>
 
-      {/* Floating Bottom Cart Bar (Only on Menu Tab) */}
+      {/* Floating Bottom Cart Bar */}
       {activeNav === 'menu' && Object.keys(cart).length > 0 && (
         <div className="fixed bottom-20 left-4 right-4 max-w-md mx-auto z-30">
           <div className="bg-slate-900/90 backdrop-blur-xl border border-emerald-500/40 p-3.5 rounded-2xl shadow-2xl flex items-center justify-between">
