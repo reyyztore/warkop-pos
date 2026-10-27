@@ -1,9 +1,6 @@
-export const dynamic = 'force-dynamic'
+'use client'
 
-'use client'
-import { useState } from 'react'
-// ... sisa kode di bawahnya biarkan tetap sama
-'use client'
+export const dynamic = 'force-dynamic'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -39,7 +36,6 @@ export default function EntryPage() {
 
       if (error) throw error
 
-      // Simpan nama di localStorage untuk akses cepat
       localStorage.setItem('customer_name', nama.trim())
       router.push('/meja')
     } catch (err: any) {
