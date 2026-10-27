@@ -12,9 +12,13 @@ function OrderContent() {
   const router = useRouter()
   const supabase = createClient()
 
-  // Tab Active
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'game' | 'profile'>('menu')
   const [selectedGame, setSelectedGame] = useState<number>(1)
+
+  // Data Store & Kasir
+  const [storeName, setStoreName] = useState('Warung Kopi Kita')
+  const [storeAvatar, setStoreAvatar] = useState('')
+  const [qrisUrl, setQrisUrl] = useState('')
 
   // Data State
   const [menuItems, setMenuItems] = useState<any[]>([])
@@ -25,6 +29,8 @@ function OrderContent() {
   const [activeCategory, setActiveCategory] = useState<string>('all')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [selectedPayment, setSelectedPayment] = useState<'qris' | 'kasir'>('kasir')
+  const [showQrisModal, setShowQrisModal] = useState(false)
 
   // Status & Profile Data
   const [myOrders, setMyOrders] = useState<any[]>([])
@@ -36,45 +42,49 @@ function OrderContent() {
   })
   const [editingName, setEditingName] = useState('')
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
-
-  // Sound Options State (1: Bel Biasa, 2: Bel 10s Loop, 3: Voice Selesai, 4: Voice Selesai Loop)
   const [soundOption, setSoundOption] = useState<number>(1)
 
-  // Games State
-  // Game 1: Tic Tac Toe
+  // --- 10 GAMES STATES ---
   const [tttBoard, setTttBoard] = useState(Array(9).fill(null))
   const [tttIsX, setTttIsX] = useState(true)
 
-  // Game 2: Tebak Angka
   const [guessTarget, setGuessTarget] = useState(Math.floor(Math.random() * 20) + 1)
   const [guessInput, setGuessInput] = useState('')
   const [guessMsg, setGuessMsg] = useState('Tebak angka 1 - 20!')
 
-  // Game 3: RPS
   const [rpsResult, setRpsResult] = useState('Pilih salah satu!')
 
-  // Game 4: Memory Cards
-  const initialCards = ['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5)
-  const [cards, setCards] = useState(initialCards)
+  const [cards, setCards] = useState(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5))
   const [flipped, setFlipped] = useState<number[]>([])
   const [matched, setMatched] = useState<number[]>([])
 
-  // Game 5: Clicker Speed Test
   const [clicks, setClicks] = useState(0)
 
-  // --- TTS & AUDIO HELPER ---
+  const [mathA, setMathA] = useState(Math.floor(Math.random() * 10) + 1)
+  const [mathB, setMathB] = useState(Math.floor(Math.random() * 10) + 1)
+  const [mathAns, setMathAns] = useState('')
+  const [mathMsg, setMathMsg] = useState('Jawab pertanyaan matematika!')
+
+  const [coinResult, setCoinResult] = useState('Tekan tombol untuk lempar koin!')
+
+  const [colorTarget, setColorTarget] = useState('#EF4444')
+  const [colorMsg, setColorMsg] = useState('Pilih warna yang sesuai!')
+
+  const [scrambleWord] = useState('WARKOP')
+  const [scrambleInput, setScrambleInput] = useState('')
+  const [scrambleMsg, setScrambleMsg] = useState('Susun kata: A K R P O W')
+
+  const [reactState, setReactState] = useState<'idle' | 'waiting' | 'ready'>('idle')
+  const [reactTime, setReactTime] = useState<number | null>(null)
+  const [startTime, setStartTime] = useState<number>(0)
+
+  // --- AUDIO HELPER ---
   const speakText = (text: string, loop: boolean = false) => {
     if (!('speechSynthesis' in window)) return
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = 'id-ID'
-    utterance.pitch = 1
-    utterance.rate = 1
-    if (loop) {
-      utterance.onend = () => {
-        window.speechSynthesis.speak(utterance)
-      }
-    }
+    if (loop) utterance.onend = () => window.speechSynthesis.speak(utterance)
     window.speechSynthesis.speak(utterance)
   }
 
@@ -103,11 +113,7 @@ function OrderContent() {
     }
   }
 
-  const triggerSoundByOption = (opt: number, forceProcess: boolean = false) => {
-    if (forceProcess) {
-      playBellSound(false)
-      return
-    }
+  const triggerSoundByOption = (opt: number) => {
     if (opt === 1) playBellSound(false)
     if (opt === 2) playBellSound(true)
     if (opt === 3) speakText('Pesanan anda sudah selesai', false)
@@ -117,30 +123,40 @@ function OrderContent() {
   useEffect(() => {
     initData()
     loadUserProfile()
+    fetchStoreConfig()
 
-    // Realtime Listener
+    // Realtime Listener Bel Spesifik Meja
     const channel = supabase
-      .channel('my-orders-channel')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders' },
-        (payload: any) => {
-          if (payload.new && payload.new.nama_pemesan === userData.name) {
-            if (payload.new.status === 'diproses') {
-              triggerSoundByOption(soundOption, true)
-            } else if (payload.new.status === 'selesai') {
-              triggerSoundByOption(soundOption, false)
-            }
-            fetchMyOrders()
-          }
+      .channel('meja-realtime-channel')
+      .on('broadcast', { event: 'ring-table-bell' }, (payload: any) => {
+        if (payload.payload?.tableNo?.toString() === selectedTable?.toString()) {
+          triggerSoundByOption(soundOption)
+          alert(`🔔 Kasir memanggil Meja #${selectedTable}! Pesanan kamu sedang disiapkan/selesai.`)
         }
-      )
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload: any) => {
+        if (payload.new && payload.new.nama_pemesan === userData.name) {
+          if (payload.new.status === 'selesai') {
+            triggerSoundByOption(soundOption)
+          }
+          fetchMyOrders()
+        }
+      })
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [userData.name, soundOption])
+  }, [selectedTable, soundOption, userData.name])
+
+  const fetchStoreConfig = async () => {
+    const { data } = await supabase.from('profiles').select('store_name, avatar_url, qris_url').eq('role', 'cashier').limit(1).single()
+    if (data) {
+      if (data.store_name) setStoreName(data.store_name)
+      if (data.avatar_url) setStoreAvatar(data.avatar_url)
+      if (data.qris_url) setQrisUrl(data.qris_url)
+    }
+  }
 
   const loadUserProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -218,6 +234,11 @@ function OrderContent() {
       return
     }
 
+    if (selectedPayment === 'qris' && !qrisUrl) {
+      alert('Kasir belum mengupload gambar QRIS. Silakan pilih Bayar di Kasir.')
+      setSelectedPayment('kasir')
+    }
+
     setSubmitting(true)
     try {
       const targetTable = tables.find((t) => t.nomor.toString() === selectedTable.toString())
@@ -231,6 +252,8 @@ function OrderContent() {
           phone_pemesan: userData.phone,
           total_harga: getTotalHarga(),
           status: 'pending',
+          metode_pembayaran: selectedPayment,
+          is_paid: false,
         })
         .select()
         .single()
@@ -250,7 +273,12 @@ function OrderContent() {
       const { error: itemsErr } = await supabase.from('order_items').insert(orderItems)
       if (itemsErr) throw itemsErr
 
-      alert('🚀 Pesanan berhasil dikirim ke kasir!')
+      if (selectedPayment === 'qris') {
+        setShowQrisModal(true)
+      } else {
+        alert('🚀 Pesanan berhasil dikirim ke kasir! Silakan lakukan pembayaran di kasir.')
+      }
+
       setCart({})
       setActiveNav('status')
       fetchMyOrders()
@@ -261,17 +289,20 @@ function OrderContent() {
     }
   }
 
-  // Panggil Kasir Manual
+  // Panggil Kasir dari Pelanggan
   const handleNudgeKasir = async () => {
     playBellSound(false)
-    alert('🔔 Memanggil kasir! Notifikasi bel panggil dikirim ke kasir.')
+    await supabase.channel('meja-realtime-channel').send({
+      type: 'broadcast',
+      event: 'customer-ring-bell',
+      payload: { tableNo: selectedTable || '??', customerName: userData.name },
+    })
+    alert(`🔔 Bel meja #${selectedTable} berhasil dibunyikan ke Kasir!`)
   }
 
-  // Update Profil
   const handleSaveProfile = async () => {
     try {
       let avatarUrl = userData.avatarUrl
-
       if (avatarFile) {
         const fileExt = avatarFile.name.split('.').pop()
         const fileName = `${Date.now()}.${fileExt}`
@@ -309,12 +340,17 @@ function OrderContent() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 pb-28 font-sans">
-      {/* Top Header */}
+      {/* Top Header dengan Foto Profil Kasir & Nama Warkop */}
       <div className="sticky top-0 z-20 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80 p-4">
         <div className="max-w-md mx-auto flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-bold tracking-wider text-emerald-400 uppercase">Warkop Digital</span>
-            <h1 className="text-xl font-extrabold text-white flex items-center gap-2">☕ Warung Kopi Kita</h1>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full overflow-hidden bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-lg shrink-0">
+              {storeAvatar ? <img src={storeAvatar} alt="Logo" className="w-full h-full object-cover" /> : '☕'}
+            </div>
+            <div>
+              <span className="text-[9px] font-bold tracking-wider text-emerald-400 uppercase">Warkop POS</span>
+              <h1 className="text-base font-extrabold text-white line-clamp-1">{storeName}</h1>
+            </div>
           </div>
 
           <div className="relative">
@@ -402,13 +438,12 @@ function OrderContent() {
           </div>
         )}
 
-        {/* TAB 2: STATUS PESANAN & NOTIFIKASI SUARA */}
+        {/* TAB 2: STATUS PESANAN & BEL */}
         {activeNav === 'status' && (
           <div className="space-y-4">
-            {/* Setting Nada Dering */}
             <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-2">
               <label className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                <span>🔊</span> Pilih Nada Dering Selesai:
+                <span>🔊</span> Pilihan Nada Dering Selesai:
               </label>
               <select
                 value={soundOption}
@@ -422,15 +457,17 @@ function OrderContent() {
               </select>
             </div>
 
-            <div className="flex justify-between items-center">
-              <h2 className="text-base font-bold text-white flex items-center gap-2"><span>📡</span> Status Pesanan Kamu</h2>
+            <div className="bg-emerald-950/40 border border-emerald-500/30 p-3.5 rounded-2xl text-center space-y-1">
+              <p className="text-xs font-bold text-emerald-300">🔔 Jika pesanan belum diproses, pencetlah bel di bawah!</p>
               <button
                 onClick={handleNudgeKasir}
-                className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold rounded-xl active:scale-95"
+                className="px-4 py-2 bg-amber-500 text-slate-950 text-xs font-black rounded-xl active:scale-95 transition mt-1 shadow-lg shadow-amber-500/20"
               >
-                🔔 Panggil Kasir
+                🔔 Pencet Bel Panggil Kasir
               </button>
             </div>
+
+            <h2 className="text-base font-bold text-white flex items-center gap-2"><span>📡</span> Status Pesanan Kamu</h2>
 
             {myOrders.length === 0 ? (
               <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-2xl text-xs text-slate-400">Belum ada pesanan aktif saat ini.</div>
@@ -442,13 +479,18 @@ function OrderContent() {
                       <span className="text-xs font-bold text-emerald-400">Meja #{ord.tables?.nomor || '-'}</span>
                       <p className="text-[10px] text-slate-500">{new Date(ord.created_at).toLocaleString('id-ID')}</p>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                      ord.status === 'pending' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-                      ord.status === 'diproses' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
-                      ord.status === 'selesai' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400'
-                    }`}>
-                      {ord.status === 'pending' ? '⏳ Menunggu Kasir' : ord.status === 'diproses' ? '🍳 Sedang Dibuat' : ord.status === 'selesai' ? '✅ Pesanan Selesai' : '❌ Dibatalkan'}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                        ord.status === 'pending' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                        ord.status === 'diproses' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                        ord.status === 'selesai' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {ord.status === 'pending' ? '⏳ Menunggu Kasir' : ord.status === 'diproses' ? '🍳 Sedang Dibuat' : ord.status === 'selesai' ? '✅ Pesanan Selesai' : '❌ Dibatalkan'}
+                      </span>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md ${ord.is_paid ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'}`}>
+                        {ord.is_paid ? 'Lunas (QRIS/Kasir)' : `Belum Bayar (${ord.metode_pembayaran?.toUpperCase()})`}
+                      </span>
+                    </div>
                   </div>
 
                   <ul className="divide-y divide-slate-800/60 text-xs text-slate-300 pt-1">
@@ -470,19 +512,24 @@ function OrderContent() {
           </div>
         )}
 
-        {/* TAB 3: 5 GAME ANTI-BOSAN */}
+        {/* TAB 3: 10 MINI GAMES DENGAN TOMBOL RESET */}
         {activeNav === 'game' && (
           <div className="space-y-4 text-center">
-            <h2 className="text-base font-bold text-white">🎮 Arena Game Anti-Bosan</h2>
+            <h2 className="text-base font-bold text-white">🎮 Arena 10 Mini Games Anti-Bosan</h2>
             
-            {/* Game Selector Tab */}
-            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+            {/* Game Selector */}
+            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[11px]">
               {[
-                { id: 1, name: '❌⭕ TicTacToe' },
-                { id: 2, name: '🔢 Tebak Angka' },
-                { id: 3, name: '✂️ Su-Wit' },
-                { id: 4, name: '🃏 Memory Card' },
-                { id: 5, name: '⚡ Clicker Speed' },
+                { id: 1, name: '1. TicTacToe' },
+                { id: 2, name: '2. Tebak Angka' },
+                { id: 3, name: '3. Su-Wit' },
+                { id: 4, name: '4. Memory Card' },
+                { id: 5, name: '5. Clicker Speed' },
+                { id: 6, name: '6. Math Quiz' },
+                { id: 7, name: '7. Color Guess' },
+                { id: 8, name: '8. Lempar Koin' },
+                { id: 9, name: '9. Acak Kata' },
+                { id: 10, name: '10. Tes Reaksi' },
               ].map((g) => (
                 <button
                   key={g.id}
@@ -494,9 +541,9 @@ function OrderContent() {
               ))}
             </div>
 
-            {/* Game 1: Tic Tac Toe */}
+            {/* Game 1: TicTacToe */}
             {selectedGame === 1 && (
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl inline-block max-w-xs w-full">
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl inline-block max-w-xs w-full">
                 <div className="grid grid-cols-3 gap-2">
                   {tttBoard.map((cell, idx) => (
                     <button
@@ -508,192 +555,240 @@ function OrderContent() {
                         setTttBoard(next)
                         setTttIsX(!tttIsX)
                       }}
-                      className="h-20 bg-slate-950 border border-slate-800 text-2xl font-black rounded-xl hover:bg-slate-800 flex items-center justify-center"
+                      className="h-16 bg-slate-950 border border-slate-800 text-xl font-black rounded-xl"
                     >
                       {cell}
                     </button>
                   ))}
                 </div>
-                <button onClick={() => { setTttBoard(Array(9).fill(null)); setTttIsX(true); }} className="mt-4 px-4 py-2 bg-slate-800 text-xs font-bold text-white rounded-xl">Reset Game</button>
+                <button onClick={() => { setTttBoard(Array(9).fill(null)); setTttIsX(true); }} className="mt-4 px-4 py-2 bg-slate-800 text-xs font-bold text-white rounded-xl">🔄 Reset Permainan</button>
               </div>
             )}
 
             {/* Game 2: Tebak Angka */}
             {selectedGame === 2 && (
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-3">
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
                 <p className="text-xs font-bold text-emerald-400">{guessMsg}</p>
-                <input
-                  type="number"
-                  value={guessInput}
-                  onChange={(e) => setGuessInput(e.target.value)}
-                  placeholder="Masukkan angka (1-20)"
-                  className="w-full p-2.5 bg-slate-950 border border-slate-800 text-center text-xs font-bold rounded-xl"
-                />
-                <button
-                  onClick={() => {
+                <input type="number" value={guessInput} onChange={(e) => setGuessInput(e.target.value)} placeholder="Masukkan angka (1-20)" className="w-full p-2.5 bg-slate-950 border border-slate-800 text-center text-xs font-bold rounded-xl text-white" />
+                <div className="flex gap-2">
+                  <button onClick={() => {
                     const num = parseInt(guessInput)
                     if (num === guessTarget) setGuessMsg('🎉 BENAR KAN! Kamu menang!')
                     else if (num < guessTarget) setGuessMsg('Too low! Angka lebih besar.')
                     else setGuessMsg('Too high! Angka lebih kecil.')
-                  }}
-                  className="w-full py-2 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl"
-                >
-                  Tebak!
-                </button>
-              </div>
-            )}
-
-            {/* Game 3: Su-wit (RPS) */}
-            {selectedGame === 3 && (
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4">
-                <p className="text-xs font-bold text-emerald-400">{rpsResult}</p>
-                <div className="flex justify-center gap-3">
-                  {['✊ Batu', '✋ Kertas', '✌️ Gunting'].map((choice, i) => (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        const bot = ['✊ Batu', '✋ Kertas', '✌️ Gunting'][Math.floor(Math.random() * 3)]
-                        if (choice === bot) setRpsResult(`Seri! Bot pilih ${bot}`)
-                        else setRpsResult(`Kamu: ${choice} vs Bot: ${bot}`)
-                      }}
-                      className="px-3 py-2 bg-slate-950 border border-slate-800 text-xs font-bold rounded-xl"
-                    >
-                      {choice}
-                    </button>
-                  ))}
+                  }} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl">Tebak!</button>
+                  <button onClick={() => { setGuessTarget(Math.floor(Math.random() * 20) + 1); setGuessInput(''); setGuessMsg('Tebak angka 1 - 20!'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
                 </div>
               </div>
             )}
 
-            {/* Game 4: Memory Cards */}
+            {/* Game 3: Suwit */}
+            {selectedGame === 3 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">{rpsResult}</p>
+                <div className="flex justify-center gap-2">
+                  {['✊ Batu', '✋ Kertas', '✌️ Gunting'].map((choice, i) => (
+                    <button key={i} onClick={() => {
+                      const bot = ['✊ Batu', '✋ Kertas', '✌️ Gunting'][Math.floor(Math.random() * 3)]
+                      setRpsResult(`Kamu: ${choice} vs Bot: ${bot}`)
+                    }} className="px-3 py-2 bg-slate-950 border border-slate-800 text-xs font-bold rounded-xl">{choice}</button>
+                  ))}
+                </div>
+                <button onClick={() => setRpsResult('Pilih salah satu!')} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
+              </div>
+            )}
+
+            {/* Game 4: Memory */}
             {selectedGame === 4 && (
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-3">
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
                 <div className="grid grid-cols-4 gap-2">
                   {cards.map((card, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        if (flipped.length < 2 && !flipped.includes(idx)) {
-                          const nextFlipped = [...flipped, idx]
-                          setFlipped(nextFlipped)
-                          if (nextFlipped.length === 2) {
-                            if (cards[nextFlipped[0]] === cards[nextFlipped[1]]) {
-                              setMatched((m) => [...m, nextFlipped[0], nextFlipped[1]])
-                            }
-                            setTimeout(() => setFlipped([]), 800)
-                          }
+                    <button key={idx} onClick={() => {
+                      if (flipped.length < 2 && !flipped.includes(idx)) {
+                        const nextFlipped = [...flipped, idx]
+                        setFlipped(nextFlipped)
+                        if (nextFlipped.length === 2) {
+                          if (cards[nextFlipped[0]] === cards[nextFlipped[1]]) setMatched((m) => [...m, nextFlipped[0], nextFlipped[1]])
+                          setTimeout(() => setFlipped([]), 800)
                         }
-                      }}
-                      className="h-16 bg-slate-950 border border-slate-800 text-xl font-bold rounded-xl"
-                    >
+                      }
+                    }} className="h-14 bg-slate-950 border border-slate-800 text-lg rounded-xl">
                       {flipped.includes(idx) || matched.includes(idx) ? card : '❓'}
                     </button>
                   ))}
                 </div>
+                <button onClick={() => { setCards(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5)); setFlipped([]); setMatched([]); }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Acak & Reset Card</button>
               </div>
             )}
 
-            {/* Game 5: Clicker Speed */}
+            {/* Game 5: Clicker */}
             {selectedGame === 5 && (
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">Total Klik Kamu: {clicks}</p>
-                <button
-                  onClick={() => setClicks(clicks + 1)}
-                  className="w-full py-8 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xl rounded-2xl active:scale-95 transition"
-                >
-                  ⚡ KLIK SECEPAT MUNGKIN!
-                </button>
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">Total Klik: {clicks}</p>
+                <button onClick={() => setClicks(clicks + 1)} className="w-full py-6 bg-emerald-500 text-slate-950 font-black text-lg rounded-2xl">⚡ KLIK SECEPATNYA!</button>
+                <button onClick={() => setClicks(0)} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset Skor</button>
+              </div>
+            )}
+
+            {/* Game 6: Math Quiz */}
+            {selectedGame === 6 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">{mathMsg}</p>
+                <p className="text-sm font-black text-white">{mathA} + {mathB} = ?</p>
+                <input type="number" value={mathAns} onChange={(e) => setMathAns(e.target.value)} placeholder="Hasil?" className="w-full p-2 bg-slate-950 border border-slate-800 text-center text-xs rounded-xl text-white" />
+                <div className="flex gap-2">
+                  <button onClick={() => {
+                    if (parseInt(mathAns) === mathA + mathB) setMathMsg('✅ Benar Sekali!')
+                    else setMathMsg('❌ Salah, coba lagi!')
+                  }} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-bold rounded-xl">Jawab</button>
+                  <button onClick={() => { setMathA(Math.floor(Math.random() * 10) + 1); setMathB(Math.floor(Math.random() * 10) + 1); setMathAns(''); setMathMsg('Jawab pertanyaan matematika!'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">🔄 Soal Baru</button>
+                </div>
+              </div>
+            )}
+
+            {/* Game 7: Color Guess */}
+            {selectedGame === 7 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">{colorMsg}</p>
+                <div className="w-16 h-16 rounded-2xl mx-auto border-2 border-white" style={{ backgroundColor: colorTarget }} />
+                <div className="flex justify-center gap-2">
+                  {['#EF4444', '#10B981', '#3B82F6'].map((c, i) => (
+                    <button key={i} onClick={() => {
+                      if (c === colorTarget) setColorMsg('🎉 Benar! Warna pas.')
+                      else setColorMsg('❌ Warna salah!')
+                    }} className="px-3 py-2 bg-slate-950 border border-slate-800 text-xs font-bold rounded-xl" style={{ color: c }}>Warna {i+1}</button>
+                  ))}
+                </div>
+                <button onClick={() => {
+                  const colors = ['#EF4444', '#10B981', '#3B82F6']
+                  setColorTarget(colors[Math.floor(Math.random() * colors.length)])
+                  setColorMsg('Pilih warna yang sesuai!')
+                }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Acak Warna</button>
+              </div>
+            )}
+
+            {/* Game 8: Coin Flip */}
+            {selectedGame === 8 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">{coinResult}</p>
+                <button onClick={() => setCoinResult(Math.random() > 0.5 ? '🪙 HASIL: GAMBAR' : '🪙 HASIL: ANGKA')} className="w-full py-3 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Lempar Koin!</button>
+                <button onClick={() => setCoinResult('Tekan tombol untuk lempar koin!')} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
+              </div>
+            )}
+
+            {/* Game 9: Acak Kata */}
+            {selectedGame === 9 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">{scrambleMsg}</p>
+                <input type="text" value={scrambleInput} onChange={(e) => setScrambleInput(e.target.value.toUpperCase())} placeholder="Jawaban kamu" className="w-full p-2 bg-slate-950 border border-slate-800 text-center text-xs font-bold text-white rounded-xl" />
+                <div className="flex gap-2">
+                  <button onClick={() => {
+                    if (scrambleInput === scrambleWord) setScrambleMsg('🎉 BENAR! KATA = WARKOP')
+                    else setScrambleMsg('❌ Masih Salah!')
+                  }} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-bold rounded-xl">Cek</button>
+                  <button onClick={() => { setScrambleInput(''); setScrambleMsg('Susun kata: A K R P O W'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
+                </div>
+              </div>
+            )}
+
+            {/* Game 10: Tes Reaksi */}
+            {selectedGame === 10 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                {reactState === 'idle' && (
+                  <button onClick={() => {
+                    setReactState('waiting')
+                    setTimeout(() => {
+                      setReactState('ready')
+                      setStartTime(Date.now())
+                    }, Math.random() * 2000 + 1000)
+                  }} className="w-full py-4 bg-emerald-500 text-slate-950 font-bold text-xs rounded-xl">Mulai Tes Reaksi</button>
+                )}
+                {reactState === 'waiting' && <p className="text-xs text-amber-400 font-bold">Tunggu warna berubah hijau...</p>}
+                {reactState === 'ready' && (
+                  <button onClick={() => {
+                    setReactTime(Date.now() - startTime)
+                    setReactState('idle')
+                  }} className="w-full py-6 bg-emerald-400 text-slate-950 font-black text-base rounded-xl">KLIK SEKARANG!</button>
+                )}
+                {reactTime && <p className="text-xs font-bold text-emerald-300">Kecepatan Reaksi: {reactTime} ms</p>}
               </div>
             )}
           </div>
         )}
 
-        {/* TAB 4: PROFIL PELANGGAN (EDIT NAMA & FOTO) */}
+        {/* TAB 4: PROFIL PELANGGAN */}
         {activeNav === 'profile' && (
           <div className="space-y-4">
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4 text-center">
-              {/* Foto Profil */}
               <div className="relative w-24 h-24 mx-auto">
                 <div className="w-full h-full rounded-full overflow-hidden bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center text-3xl">
-                  {userData.avatarUrl ? (
-                    <img src={userData.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    '👤'
-                  )}
+                  {userData.avatarUrl ? <img src={userData.avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : '👤'}
                 </div>
               </div>
 
-              {/* Form Upload Foto & Edit Nama */}
               <div className="space-y-3 text-left">
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase">Ubah Foto Profil</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
-                    className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-xl file:border-0 file:bg-emerald-950 file:text-emerald-300"
-                  />
+                  <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-xl file:border-0 file:bg-emerald-950 file:text-emerald-300" />
                 </div>
 
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase">Ganti Nama Pelanggan</label>
-                  <input
-                    type="text"
-                    value={editingName}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs font-bold text-white rounded-xl focus:outline-none focus:border-emerald-500"
-                  />
+                  <input type="text" value={editingName} onChange={(e) => setEditingName(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs font-bold text-white rounded-xl focus:outline-none" />
                 </div>
 
-                <button
-                  onClick={handleSaveProfile}
-                  className="w-full py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl active:scale-95 transition"
-                >
-                  💾 Simpan Perubahan Profil
-                </button>
+                <button onClick={handleSaveProfile} className="w-full py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl">💾 Simpan Perubahan Profil</button>
               </div>
 
-              <button
-                onClick={handleLogout}
-                className="w-full py-2.5 mt-2 bg-red-950/80 hover:bg-red-900 text-red-400 border border-red-800/80 text-xs font-bold rounded-xl transition active:scale-95"
-              >
-                🚪 Keluar (Logout)
-              </button>
+              <button onClick={handleLogout} className="w-full py-2.5 bg-red-950/80 text-red-400 border border-red-800/80 text-xs font-bold rounded-xl">🚪 Keluar (Logout)</button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Floating Bottom Cart Bar */}
+      {/* Floating Cart & Opsi Pembayaran */}
       {activeNav === 'menu' && Object.keys(cart).length > 0 && (
         <div className="fixed bottom-20 left-4 right-4 max-w-md mx-auto z-30">
-          <div className="bg-slate-900/90 backdrop-blur-xl border border-emerald-500/40 p-3.5 rounded-2xl shadow-2xl flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">{getTotalItem()} Menu Dipilih</p>
-              <p className="text-base font-black text-emerald-400">Rp {getTotalHarga().toLocaleString('id-ID')}</p>
+          <div className="bg-slate-900/90 backdrop-blur-xl border border-emerald-500/40 p-3.5 rounded-2xl shadow-2xl space-y-3">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">{getTotalItem()} Menu Dipilih</p>
+                <p className="text-base font-black text-emerald-400">Rp {getTotalHarga().toLocaleString('id-ID')}</p>
+              </div>
+              <div className="flex gap-2 text-[10px] font-bold">
+                <button onClick={() => setSelectedPayment('kasir')} className={`px-2.5 py-1.5 rounded-xl border ${selectedPayment === 'kasir' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>Bayar di Kasir</button>
+                <button onClick={() => setSelectedPayment('qris')} className={`px-2.5 py-1.5 rounded-xl border ${selectedPayment === 'qris' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>QRIS</button>
+              </div>
             </div>
-            <button onClick={handleCheckout} disabled={submitting} className="px-5 py-2.5 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl">
+
+            <button onClick={handleCheckout} disabled={submitting} className="w-full py-2.5 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl">
               {submitting ? 'Mengirim...' : 'Pesan Sekarang →'}
             </button>
           </div>
         </div>
       )}
 
-      {/* Bottom Navigation Bar */}
+      {/* Modal QRIS Pelanggan */}
+      {showQrisModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-6 text-center space-y-4">
+            <h3 className="text-base font-bold text-emerald-400">📲 Pembayaran QRIS</h3>
+            <p className="text-xs text-slate-300">Scan QRIS di bawah ini untuk membayar pesananmu:</p>
+            <div className="w-56 h-56 mx-auto bg-white p-2 rounded-2xl">
+              {qrisUrl ? <img src={qrisUrl} alt="QRIS" className="w-full h-full object-contain" /> : <p className="text-xs text-slate-500 pt-20">Gambar QRIS tidak tersedia</p>}
+            </div>
+            <button onClick={() => setShowQrisModal(false)} className="w-full py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl">Tutup & Cek Status Pesanan</button>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800 p-2 z-40">
         <div className="max-w-md mx-auto grid grid-cols-4 gap-1 text-center">
-          <button onClick={() => setActiveNav('menu')} className={`py-1.5 text-xs font-bold rounded-xl transition ${activeNav === 'menu' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>
-            ☕ Menu
-          </button>
-          <button onClick={() => setActiveNav('status')} className={`py-1.5 text-xs font-bold rounded-xl transition ${activeNav === 'status' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>
-            📡 Status
-          </button>
-          <button onClick={() => setActiveNav('game')} className={`py-1.5 text-xs font-bold rounded-xl transition ${activeNav === 'game' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>
-            🎮 Game
-          </button>
-          <button onClick={() => setActiveNav('profile')} className={`py-1.5 text-xs font-bold rounded-xl transition ${activeNav === 'profile' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>
-            👤 Profil
-          </button>
+          <button onClick={() => setActiveNav('menu')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'menu' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>☕ Menu</button>
+          <button onClick={() => setActiveNav('status')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'status' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>📡 Status</button>
+          <button onClick={() => setActiveNav('game')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'game' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>🎮 Game</button>
+          <button onClick={() => setActiveNav('profile')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'profile' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>👤 Profil</button>
         </div>
       </div>
     </div>
@@ -701,16 +796,10 @@ function OrderContent() {
 }
 
 function calculateWinner(squares: any[]) {
-  const lines = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8],
-    [0, 3, 6], [1, 4, 7], [2, 5, 8],
-    [0, 4, 8], [2, 4, 6],
-  ]
+  const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]]
   for (let i = 0; i < lines.length; i++) {
     const [a, b, c] = lines[i]
-    if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
-      return squares[a]
-    }
+    if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) return squares[a]
   }
   return null
 }
