@@ -1,8 +1,14 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cwcoqkrihwyniyucrqai.supabase.co'
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_BC3nOHNjKeXN76x2OtCH5w_94ljBkID'
+const defaultUrl = 'https://cwcoqkrihwyniyucrqai.supabase.co'
+const defaultKey = 'sb_publishable_BC3nOHNjKeXN76x2OtCH5w_94ljBkID'
+
+const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/["'\s]/g, '')
+const envKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.replace(/["'\s]/g, '')
+
+const SUPABASE_URL = envUrl && envUrl.startsWith('http') ? envUrl : defaultUrl
+const SUPABASE_ANON_KEY = envKey && envKey.length > 10 ? envKey : defaultKey
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
