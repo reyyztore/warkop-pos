@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 
 export default function KelolaMenuPage() {
   const [categories, setCategories] = useState<any[]>([])
@@ -11,12 +12,13 @@ export default function KelolaMenuPage() {
   const [loading, setLoading] = useState(true)
 
   // Form State
-  const [newCat, setNewCat] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [nama, setNama] = useState('')
   const [harga, setHarga] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [deskripsi, setDeskripsi] = useState('')
-  const [fotoUrl, setFotoUrl] = useState('')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [existingFotoUrl, setExistingFotoUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const supabase = createClient()
@@ -38,38 +40,89 @@ export default function KelolaMenuPage() {
     setLoading(false)
   }
 
-  const handleAddCategory = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newCat.trim()) return
-    await supabase.from('categories').insert({ nama: newCat.trim(), urutan: categories.length + 1 })
-    setNewCat('')
-    fetchData()
+  // Upload Gambar File ke Supabase Storage
+  const uploadImage = async (file: File) => {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Date.now()}.${fileExt}`
+    const filePath = `menu/${fileName}`
+
+    const { error: uploadErr } = await supabase.storage.from('menu-images').upload(filePath, file)
+    if (uploadErr) {
+      // Jika bucket belum ada, gunakan fallback Public URL
+      console.error(uploadErr)
+    }
+
+    const { data } = supabase.storage.from('menu-images').getPublicUrl(filePath)
+    return data.publicUrl
   }
 
-  const handleAddMenu = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!nama.trim() || !harga || !categoryId) return
 
     setSubmitting(true)
-    const { error } = await supabase.from('menu_items').insert({
-      nama: nama.trim(),
-      harga: parseInt(harga),
-      category_id: categoryId,
-      deskripsi: deskripsi.trim(),
-      foto_url: fotoUrl.trim() || null,
-      tersedia: true,
-    })
+    try {
+      let finalFotoUrl = existingFotoUrl
 
-    if (!error) {
-      setNama('')
-      setHarga('')
-      setDeskripsi('')
-      setFotoUrl('')
+      if (imageFile) {
+        finalFotoUrl = await uploadImage(imageFile)
+      }
+
+      if (editingId) {
+        // Edit Menu
+        const { error } = await supabase
+          .from('menu_items')
+          .update({
+            nama: nama.trim(),
+            harga: parseInt(harga),
+            category_id: categoryId,
+            deskripsi: deskripsi.trim(),
+            foto_url: finalFotoUrl || null,
+          })
+          .eq('id', editingId)
+
+        if (error) throw error
+        alert('Menu berhasil diperbarui!')
+      } else {
+        // Tambah Menu
+        const { error } = await supabase.from('menu_items').insert({
+          nama: nama.trim(),
+          harga: parseInt(harga),
+          category_id: categoryId,
+          deskripsi: deskripsi.trim(),
+          foto_url: finalFotoUrl || null,
+          tersedia: true,
+        })
+
+        if (error) throw error
+        alert('Menu berhasil ditambahkan!')
+      }
+
+      resetForm()
       fetchData()
-    } else {
-      alert(error.message)
+    } catch (err: any) {
+      alert(err.message || 'Gagal menyimpan data menu.')
+    } finally {
+      setSubmitting(false)
     }
-    setSubmitting(false)
+  }
+
+  const startEdit = (item: any) => {
+    setEditingId(item.id)
+    setNama(item.nama)
+    setHarga(item.harga.toString())
+    setCategoryId(item.category_id)
+    setDeskripsi(item.deskripsi || '')
+    setExistingFotoUrl(item.foto_url || '')
+  }
+
+  const resetForm = () => {
+    setEditingId(null)
+    setNama('')
+    setHarga('')
+    setDeskripsi('')
+    setImageFile(null)
+    setExistingFotoUrl('')
   }
 
   const toggleStok = async (id: string, tersedia: boolean) => {
@@ -85,30 +138,18 @@ export default function KelolaMenuPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 text-white p-4">
-      <h1 className="text-xl font-bold">☕ Kelola Menu & Kategori</h1>
-
-      {/* Form Tambah Kategori */}
-      <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-        <h2 className="text-sm font-semibold mb-2 text-slate-300">Tambah Kategori</h2>
-        <form onSubmit={handleAddCategory} className="flex gap-2">
-          <input
-            type="text"
-            value={newCat}
-            onChange={(e) => setNewCat(e.target.value)}
-            placeholder="Nama Kategori (misal: Kopi, Snack)"
-            className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
-          />
-          <button type="submit" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-xs font-bold rounded-lg">
-            + Kategori
-          </button>
-        </form>
+    <div className="max-w-4xl mx-auto space-y-6 text-white p-4 font-sans pb-12">
+      <div className="flex justify-between items-center">
+        <h1 className="text-xl font-bold text-rose-300">🌸 Kelola & Edit Menu Kasir</h1>
+        <Link href="/kasir" className="text-xs bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
+          ← Kembali ke Dashboard
+        </Link>
       </div>
 
-      {/* Form Tambah Menu */}
-      <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
-        <h2 className="text-sm font-semibold text-slate-300">Tambah Menu Baru</h2>
-        <form onSubmit={handleAddMenu} className="space-y-3">
+      {/* Form Tambah / Edit Menu */}
+      <div className="bg-slate-900/80 border border-rose-900/30 p-5 rounded-3xl space-y-4">
+        <h2 className="text-sm font-bold text-rose-300">{editingId ? '✏️ Edit Menu' : '➕ Tambah Menu Baru'}</h2>
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <input
               type="text"
@@ -116,7 +157,7 @@ export default function KelolaMenuPage() {
               onChange={(e) => setNama(e.target.value)}
               placeholder="Nama Menu"
               required
-              className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+              className="px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
             />
             <input
               type="number"
@@ -124,7 +165,7 @@ export default function KelolaMenuPage() {
               onChange={(e) => setHarga(e.target.value)}
               placeholder="Harga (Rp)"
               required
-              className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+              className="px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
             />
           </div>
 
@@ -132,77 +173,79 @@ export default function KelolaMenuPage() {
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
+              className="px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
             >
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nama}
-                </option>
+                <option key={c.id} value={c.id}>{c.nama}</option>
               ))}
             </select>
-            <input
-              type="url"
-              value={fotoUrl}
-              onChange={(e) => setFotoUrl(e.target.value)}
-              placeholder="URL Foto Produk (opsional)"
-              className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white"
-            />
+
+            {/* Input File Upload Gambar */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-slate-400 font-bold uppercase">Upload Foto Produk</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                className="text-xs text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-xl file:border-0 file:bg-rose-950 file:text-rose-300"
+              />
+            </div>
           </div>
 
           <textarea
             value={deskripsi}
             onChange={(e) => setDeskripsi(e.target.value)}
             placeholder="Deskripsi singkat..."
-            className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white h-20"
+            className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white h-20"
           />
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 font-bold text-xs rounded-lg transition"
-          >
-            {submitting ? 'Menyimpan...' : 'Simpan Menu Baru'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 py-2.5 bg-gradient-to-r from-rose-500 to-pink-500 text-slate-950 font-black text-xs rounded-xl"
+            >
+              {submitting ? 'Memproses...' : editingId ? 'Simpan Perubahan' : 'Tambah Menu'}
+            </button>
+            {editingId && (
+              <button type="button" onClick={resetForm} className="px-4 py-2.5 bg-slate-800 text-xs font-bold rounded-xl">
+                Batal
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
-      {/* Daftar Menu */}
-      <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-        <h2 className="text-sm font-semibold mb-3 text-slate-300">Daftar Menu Aktif</h2>
+      {/* List Menu Aktif */}
+      <div className="bg-slate-900/80 border border-slate-800 p-5 rounded-3xl">
+        <h2 className="text-sm font-bold text-slate-300 mb-3">Daftar Menu Aktif</h2>
         {loading ? (
-          <p className="text-xs text-slate-400">Memuat...</p>
-        ) : menuItems.length === 0 ? (
-          <p className="text-xs text-slate-500">Belum ada menu tersimpan.</p>
-        ) : (
-          <div className="divide-y divide-slate-700">
-            {menuItems.map((item) => (
-              <div key={item.id} className="py-3 flex items-center justify-between text-xs">
-                <div>
-                  <p className="font-bold text-white">{item.nama}</p>
-                  <p className="text-slate-400">
-                    Rp {item.harga?.toLocaleString('id-ID')} • Kategori: {item.categories?.nama || '-'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => toggleStok(item.id, item.tersedia)}
-                    className={`px-3 py-1 rounded-lg font-bold text-[10px] ${
-                      item.tersedia ? 'bg-emerald-900 text-emerald-300' : 'bg-red-900 text-red-300'
-                    }`}
-                  >
-                    {item.tersedia ? 'Tersedia' : 'Habis'}
-                  </button>
-                  <button
-                    onClick={() => deleteMenu(item.id)}
-                    className="p-1 bg-slate-700 hover:bg-red-900 text-slate-300 hover:text-red-200 rounded-lg"
-                  >
-                    🗑️
-                  </button>
-                </div>
+          <p className="text-xs text-slate-500">Memuat menu...</p>
+        ) : menuItems.map((item) => (
+          <div key={item.id} className="py-3 flex items-center justify-between border-b border-slate-800 text-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-slate-950 overflow-hidden border border-slate-800 shrink-0">
+                {item.foto_url ? <img src={item.foto_url} alt={item.nama} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg">☕</div>}
               </div>
-            ))}
+              <div>
+                <p className="font-bold text-white">{item.nama}</p>
+                <p className="text-slate-400">Rp {item.harga?.toLocaleString('id-ID')} • {item.categories?.nama}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button onClick={() => startEdit(item)} className="px-3 py-1 bg-purple-950 text-purple-300 border border-purple-800 rounded-xl font-bold text-[10px]">
+                ✏️ Edit
+              </button>
+              <button onClick={() => toggleStok(item.id, item.tersedia)} className={`px-3 py-1 rounded-xl font-bold text-[10px] ${item.tersedia ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-red-950 text-red-300 border border-red-800'}`}>
+                {item.tersedia ? 'Tersedia' : 'Habis'}
+              </button>
+              <button onClick={() => deleteMenu(item.id)} className="p-1.5 bg-slate-800 text-slate-400 hover:text-red-400 rounded-xl">
+                🗑️
+              </button>
+            </div>
           </div>
-        )}
+        ))}
       </div>
     </div>
   )
