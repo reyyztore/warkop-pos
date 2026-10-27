@@ -7,6 +7,11 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function EntryPage() {
+  // --- STORE PROFILE STATE (DARI KASIR) ---
+  const [storeName, setStoreName] = useState('Warung Kopi Kita')
+  const [storeAvatar, setStoreAvatar] = useState('')
+  const [loadingStore, setLoadingStore] = useState(true)
+
   // --- AUTH STATE ---
   const [isRegister, setIsRegister] = useState(false)
   const [nama, setNama] = useState('')
@@ -39,6 +44,26 @@ export default function EntryPage() {
 
   const router = useRouter()
   const supabase = createClient()
+
+  // --- FETCH PROFIL TOKO (NAMA & LOGO DARI KASIR) ---
+  useEffect(() => {
+    fetchStoreProfile()
+  }, [])
+
+  const fetchStoreProfile = async () => {
+    setLoadingStore(true)
+    const { data } = await supabase
+      .from('profiles')
+      .select('store_name, avatar_url')
+      .eq('role', 'cashier')
+      .limit(1)
+
+    if (data && data.length > 0) {
+      if (data[0].store_name) setStoreName(data[0].store_name)
+      if (data[0].avatar_url) setStoreAvatar(data[0].avatar_url)
+    }
+    setLoadingStore(false)
+  }
 
   // --- EYE TRACKING LOGIC ---
   const pupilsData = [
@@ -297,18 +322,20 @@ export default function EntryPage() {
           <div className="absolute top-10 left-10 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute bottom-10 right-10 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
-          {/* Top Status Header */}
+          {/* Top Status Header (Disesuaikan dengan Nama & Logo Toko Kasir) */}
           <div className="w-full flex justify-between items-center z-10">
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Warung Kopi Kita</span>
+            <div className="flex items-center space-x-2.5">
+              <div className="w-7 h-7 rounded-full overflow-hidden bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-xs text-emerald-400 shrink-0">
+                {storeAvatar ? <img src={storeAvatar} alt="Logo" className="w-full h-full object-cover" /> : '☕'}
+              </div>
+              <span className="text-[11px] font-black tracking-wider text-slate-200 uppercase line-clamp-1">{storeName}</span>
             </div>
             <span className={`text-[11px] font-bold px-3 py-1 rounded-full border transition-all duration-300 ${badgeClass}`}>
               {badgeText}
             </span>
           </div>
 
-          {/* Canvas SVG Karakter */}
+          {/* Canvas SVG Karakter Interaktif */}
           <div className="relative w-full max-w-[400px] aspect-[4/3] my-auto flex items-center justify-center">
             <svg ref={svgRef} id="characters-svg" viewBox="0 0 500 400" className="w-full h-full overflow-visible">
               <ellipse cx="250" cy="365" rx="190" ry="14" fill="#0F172A" />
@@ -336,7 +363,7 @@ export default function EntryPage() {
                   <ellipse id="eyelid-black-l" className="eyelid" cx="-14" cy="0" rx="10.5" ry="10.5" fill="#1E293B" style={{ opacity: eyelidOpacity }} />
                   <circle cx="14" cy="0" r="10" fill="white" />
                   <circle id="pupil-black-r" className="pupil" cx="14" cy="0" r="5" fill="#0F172A" />
-                  <ellipse id="eyelid-black-r" className="eyelid" cx="14" cy="0" rx="10.5" ry="10.5" fill="#1E293B" style={{ opacity: eyelidOpacity }} />
+                  <ellipse id="eyelid-black-r" className="eyelid" cx="14" cy="0" rx="10.5" ry="10.5" fill="#0F172A" style={{ opacity: eyelidOpacity }} />
                   <path id="mouth-black" className="mouth" d={mouthBlack} stroke="white" strokeWidth="2" strokeLinecap="round" fill="none" />
                 </g>
               </g>
@@ -380,11 +407,16 @@ export default function EntryPage() {
 
         {/* Kolom Kanan: Form Login & Register */}
         <div className="lg:col-span-6 p-6 sm:p-10 flex flex-col justify-center bg-slate-900/40">
-          <div className="mb-6">
-            <h1 className="text-2xl font-black text-white tracking-tight">Selamat Datang! ☕</h1>
-            <p className="text-slate-400 text-xs mt-1 font-medium">
-              {isRegister ? 'Lengkapi data untuk membuat akun baru' : 'Silakan masuk ke akun pelanggan kamu'}
-            </p>
+          <div className="mb-6 flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center text-xl shrink-0">
+              {loadingStore ? '☕' : storeAvatar ? <img src={storeAvatar} alt="Logo Toko" className="w-full h-full object-cover" /> : '☕'}
+            </div>
+            <div>
+              <h1 className="text-xl font-black text-white tracking-tight">{storeName}</h1>
+              <p className="text-slate-400 text-xs mt-0.5 font-medium">
+                {isRegister ? 'Lengkapi data untuk membuat akun baru' : 'Silakan masuk ke akun pelanggan kamu'}
+              </p>
+            </div>
           </div>
 
           {/* Tab Switcher */}
