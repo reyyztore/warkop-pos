@@ -13,6 +13,7 @@ function DynamicStoreContent() {
   const mejaParam = searchParams.get('meja')
   const supabase = createClient()
 
+  // Auth & Animated Eye Tracker State
   const [session, setSession] = useState<any>(null)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [authEmail, setAuthEmail] = useState('')
@@ -20,11 +21,16 @@ function DynamicStoreContent() {
   const [authName, setAuthName] = useState('')
   const [authPhone, setAuthPhone] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
+  const [isPasswordFocused, setIsPasswordFocused] = useState(false)
+  const [pupilPos, setPupilPos] = useState({ x: 0, y: 0 })
+
+  // Customer Sound Bell Option
+  const [customerSoundOption, setCustomerSoundOption] = useState<number>(1)
 
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'game' | 'profile'>('menu')
   const [selectedGame, setSelectedGame] = useState<number>(1)
 
-  // Store & Profile Data dari Database Toko X
+  // Toko X State
   const [storeData, setStoreData] = useState<any>(null)
   const [storeId, setStoreId] = useState<string>('')
   const [storeName, setStoreName] = useState('Warung Kopi')
@@ -35,7 +41,7 @@ function DynamicStoreContent() {
   const [bannerUrl, setBannerUrl] = useState('')
   const [isOpen, setIsOpen] = useState(true)
 
-  // Data State Menu & Cart
+  // Data Menu & Cart
   const [menuItems, setMenuItems] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [cart, setCart] = useState<{ [key: string]: number }>({})
@@ -88,6 +94,49 @@ function DynamicStoreContent() {
   const [reactTime, setReactTime] = useState<number | null>(null)
   const [startTime, setStartTime] = useState<number>(0)
 
+  // Audio Voice Helper
+  const speakText = (text: string) => {
+    if (!('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'id-ID'
+    window.speechSynthesis.speak(utterance)
+  }
+
+  const playCustomerBellSound = () => {
+    if (customerSoundOption === 1) {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+        const audioCtx = new AudioCtx()
+        const osc = audioCtx.createOscillator()
+        const gain = audioCtx.createGain()
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(1046.5, audioCtx.currentTime)
+        gain.gain.setValueAtTime(0.4, audioCtx.currentTime)
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.2)
+        osc.connect(gain)
+        gain.connect(audioCtx.destination)
+        osc.start()
+        osc.stop(audioCtx.currentTime + 1.2)
+      } catch (e) {}
+    } else if (customerSoundOption === 2) {
+      speakText(`Pesanan kamu di Meja ${selectedTable || ''} sudah siap kak!`)
+    } else if (customerSoundOption === 3) {
+      speakText('Halo, pesanan kamu sudah jadi, silakan diambil ya!')
+    }
+  }
+
+  // Mouse move tracker untuk animasi mata mengintai
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const offsetX = (e.clientX / window.innerWidth - 0.5) * 12
+      const offsetY = (e.clientY / window.innerHeight - 0.5) * 12
+      setPupilPos({ x: offsetX, y: offsetY })
+    }
+    window.addEventListener('mousemove', handleMouseMove)
+    return () => window.removeEventListener('mousemove', handleMouseMove)
+  }, [])
+
   useEffect(() => {
     checkSession()
     if (slug) fetchStoreDetails()
@@ -96,17 +145,17 @@ function DynamicStoreContent() {
   useEffect(() => {
     if (!storeId) return
 
+    // Realtime Listener Khusus Toko X
     const channel = supabase
       .channel(`meja-customer-${storeId}`)
       .on('broadcast', { event: 'ring-table-bell' }, (payload: any) => {
         if (payload.payload?.tableNo?.toString() === selectedTable?.toString()) {
+          playCustomerBellSound()
           alert(`🔔 Meja #${selectedTable}: Dipanggil Kasir Toko! Pesanan Kamu Siap.`)
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `store_id=eq.${storeId}` }, (payload: any) => {
-        if (payload.new && payload.new.nama_pemesan === userData.name) {
-          fetchMyOrders(storeId, userData.name)
-        }
+        if (userData.name) fetchMyOrders(storeId, userData.name)
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stores', filter: `id=eq.${storeId}` }, (payload: any) => {
         if (payload.new) updateStoreConfig(payload.new)
@@ -116,18 +165,19 @@ function DynamicStoreContent() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [storeId, selectedTable, userData.name])
+  }, [storeId, selectedTable, userData.name, customerSoundOption])
 
   const checkSession = async () => {
     const { data: { session: activeSession } } = await supabase.auth.getSession()
     if (activeSession) {
       setSession(activeSession)
-      const name = activeSession.user.user_metadata?.full_name || 'Pelanggan'
+      const name = activeSession.user.user_metadata?.full_name || activeSession.user.email?.split('@')[0] || 'Pelanggan'
       const phone = activeSession.user.user_metadata?.phone || '-'
       const email = activeSession.user.email || ''
       const avatarUrl = activeSession.user.user_metadata?.avatar_url || ''
       setUserData({ name, phone, email, avatarUrl })
       setEditingName(name)
+      if (storeId) fetchMyOrders(storeId, name)
     }
   }
 
@@ -153,7 +203,7 @@ function DynamicStoreContent() {
         })
         if (error) throw error
         setSession(data.session)
-        const name = data.session.user.user_metadata?.full_name || 'Pelanggan'
+        const name = data.session.user.user_metadata?.full_name || data.session.user.email?.split('@')[0] || 'Pelanggan'
         const phone = data.session.user.user_metadata?.phone || '-'
         const email = data.session.user.email || ''
         const avatarUrl = data.session.user.user_metadata?.avatar_url || ''
@@ -227,12 +277,10 @@ function DynamicStoreContent() {
     })
   }
 
-  const getTotalHarga = () => {
-    return Object.entries(cart).reduce((total, [id, qty]) => {
-      const item = menuItems.find((m) => m.id === id)
-      return total + (item ? item.harga * qty : 0)
-    }, 0)
-  }
+  const getTotalHarga = () => Object.entries(cart).reduce((total, [id, qty]) => {
+    const item = menuItems.find((m) => m.id === id)
+    return total + (item ? item.harga * qty : 0)
+  }, 0)
 
   const getTotalItem = () => Object.values(cart).reduce((a, b) => a + b, 0)
 
@@ -369,6 +417,8 @@ function DynamicStoreContent() {
     ? menuItems 
     : menuItems.filter(m => m.category_id === activeCategory)
 
+  const winner = calculateWinner(tttBoard)
+
   if (loading) {
     return <div className="min-h-screen bg-slate-950 text-slate-400 flex items-center justify-center text-xs">Memuat toko {slug}...</div>
   }
@@ -377,18 +427,35 @@ function DynamicStoreContent() {
     return <div className="min-h-screen bg-slate-950 text-rose-400 flex items-center justify-center text-xs">Toko tidak ditemukan.</div>
   }
 
-  // TAMPILAN JIKA PELANGGAN BELUM LOGIN (WAJIB LOGIN / DAFTAR TERLEBIH DAHULU)
+  // TAMPILAN LOGIN DENGAN ANIMASI MATA MENGINTAI INTERAKTIF
   if (!session) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 font-sans">
-        <div className="w-full max-w-sm bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-5 text-center shadow-2xl">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-slate-800 overflow-hidden flex items-center justify-center text-2xl border border-slate-700">
-            {storeAvatar ? <img src={storeAvatar} alt="Logo Toko" className="w-full h-full object-cover" /> : '☕'}
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 font-sans relative overflow-hidden">
+        <div className="w-full max-w-sm bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-5 text-center shadow-2xl relative z-10">
+          
+          {/* Karakter Animasi Mengintai */}
+          <div className="relative w-24 h-24 mx-auto bg-slate-800 rounded-full border-2 border-emerald-500 flex items-center justify-center overflow-hidden">
+            <div className="flex gap-3">
+              <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center relative">
+                {!isPasswordFocused ? (
+                  <div className="w-3 h-3 bg-slate-950 rounded-full transition-transform duration-75" style={{ transform: `translate(${pupilPos.x}px, ${pupilPos.y}px)` }} />
+                ) : (
+                  <span className="text-[10px] text-slate-950 font-black">🙈</span>
+                )}
+              </div>
+              <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center relative">
+                {!isPasswordFocused ? (
+                  <div className="w-3 h-3 bg-slate-950 rounded-full transition-transform duration-75" style={{ transform: `translate(${pupilPos.x}px, ${pupilPos.y}px)` }} />
+                ) : (
+                  <span className="text-[10px] text-slate-950 font-black">🙈</span>
+                )}
+              </div>
+            </div>
           </div>
 
           <div>
             <h1 className="text-lg font-black text-white">{storeName}</h1>
-            <p className="text-xs text-slate-400 mt-1">Silakan masuk / daftar untuk memesan menu dari meja kamu.</p>
+            <p className="text-xs text-slate-400 mt-1">Masuk untuk pesan makanan dari meja kamu.</p>
           </div>
 
           <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-bold">
@@ -417,7 +484,16 @@ function DynamicStoreContent() {
 
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase">Kata Sandi</label>
-              <input type="password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} required placeholder="••••••••" className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+              <input
+                type="password"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                onFocus={() => setIsPasswordFocused(true)}
+                onBlur={() => setIsPasswordFocused(false)}
+                required
+                placeholder="••••••••"
+                className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
+              />
             </div>
 
             <button type="submit" disabled={authLoading} className="w-full py-3 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl">
@@ -607,13 +683,16 @@ function DynamicStoreContent() {
               ))}
             </div>
 
-            {/* Game 1: TicTacToe */}
+            {/* Game 1: TicTacToe (Lengkap Indicator) */}
             {selectedGame === 1 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl inline-block max-w-xs w-full">
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl inline-block max-w-xs w-full space-y-3">
+                <p className="text-xs font-bold text-emerald-400">
+                  {winner ? `🎉 PEMENANG: ${winner}!` : tttBoard.every(Boolean) ? '🤝 HASIL SERI!' : `Giliran Main: ${tttIsX ? '❌' : '⭕'}`}
+                </p>
                 <div className="grid grid-cols-3 gap-2">
                   {tttBoard.map((cell, idx) => (
                     <button key={idx} onClick={() => {
-                      if (cell || calculateWinner(tttBoard)) return
+                      if (cell || winner) return
                       const next = [...tttBoard]
                       next[idx] = tttIsX ? '❌' : '⭕'
                       setTttBoard(next)
@@ -623,7 +702,7 @@ function DynamicStoreContent() {
                     </button>
                   ))}
                 </div>
-                <button onClick={() => { setTttBoard(Array(9).fill(null)); setTttIsX(true); }} className="mt-4 px-4 py-2 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset Game</button>
+                <button onClick={() => { setTttBoard(Array(9).fill(null)); setTttIsX(true); }} className="px-4 py-2 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset Game</button>
               </div>
             )}
 
@@ -779,7 +858,7 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 4: PROFIL PELANGGAN */}
+        {/* TAB 4: PROFIL PELANGGAN + PENGATURAN NADA DERING */}
         {activeNav === 'profile' && (
           <div className="space-y-4">
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4 text-center">
@@ -796,6 +875,15 @@ function DynamicStoreContent() {
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase">Ganti Nama Pelanggan</label>
                   <input type="text" value={editingName} onChange={(e) => setEditingName(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs font-bold text-white rounded-xl" />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Pilihan Nada Dering Panggilan Kasir</label>
+                  <select value={customerSoundOption} onChange={(e) => setCustomerSoundOption(Number(e.target.value))} className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl">
+                    <option value={1}>1. Bel Dering Biasa</option>
+                    <option value={2}>2. "Pesanan kamu di Meja X sudah siap kak!"</option>
+                    <option value={3}>3. "Halo, pesanan kamu sudah jadi, silakan diambil!"</option>
+                  </select>
                 </div>
 
                 <button onClick={handleSaveProfile} className="w-full py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl">💾 Simpan Perubahan Profil</button>
