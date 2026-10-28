@@ -16,28 +16,33 @@ export default function SuperAdminDashboard() {
   const [stores, setStores] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
 
+  // LOGIKA VERIFIKASI PIN DARI SUPABASE 100%
   const handleVerifyPin = async (e: React.FormEvent) => {
     e.preventDefault()
     setPinLoading(true)
 
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('super_admin_config')
         .select('pin')
-        .eq('id', 1)
+        .limit(1)
         .maybeSingle()
 
-      const correctPin = data?.pin || '123456'
+      if (error || !data) {
+        alert('Gagal mengambil PIN dari Supabase. Pastikan tabel super_admin_config sudah dibuat dan terisi!')
+        setPinLoading(false)
+        return
+      }
 
-      if (inputPin === correctPin) {
+      if (inputPin.trim() === data.pin.toString().trim()) {
         setIsAuthenticated(true)
         fetchAllStoresWithStats()
       } else {
-        alert('PIN Super Admin Tidak Valid!')
+        alert('PIN Super Admin Salah!')
         setInputPin('')
       }
     } catch (err: any) {
-      alert('Gagal memverifikasi PIN.')
+      alert('Terjadi kesalahan sistem saat memverifikasi PIN.')
     } finally {
       setPinLoading(false)
     }
