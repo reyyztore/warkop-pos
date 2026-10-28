@@ -13,7 +13,7 @@ function DynamicStoreContent() {
   const mejaParam = searchParams.get('meja')
   const supabase = createClient()
 
-  // Auth & Animated Eye Tracker State
+  // Auth & Interactive Mascot State
   const [session, setSession] = useState<any>(null)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [authEmail, setAuthEmail] = useState('')
@@ -21,10 +21,12 @@ function DynamicStoreContent() {
   const [authName, setAuthName] = useState('')
   const [authPhone, setAuthPhone] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
+  
+  // Interactive Mascot Hands State (Tutup Mata)
   const [isPasswordFocused, setIsPasswordFocused] = useState(false)
   const [pupilPos, setPupilPos] = useState({ x: 0, y: 0 })
 
-  // Customer Sound Bell Option
+  // Customer Sound Option
   const [customerSoundOption, setCustomerSoundOption] = useState<number>(1)
 
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'game' | 'profile'>('menu')
@@ -69,7 +71,7 @@ function DynamicStoreContent() {
   const [editingName, setEditingName] = useState('')
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
 
-  // --- 10 GAMES STATES ---
+  // 10 Games States
   const [tttBoard, setTttBoard] = useState(Array(9).fill(null))
   const [tttIsX, setTttIsX] = useState(true)
   const [guessTarget, setGuessTarget] = useState(Math.floor(Math.random() * 20) + 1)
@@ -94,7 +96,7 @@ function DynamicStoreContent() {
   const [reactTime, setReactTime] = useState<number | null>(null)
   const [startTime, setStartTime] = useState<number>(0)
 
-  // Audio Voice Helper
+  // Audio Helper
   const speakText = (text: string) => {
     if (!('speechSynthesis' in window)) return
     window.speechSynthesis.cancel()
@@ -126,16 +128,13 @@ function DynamicStoreContent() {
     }
   }
 
-  // Mouse move tracker untuk animasi mata mengintai
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      const offsetX = (e.clientX / window.innerWidth - 0.5) * 12
-      const offsetY = (e.clientY / window.innerHeight - 0.5) * 12
-      setPupilPos({ x: offsetX, y: offsetY })
-    }
-    window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
-  }, [])
+  // Tracking gerakan kursor untuk mata karakter
+  const handleEmailInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAuthEmail(e.target.value)
+    const len = e.target.value.length
+    const posX = Math.min(Math.max((len - 10) * 0.8, -8), 8)
+    setPupilPos({ x: posX, y: 3 })
+  }
 
   useEffect(() => {
     checkSession()
@@ -145,7 +144,6 @@ function DynamicStoreContent() {
   useEffect(() => {
     if (!storeId) return
 
-    // Realtime Listener Khusus Toko X
     const channel = supabase
       .channel(`meja-customer-${storeId}`)
       .on('broadcast', { event: 'ring-table-bell' }, (payload: any) => {
@@ -154,7 +152,7 @@ function DynamicStoreContent() {
           alert(`🔔 Meja #${selectedTable}: Dipanggil Kasir Toko! Pesanan Kamu Siap.`)
         }
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `store_id=eq.${storeId}` }, (payload: any) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `store_id=eq.${storeId}` }, () => {
         if (userData.name) fetchMyOrders(storeId, userData.name)
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stores', filter: `id=eq.${storeId}` }, (payload: any) => {
@@ -186,7 +184,7 @@ function DynamicStoreContent() {
     setAuthLoading(true)
     try {
       if (authMode === 'register') {
-        const { data, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email: authEmail,
           password: authPassword,
           options: {
@@ -427,29 +425,38 @@ function DynamicStoreContent() {
     return <div className="min-h-screen bg-slate-950 text-rose-400 flex items-center justify-center text-xs">Toko tidak ditemukan.</div>
   }
 
-  // TAMPILAN LOGIN DENGAN ANIMASI MATA MENGINTAI INTERAKTIF
+  // KARAKTER BEAR/ANIMASI INTERAKTIF LENGKAP DENGAN TUTUP MATA PAKAI TANGAN
   if (!session) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 font-sans relative overflow-hidden">
         <div className="w-full max-w-sm bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-5 text-center shadow-2xl relative z-10">
           
-          {/* Karakter Animasi Mengintai */}
-          <div className="relative w-24 h-24 mx-auto bg-slate-800 rounded-full border-2 border-emerald-500 flex items-center justify-center overflow-hidden">
-            <div className="flex gap-3">
-              <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center relative">
-                {!isPasswordFocused ? (
-                  <div className="w-3 h-3 bg-slate-950 rounded-full transition-transform duration-75" style={{ transform: `translate(${pupilPos.x}px, ${pupilPos.y}px)` }} />
-                ) : (
-                  <span className="text-[10px] text-slate-950 font-black">🙈</span>
-                )}
+          {/* Visual Karakter Beruang 3D Interaktif */}
+          <div className="relative w-28 h-28 mx-auto bg-amber-900/40 border-2 border-amber-500 rounded-full flex flex-col items-center justify-center overflow-hidden transition-all duration-300">
+            {/* Telinga Beruang */}
+            <div className="absolute top-1 left-3 w-6 h-6 bg-amber-700 rounded-full border border-amber-500" />
+            <div className="absolute top-1 right-3 w-6 h-6 bg-amber-700 rounded-full border border-amber-500" />
+
+            {/* Wajah Beruang */}
+            <div className="relative z-10 flex flex-col items-center mt-2">
+              {/* Mata & Bola Mata */}
+              <div className="flex gap-4">
+                <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center overflow-hidden relative">
+                  <div className="w-2.5 h-2.5 bg-slate-950 rounded-full transition-transform duration-100" style={{ transform: `translate(${pupilPos.x}px, ${pupilPos.y}px)` }} />
+                </div>
+                <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center overflow-hidden relative">
+                  <div className="w-2.5 h-2.5 bg-slate-950 rounded-full transition-transform duration-100" style={{ transform: `translate(${pupilPos.x}px, ${pupilPos.y}px)` }} />
+                </div>
               </div>
-              <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center relative">
-                {!isPasswordFocused ? (
-                  <div className="w-3 h-3 bg-slate-950 rounded-full transition-transform duration-75" style={{ transform: `translate(${pupilPos.x}px, ${pupilPos.y}px)` }} />
-                ) : (
-                  <span className="text-[10px] text-slate-950 font-black">🙈</span>
-                )}
-              </div>
+
+              {/* Hidung & Senyum */}
+              <div className="w-4 h-3 bg-slate-950 rounded-full mt-1" />
+              <div className="w-3 h-1 bg-amber-600 rounded-full mt-0.5" />
+            </div>
+
+            {/* Tangan Beruang Tutup Mata ketika fokus Kata Sandi */}
+            <div className={`absolute inset-0 z-20 bg-amber-800/90 flex items-center justify-center transition-all duration-300 ${isPasswordFocused ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12 pointer-events-none'}`}>
+              <span className="text-2xl font-black">🙈</span>
             </div>
           </div>
 
@@ -479,7 +486,14 @@ function DynamicStoreContent() {
 
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase">Email Pelanggan</label>
-              <input type="email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} required placeholder="pelanggan@gmail.com" className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+              <input
+                type="email"
+                value={authEmail}
+                onChange={handleEmailInputChange}
+                required
+                placeholder="pelanggan@gmail.com"
+                className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
+              />
             </div>
 
             <div>
@@ -683,7 +697,7 @@ function DynamicStoreContent() {
               ))}
             </div>
 
-            {/* Game 1: TicTacToe (Lengkap Indicator) */}
+            {/* Game 1: TicTacToe (Indikator Giliran & Pemenang) */}
             {selectedGame === 1 && (
               <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl inline-block max-w-xs w-full space-y-3">
                 <p className="text-xs font-bold text-emerald-400">
