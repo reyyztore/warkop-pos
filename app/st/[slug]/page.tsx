@@ -15,7 +15,7 @@ function DynamicStoreContent() {
 
   // --- STATE PWA INSTALLER UNTUK PELANGGAN ---
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
-  const [showInstallBtn, setShowInstallBtn] = useState<boolean>(false)
+  const [showInstallBtn, setShowInstallBtn] = useState<boolean>(true) // Default true agar banner selalu tampil
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -32,13 +32,21 @@ function DynamicStoreContent() {
   }, [])
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return
-    deferredPrompt.prompt()
-    const { outcome } = await deferredPrompt.userChoice
-    if (outcome === 'accepted') {
-      setShowInstallBtn(false)
+    if (deferredPrompt) {
+      deferredPrompt.prompt()
+      const { outcome } = await deferredPrompt.userChoice
+      if (outcome === 'accepted') {
+        setShowInstallBtn(false)
+      }
+      setDeferredPrompt(null)
+    } else {
+      alert(
+        `Cara Pasang Aplikasi ${storeName}:\n\n` +
+        `1. Klik ikon titik tiga (⋮) atau tombol Share (📤) di browser HP kamu.\n` +
+        `2. Pilih menu "Tambahkan ke Layar Utama" / "Add to Home Screen".\n` +
+        `3. Aplikasi ${storeName} akan otomatis terpasang di HP kamu!`
+      )
     }
-    setDeferredPrompt(null)
   }
 
   // --- AUTH STATE & REFS ---
@@ -604,7 +612,7 @@ function DynamicStoreContent() {
     return <div className="min-h-screen bg-slate-950 text-rose-400 flex items-center justify-center text-xs">Toko tidak ditemukan.</div>
   }
 
-  // TAMPILAN LOGIN MASKOT KARTUN INTERAKTIF DENGAN KANTONG & GERAKAN SAMA PERSIS WEB UTAMA
+  // TAMPILAN LOGIN MASKOT KARTUN INTERAKTIF
   if (!session) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-3 sm:p-6 font-sans">
@@ -890,7 +898,7 @@ function DynamicStoreContent() {
           </div>
           <button
             onClick={handleInstallClick}
-            className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition active:scale-95 shrink-0"
+            className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition active:scale-95 shrink-0 shadow-md shadow-emerald-500/20"
           >
             Install
           </button>
