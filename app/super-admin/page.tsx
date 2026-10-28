@@ -63,6 +63,7 @@ export default function SuperAdminDashboard() {
 
       const enrichedStores = await Promise.all(
         storeList.map(async (st) => {
+          // 1. Ambil Omset & Jumlah Pesanan Hari Ini
           const { data: todayOrders } = await supabase
             .from('orders')
             .select('total_harga, status')
@@ -75,7 +76,14 @@ export default function SuperAdminDashboard() {
 
           const totalOrdersCount = todayOrders ? todayOrders.length : 0
 
-          // HITUNG SISA HARI AKURAT LOKAL
+          // 2. Ambil Informasi Akun Pemilik Toko / Profil Kasir
+          const { data: ownerProfile } = await supabase
+            .from('profiles')
+            .select('full_name, email, phone')
+            .eq('store_id', st.id)
+            .maybeSingle()
+
+          // 3. Hitung Sisa Hari Masa Aktif Langganan
           let daysRemaining = 0
           if (st.expired_at) {
             const now = new Date().getTime()
@@ -89,6 +97,9 @@ export default function SuperAdminDashboard() {
             totalOmsetToday,
             totalOrdersCount,
             daysRemaining,
+            ownerName: ownerProfile?.full_name || st.owner_name || 'Tidak ada nama',
+            ownerEmail: ownerProfile?.email || st.owner_email || 'Tidak ada email',
+            ownerPhone: ownerProfile?.phone || st.owner_phone || 'Tidak ada no hp',
           }
         })
       )
@@ -110,7 +121,6 @@ export default function SuperAdminDashboard() {
     const target = stores.find((s) => s.id === storeId)
     const now = new Date()
 
-    // Titik acuan dasar
     let baseTime = now.getTime()
     if (target?.expired_at) {
       const currentExpiry = new Date(target.expired_at).getTime()
@@ -119,7 +129,6 @@ export default function SuperAdminDashboard() {
       }
     }
 
-    // Tambahkan milidetik sesuai jumlah hari
     const newExpiryTime = baseTime + additionalDays * 24 * 60 * 60 * 1000
     const newExpiryISO = new Date(newExpiryTime).toISOString()
 
@@ -144,7 +153,6 @@ export default function SuperAdminDashboard() {
 
     setLoading(true)
     try {
-      // 1. Ambil daftar ID pesanan toko
       const { data: storeOrders } = await supabase
         .from('orders')
         .select('id')
@@ -155,14 +163,12 @@ export default function SuperAdminDashboard() {
         await supabase.from('order_items').delete().in('order_id', orderIds)
       }
 
-      // 2. Hapus seluruh data anak
       await supabase.from('orders').delete().eq('store_id', storeId)
       await supabase.from('menu_items').delete().eq('store_id', storeId)
       await supabase.from('categories').delete().eq('store_id', storeId)
       await supabase.from('tables').delete().eq('store_id', storeId)
       await supabase.from('profiles').delete().eq('store_id', storeId)
 
-      // 3. Hapus data toko utama
       const { error } = await supabase.from('stores').delete().eq('id', storeId)
       if (error) throw error
 
@@ -263,6 +269,28 @@ export default function SuperAdminDashboard() {
                       >
                         Hapus Toko
                       </button>
+                    </div>
+                  </div>
+
+                  {/* 🌟 KOTAK INFORMASI AKUN PEMILIK TOKO 🌟 */}
+                  <div className="bg-slate-900/90 border border-slate-800 p-3.5 rounded-2xl text-white space-y-1.5 shadow-inner">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                      <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">👤 Akun Pemilik / Admin</span>
+                      <span className="text-[9px] font-mono text-slate-400">ID: {st.id.slice(0, 8)}...</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-1 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Nama:</span>
+                        <span className="font-bold text-slate-200">{st.ownerName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Email:</span>
+                        <span className="font-mono text-emerald-300 font-semibold">{st.ownerEmail}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">WhatsApp / HP:</span>
+                        <span className="font-mono text-amber-300 font-semibold">{st.ownerPhone}</span>
+                      </div>
                     </div>
                   </div>
 
