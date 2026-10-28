@@ -63,7 +63,7 @@ export default function SuperAdminDashboard() {
 
       const enrichedStores = await Promise.all(
         storeList.map(async (st) => {
-          // 1. Ambil Omset & Jumlah Pesanan Hari Ini
+          // 1. Ambil Omset & Pesanan Hari Ini
           const { data: todayOrders } = await supabase
             .from('orders')
             .select('total_harga, status')
@@ -76,23 +76,14 @@ export default function SuperAdminDashboard() {
 
           const totalOrdersCount = todayOrders ? todayOrders.length : 0
 
-          // 2. Cari data pemilik dari tabel profiles
+          // 2. Cek Profil dari tabel profiles
           const { data: ownerProfile } = await supabase
             .from('profiles')
             .select('full_name, email, phone')
             .eq('store_id', st.id)
             .maybeSingle()
 
-          // 3. Cari data dari pesanan pertama jika profil kosong (Pencarian Cadangan)
-          const { data: firstOrder } = await supabase
-            .from('orders')
-            .select('nama_pemesan, email_pemesan, phone_pemesan')
-            .eq('store_id', st.id)
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .maybeSingle()
-
-          // 4. Hitung Sisa Hari Masa Aktif Langganan
+          // 3. Hitung sisa hari langganan
           let daysRemaining = 0
           if (st.expired_at) {
             const now = new Date().getTime()
@@ -101,10 +92,10 @@ export default function SuperAdminDashboard() {
             daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
           }
 
-          // Logika Penanganan Nama, Email & HP agar tidak pernah "Tidak ada nama"
-          const resolvedName = ownerProfile?.full_name || st.owner_name || firstOrder?.nama_pemesan || `Pemilik (${st.store_name})`
-          const resolvedEmail = ownerProfile?.email || st.owner_email || firstOrder?.email_pemesan || `${st.slug}@warkop.id`
-          const resolvedPhone = ownerProfile?.phone || st.owner_phone || firstOrder?.phone_pemesan || 'Belum diisi'
+          // Pencarian berlapis agar tidak pernah bertuliskan "Tidak ada nama"
+          const resolvedName = st.owner_name || ownerProfile?.full_name || `Admin (${st.store_name})`
+          const resolvedEmail = st.owner_email || ownerProfile?.email || `${st.slug}@warkop.id`
+          const resolvedPhone = st.owner_phone || ownerProfile?.phone || 'Belum diisi'
 
           return {
             ...st,
