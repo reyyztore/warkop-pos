@@ -75,14 +75,13 @@ export default function SuperAdminDashboard() {
 
           const totalOrdersCount = todayOrders ? todayOrders.length : 0
 
-          // Perhitungan Sisa Hari Langganan Presisi
+          // HITUNG SISA HARI AKURAT LOKAL
           let daysRemaining = 0
           if (st.expired_at) {
-            const now = new Date()
-            const expiry = new Date(st.expired_at)
-            const diffTime = expiry.getTime() - now.getTime()
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-            daysRemaining = diffDays > 0 ? diffDays : 0
+            const now = new Date().getTime()
+            const expiry = new Date(st.expired_at).getTime()
+            const diffTime = expiry - now
+            daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
           }
 
           return {
@@ -105,54 +104,69 @@ export default function SuperAdminDashboard() {
     fetchAllStoresWithStats()
   }
 
-  // LOGIKA PENAMBAHAN MASA AKTIF AKUMULATIF PRESISI
+  // FIX AKUMULASI HARI AKURAT
   const updateSubscriptionDays = async (storeId: string, additionalDays: number) => {
+    setLoading(true)
     const target = stores.find((s) => s.id === storeId)
     const now = new Date()
 
-    let baseDate = now
+    // Titik acuan dasar
+    let baseTime = now.getTime()
     if (target?.expired_at) {
-      const currentExpiry = new Date(target.expired_at)
-      if (currentExpiry > now) {
-        baseDate = currentExpiry
+      const currentExpiry = new Date(target.expired_at).getTime()
+      if (currentExpiry > baseTime) {
+        baseTime = currentExpiry
       }
     }
 
-    // Tambahkan hari dari tanggal kadaluarsa terakhir
-    const newExpiry = new Date(baseDate.getTime() + additionalDays * 24 * 60 * 60 * 1000)
+    // Tambahkan milidetik sesuai jumlah hari
+    const newExpiryTime = baseTime + additionalDays * 24 * 60 * 60 * 1000
+    const newExpiryISO = new Date(newExpiryTime).toISOString()
 
     const { error } = await supabase
       .from('stores')
-      .update({
-        expired_at: newExpiry.toISOString(),
-      })
+      .update({ expired_at: newExpiryISO })
       .eq('id', storeId)
 
     if (error) {
       alert('Gagal memperbarui langganan: ' + error.message)
+      setLoading(false)
     } else {
-      alert(`Masa langganan toko berhasil ditambah +${additionalDays} hari!`)
+      alert(`Berhasil memperpanjang langganan +${additionalDays} hari!`)
       await fetchAllStoresWithStats()
     }
   }
 
-  // LOGIKA HAPUS TOKO PERMANEN
+  // FIX HAPUS TOKO PAKSA
   const handleDeleteStore = async (storeId: string, storeName: string) => {
-    const confirmDelete = confirm(`Apakah Anda yakin ingin MENGHAPUS PERMANEN toko "${storeName}"?\n\nSemua data pesanan, menu, dan kategori toko ini akan dihapus permanen!`)
+    const confirmDelete = confirm(`HAPUS PERMANEN toko "${storeName}" beserta seluruh datanya?`)
     if (!confirmDelete) return
 
     setLoading(true)
     try {
-      await supabase.from('order_items').delete().eq('order_id', storeId)
+      // 1. Ambil daftar ID pesanan toko
+      const { data: storeOrders } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('store_id', storeId)
+
+      if (storeOrders && storeOrders.length > 0) {
+        const orderIds = storeOrders.map((o) => o.id)
+        await supabase.from('order_items').delete().in('order_id', orderIds)
+      }
+
+      // 2. Hapus seluruh data anak
       await supabase.from('orders').delete().eq('store_id', storeId)
       await supabase.from('menu_items').delete().eq('store_id', storeId)
       await supabase.from('categories').delete().eq('store_id', storeId)
       await supabase.from('tables').delete().eq('store_id', storeId)
+      await supabase.from('profiles').delete().eq('store_id', storeId)
 
+      // 3. Hapus data toko utama
       const { error } = await supabase.from('stores').delete().eq('id', storeId)
       if (error) throw error
 
-      alert(`Toko "${storeName}" beserta seluruh sistemnya berhasil dihapus permanen!`)
+      alert(`Toko "${storeName}" berhasil dihapus permanen!`)
       fetchAllStoresWithStats()
     } catch (err: any) {
       alert('Gagal menghapus toko: ' + err.message)
@@ -245,7 +259,7 @@ export default function SuperAdminDashboard() {
                       </button>
                       <button
                         onClick={() => handleDeleteStore(st.id, st.store_name)}
-                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-extrabold rounded-full transition shadow-sm"
+                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-extrabold rounded-full transition shadow-sm active:scale-95"
                       >
                         Hapus Toko
                       </button>
