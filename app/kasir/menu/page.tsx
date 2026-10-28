@@ -20,6 +20,7 @@ export default function KasirMenuPage() {
   const [namaMenu, setNamaMenu] = useState('')
   const [deskripsiMenu, setDeskripsiMenu] = useState('')
   const [hargaMenu, setHargaMenu] = useState('')
+  const [hargaDinginMenu, setHargaDinginMenu] = useState('') // 🌟 State baru harga dingin
   const [selectedCatId, setSelectedCatId] = useState('')
   const [fotoFile, setFotoFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -60,12 +61,12 @@ export default function KasirMenuPage() {
     setLoading(false)
   }
 
-  // TAMBAH / EDIT MENU
+  // TAMBAH / EDIT MENU (DENGAN REVISI HARGA PANAS & DINGIN)
   const handleSaveMenu = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!storeId) return
     if (!namaMenu.trim() || !hargaMenu || !selectedCatId) {
-      alert('Nama, harga, dan kategori wajib diisi!')
+      alert('Nama, harga utama/panas, dan kategori wajib diisi!')
       return
     }
 
@@ -81,12 +82,17 @@ export default function KasirMenuPage() {
         fotoUrl = data.publicUrl
       }
 
+      const mainHarga = parseInt(hargaMenu)
+      const dinginHarga = hargaDinginMenu ? parseInt(hargaDinginMenu) : null
+
       const menuDataPayload = {
         store_id: storeId,
         category_id: selectedCatId,
         nama: namaMenu.trim(),
         deskripsi: deskripsiMenu.trim(),
-        harga: parseInt(hargaMenu),
+        harga: mainHarga,
+        harga_panas: mainHarga, // 🌟 Simpan ke kolom harga_panas
+        harga_dingin: dinginHarga, // 🌟 Simpan ke kolom harga_dingin
         foto_url: fotoUrl,
         tersedia: editingMenuItem ? editingMenuItem.tersedia : true,
       }
@@ -144,6 +150,7 @@ export default function KasirMenuPage() {
     setNamaMenu('')
     setDeskripsiMenu('')
     setHargaMenu('')
+    setHargaDinginMenu('')
     setSelectedCatId('')
     setFotoFile(null)
   }
@@ -152,7 +159,8 @@ export default function KasirMenuPage() {
     setEditingMenuItem(item)
     setNamaMenu(item.nama)
     setDeskripsiMenu(item.deskripsi || '')
-    setHargaMenu(item.harga.toString())
+    setHargaMenu((item.harga_panas || item.harga).toString())
+    setHargaDinginMenu(item.harga_dingin ? item.harga_dingin.toString() : '')
     setSelectedCatId(item.category_id)
     setShowMenuModal(true)
   }
@@ -196,7 +204,18 @@ export default function KasirMenuPage() {
                   <div>
                     <span className="text-[9px] font-bold text-emerald-400 uppercase">{item.categories?.nama || 'Tanpa Kategori'}</span>
                     <h3 className="text-xs font-bold text-white line-clamp-1">{item.nama}</h3>
-                    <p className="text-xs font-black text-slate-300 mt-0.5">Rp {item.harga?.toLocaleString('id-ID')}</p>
+                    
+                    {/* Display Harga Panas & Dingin */}
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs font-black text-amber-400">
+                        🔥 Rp {(item.harga_panas || item.harga)?.toLocaleString('id-ID')}
+                      </p>
+                      {item.harga_dingin && (
+                        <p className="text-xs font-black text-cyan-400">
+                          🧊 Rp {item.harga_dingin?.toLocaleString('id-ID')}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -220,10 +239,10 @@ export default function KasirMenuPage() {
 
       </div>
 
-      {/* Modal Tambah/Edit Menu */}
+      {/* Modal Tambah/Edit Menu (Dengan Input Harga Panas/Dingin) */}
       {showMenuModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <form onSubmit={handleSaveMenu} className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-3.5">
+          <form onSubmit={handleSaveMenu} className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-3.5 max-h-[90vh] overflow-y-auto">
             <h2 className="text-sm font-bold text-emerald-400">{editingMenuItem ? '✏️ Edit Menu Warkop' : '➕ Tambah Menu Baru'}</h2>
 
             <div>
@@ -241,9 +260,18 @@ export default function KasirMenuPage() {
               </select>
             </div>
 
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Harga (Rp)</label>
-              <input type="number" value={hargaMenu} onChange={(e) => setHargaMenu(e.target.value)} required placeholder="15000" className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white font-bold" />
+            {/* Input 2 Harga (Panas & Dingin) */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] font-bold text-amber-400 uppercase">🔥 Harga / Harga Panas (Rp) *</label>
+                <input type="number" value={hargaMenu} onChange={(e) => setHargaMenu(e.target.value)} required placeholder="15000" className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white font-bold" />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-cyan-400 uppercase">🧊 Harga Dingin (Opsional)</label>
+                <input type="number" value={hargaDinginMenu} onChange={(e) => setHargaDinginMenu(e.target.value)} placeholder="17000" className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white font-bold" />
+                <span className="text-[9px] text-slate-500">Kosongkan jika bukan minuman varian dingin</span>
+              </div>
             </div>
 
             <div>
