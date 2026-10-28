@@ -12,7 +12,8 @@ export default function KasirDashboardPage() {
   const [activeTab, setActiveTab] = useState<string>('semua')
   const [selectedBuktiUrl, setSelectedBuktiUrl] = useState<string | null>(null)
 
-  // Profile Toko & Akun Kasir State
+  // Profile Store & Multi-Tenant State
+  const [storeId, setStoreId] = useState<string | null>(null)
   const [cashierName, setCashierName] = useState('')
   const [storeName, setStoreName] = useState('Warung Kopi Kita')
   const [avatarUrl, setAvatarUrl] = useState('')
@@ -21,7 +22,7 @@ export default function KasirDashboardPage() {
   const [qrisFile, setQrisFile] = useState<File | null>(null)
   const [showProfileModal, setShowProfileModal] = useState(false)
 
-  // Tampilan Toko State (Warna, Banner, Pengumuman, Buka/Tutup)
+  // Tampilan Toko State
   const [bgColor, setBgColor] = useState('#0f172a')
   const [primaryColor, setPrimaryColor] = useState('#10b981')
   const [announcement, setAnnouncement] = useState('')
@@ -72,28 +73,33 @@ export default function KasirDashboardPage() {
 
   useEffect(() => {
     checkAuthAndFetch()
+  }, [])
 
+  useEffect(() => {
+    if (!storeId) return
+
+    // Realtime Broadcast Khusus Store ID Ini
     const channel = supabase
-      .channel('kasir-dashboard-realtime')
+      .channel(`kasir-dashboard-${storeId}`)
       .on('broadcast', { event: 'customer-ring-bell' }, (payload: any) => {
         playBellSound()
         const table = payload.payload?.tableNo || '??'
         setCustomerBellAlert(`🔔 Meja #${table} memanggil kasir!`)
         setTimeout(() => setCustomerBellAlert(null), 8000)
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `store_id=eq.${storeId}` }, () => {
         playIncomingOrderSound()
-        fetchOrders()
+        fetchOrders(storeId)
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => {
-        fetchOrders()
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `store_id=eq.${storeId}` }, () => {
+        fetchOrders(storeId)
       })
       .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [kasirSoundOption])
+  }, [storeId, kasirSoundOption])
 
   const checkAuthAndFetch = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -102,27 +108,43 @@ export default function KasirDashboardPage() {
       return
     }
 
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
+    // Ambil Profile User & Store ID
+    const { data: profile } = await supabase.from('profiles').select('*, stores(*)').eq('id', session.user.id).single()
+    
     if (profile) {
       setCashierName(profile.full_name || session.user.email?.split('@')[0] || 'Kasir')
-      if (profile.store_name) setStoreName(profile.store_name)
-      if (profile.avatar_url) setAvatarUrl(profile.avatar_url)
-      if (profile.qris_url) setQrisUrl(profile.qris_url)
-      if (profile.bg_color) setBgColor(profile.bg_color)
-      if (profile.primary_color) setPrimaryColor(profile.primary_color)
-      if (profile.announcement) setAnnouncement(profile.announcement)
-      if (profile.banner_url) setBannerUrl(profile.banner_url)
-      if (profile.is_open !== undefined && profile.is_open !== null) setIsOpen(profile.is_open)
-    }
+      
+      const currentStoreId = profile.store_id || profile.stores?.id
+      if (currentStoreId) {
+        setStoreId(currentStoreId)
 
-    fetchOrders()
+        // Ambil Data Pengaturan Toko dari Tabel `stores`
+        const { data: storeData } = await supabase.from('stores').select('*').eq('id', currentStoreId).single()
+        if (storeData) {
+          if (storeData.store_name) setStoreName(storeData.store_name)
+          if (storeData.avatar_url) setAvatarUrl(storeData.avatar_url)
+          if (storeData.qris_url) setQrisUrl(storeData.qris_url)
+          if (storeData.bg_color) setBgColor(storeData.bg_color)
+          if (storeData.primary_color) setPrimaryColor(storeData.primary_color)
+          if (storeData.announcement) setAnnouncement(storeData.announcement)
+          if (storeData.banner_url) setBannerUrl(storeData.banner_url)
+          if (storeData.is_open !== undefined) setIsOpen(storeData.is_open)
+        }
+
+        fetchOrders(currentStoreId)
+      } else {
+        setLoading(false)
+        alert('Akun kamu belum terhubung dengan toko mana pun. Silakan daftar toko terlebih dahulu.')
+      }
+    }
   }
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (targetStoreId: string) => {
     setLoading(true)
     const { data } = await supabase
       .from('orders')
       .select('*, tables(nomor), order_items(*, menu_items(nama))')
+      .eq('store_id', targetStoreId)
       .order('created_at', { ascending: false })
 
     if (data) setOrders(data)
@@ -131,16 +153,17 @@ export default function KasirDashboardPage() {
 
   const updateStatus = async (orderId: string, status: string) => {
     await supabase.from('orders').update({ status }).eq('id', orderId)
-    fetchOrders()
+    if (storeId) fetchOrders(storeId)
   }
 
   const togglePaidStatus = async (orderId: string, currentPaid: boolean) => {
     await supabase.from('orders').update({ is_paid: !currentPaid }).eq('id', orderId)
-    fetchOrders()
+    if (storeId) fetchOrders(storeId)
   }
 
   const ringSpecificTableBell = async (tableNo: any) => {
-    await supabase.channel('meja-customer-realtime').send({
+    if (!storeId) return
+    await supabase.channel(`meja-customer-${storeId}`).send({
       type: 'broadcast',
       event: 'ring-table-bell',
       payload: { tableNo },
@@ -148,29 +171,25 @@ export default function KasirDashboardPage() {
     alert(`🔔 Bel terkirim ke Meja #${tableNo}`)
   }
 
-  // FUNGSI KHUSUS TOGGLE STATUS BUKA / TUTUP TOKO LANGSUNG KE SUPABASE
   const handleToggleStoreOpen = async () => {
+    if (!storeId) return
     try {
       const nextOpenState = !isOpen
       setIsOpen(nextOpenState)
 
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-
-      const { error } = await supabase.from('profiles').update({
+      const { error } = await supabase.from('stores').update({
         is_open: nextOpenState,
-      }).eq('id', session.user.id)
+      }).eq('id', storeId)
 
       if (error) throw error
-
       alert(`Status toko berhasil diubah menjadi: ${nextOpenState ? 'BUKA ✅' : 'TUTUP 🚫'}`)
     } catch (e: any) {
       alert(`Gagal mengubah status toko: ${e.message}`)
     }
   }
 
-  // SIMPAN PROFIL KASIR (Nama Kasir, Nama Toko, Foto Logo, QRIS)
   const handleSaveProfile = async () => {
+    if (!storeId) return
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
@@ -180,7 +199,7 @@ export default function KasirDashboardPage() {
 
       if (avatarFile) {
         const fileExt = avatarFile.name.split('.').pop()
-        const filePath = `store/avatar_${Date.now()}.${fileExt}`
+        const filePath = `store/${storeId}/avatar_${Date.now()}.${fileExt}`
         await supabase.storage.from('menu-images').upload(filePath, avatarFile)
         const { data } = supabase.storage.from('menu-images').getPublicUrl(filePath)
         newAvatarUrl = data.publicUrl
@@ -188,18 +207,23 @@ export default function KasirDashboardPage() {
 
       if (qrisFile) {
         const fileExt = qrisFile.name.split('.').pop()
-        const filePath = `store/qris_${Date.now()}.${fileExt}`
+        const filePath = `store/${storeId}/qris_${Date.now()}.${fileExt}`
         await supabase.storage.from('menu-images').upload(filePath, qrisFile)
         const { data } = supabase.storage.from('menu-images').getPublicUrl(filePath)
         newQrisUrl = data.publicUrl
       }
 
+      // Update Akun Kasir
       await supabase.from('profiles').update({
         full_name: cashierName,
+      }).eq('id', session.user.id)
+
+      // Update Data Toko di Tabel Stores
+      await supabase.from('stores').update({
         store_name: storeName,
         avatar_url: newAvatarUrl,
         qris_url: newQrisUrl,
-      }).eq('id', session.user.id)
+      }).eq('id', storeId)
 
       setAvatarUrl(newAvatarUrl)
       setQrisUrl(newQrisUrl)
@@ -210,33 +234,30 @@ export default function KasirDashboardPage() {
     }
   }
 
-  // SIMPAN TAMPILAN PELANGGAN (Warna, Banner, Pengumuman, Buka/Tutup)
   const handleSaveTampilan = async () => {
+    if (!storeId) return
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-
       let newBannerUrl = bannerUrl
 
       if (bannerFile) {
         const fileExt = bannerFile.name.split('.').pop()
-        const filePath = `store/banner_${Date.now()}.${fileExt}`
+        const filePath = `store/${storeId}/banner_${Date.now()}.${fileExt}`
         await supabase.storage.from('menu-images').upload(filePath, bannerFile)
         const { data } = supabase.storage.from('menu-images').getPublicUrl(filePath)
         newBannerUrl = data.publicUrl
       }
 
-      await supabase.from('profiles').update({
+      await supabase.from('stores').update({
         bg_color: bgColor,
         primary_color: primaryColor,
         announcement: announcement,
         banner_url: newBannerUrl,
         is_open: isOpen,
-      }).eq('id', session.user.id)
+      }).eq('id', storeId)
 
       setBannerUrl(newBannerUrl)
       setShowTampilanModal(false)
-      alert('🎨 Tampilan & Status Toko berhasil diperbarui ke seluruh HP Pelanggan!')
+      alert('🎨 Tampilan Toko berhasil diperbarui ke seluruh HP Pelanggan!')
     } catch (e: any) {
       alert(e.message)
     }
@@ -277,7 +298,7 @@ export default function KasirDashboardPage() {
                   isOpen ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
                 }`}
               >
-                {isOpen ? '● Toko Buka (Klik Tutup)' : '○ Toko Tutup (Klik Buka)'}
+                {isOpen ? '● Toko Buka' : '○ Toko Tutup'}
               </button>
             </div>
             <p className="text-xs text-slate-400">Kasir Aktif: <strong className="text-emerald-400">{cashierName}</strong></p>
@@ -346,7 +367,7 @@ export default function KasirDashboardPage() {
         ))}
       </div>
 
-      {/* Grid Pesanan + Info Nama, Email & No Terdaftar */}
+      {/* Grid Pesanan */}
       <div className="max-w-5xl mx-auto mt-4 relative z-10 space-y-3">
         {loading ? (
           <div className="h-44 bg-slate-900/50 rounded-3xl animate-pulse border border-slate-800" />
@@ -356,7 +377,6 @@ export default function KasirDashboardPage() {
               <div className="space-y-0.5">
                 <span className="text-sm font-black text-emerald-400">Meja #{ord.tables?.nomor || '-'}</span>
                 
-                {/* INFO LENGKAP PELANGGAN TERDAFTAR */}
                 <div className="bg-slate-950 p-2 rounded-xl border border-slate-800 text-[11px] space-y-0.5 mt-1">
                   <p className="font-bold text-white">👤 Pemesan: {ord.nama_pemesan}</p>
                   <p className="text-slate-400">📧 Email: {ord.email_pemesan || 'Tamu / Tanpa Email'}</p>
@@ -443,11 +463,11 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* MODAL 2: EDIT TAMPILAN PELANGGAN (Warna, Banner, Pengumuman, Buka/Tutup) */}
+      {/* MODAL 2: EDIT TAMPILAN TOKO */}
       {showTampilanModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-base font-bold text-amber-400">🎨 Edit Tampilan & Status Toko</h2>
+            <h2 className="text-base font-bold text-amber-400">🎨 Edit Tampilan Toko</h2>
             
             <div className="space-y-3">
               <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-slate-800">
@@ -502,4 +522,3 @@ export default function KasirDashboardPage() {
     </div>
   )
 }
-
