@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
-// 10 PRESET TEMA DENGAN KOMBINASI WARNA LENGKAP
+// PRESET TEMA DENGAN KOMBINASI WARNA & EMOJI
 const THEME_PRESETS = [
   { name: 'Slate Dark', bgColor: '#0f172a', textColor: '#ffffff', accentColor: '#10b981', emoji: '☕' },
   { name: 'Emerald Warkop', bgColor: '#064e3b', textColor: '#ecfdf5', accentColor: '#34d399', emoji: '🍵' },
@@ -47,13 +47,19 @@ export default function KasirDashboardPage() {
   const [bannerFile, setBannerFile] = useState<File | null>(null)
   const [showTampilanModal, setShowTampilanModal] = useState(false)
 
-  // 🌟 FITUR BARU: Wifi, Maps, WA Komplain, Sosmed, & Tema
+  // Fitur Wifi, Maps, WA Komplain, Sosmed, Jam Operasional, Fasilitas & Tema Visual
   const [mapsUrl, setMapsUrl] = useState('')
   const [waComplaint, setWaComplaint] = useState('')
   const [socialLinks, setSocialLinks] = useState<{ platform: string; url: string }[]>([])
   const [wifiActive, setWifiActive] = useState(false)
   const [wifiName, setWifiName] = useState('')
   const [wifiPassword, setWifiPassword] = useState('')
+  const [jamOperasional, setJamOperasional] = useState('')
+  const [fasilitasInput, setFasilitasInput] = useState('')
+  const [themeStyle, setThemeStyle] = useState('glassmorphic')
+  const [bgImageUrl, setBgImageUrl] = useState('')
+  const [bgImageFile, setBgImageFile] = useState<File | null>(null)
+
   const [selectedPreset, setSelectedPreset] = useState('Slate Dark')
   const [themeConfig, setThemeConfig] = useState({
     bgColor: '#0f172a',
@@ -117,7 +123,6 @@ export default function KasirDashboardPage() {
         setCustomerBellAlert(`🔔 Meja #${table} memanggil kasir!`)
         setTimeout(() => setCustomerBellAlert(null), 8000)
       })
-      // 🌟 LISTENER PEMBATALAN PESANAN DARI PELANGGAN REALTIME
       .on('broadcast', { event: 'order-cancelled-by-customer' }, (payload: any) => {
         playBellSound()
         const table = payload.payload?.tableNo || '??'
@@ -182,6 +187,10 @@ export default function KasirDashboardPage() {
           if (storeData.wifi_active !== undefined) setWifiActive(storeData.wifi_active)
           if (storeData.wifi_name) setWifiName(storeData.wifi_name)
           if (storeData.wifi_password) setWifiPassword(storeData.wifi_password)
+          if (storeData.jam_operasional) setJamOperasional(storeData.jam_operasional)
+          if (storeData.fasilitas) setFasilitasInput(Array.isArray(storeData.fasilitas) ? storeData.fasilitas.join(', ') : '')
+          if (storeData.theme_style) setThemeStyle(storeData.theme_style)
+          if (storeData.bg_image_url) setBgImageUrl(storeData.bg_image_url)
           if (storeData.theme_config) setThemeConfig(storeData.theme_config)
 
           // Hitung Sisa Langganan
@@ -286,7 +295,6 @@ export default function KasirDashboardPage() {
     }
   }
 
-  // 🌟 TERAPKAN KUSTOMISASI TEMA, WIFI, MAPS, SOSMED
   const handleSelectPresetTheme = (preset: typeof THEME_PRESETS[0]) => {
     setSelectedPreset(preset.name)
     setThemeConfig({
@@ -315,6 +323,7 @@ export default function KasirDashboardPage() {
     if (!storeId) return
     try {
       let newBannerUrl = bannerUrl
+      let newBgImageUrl = bgImageUrl
 
       if (bannerFile) {
         const fileExt = bannerFile.name.split('.').pop()
@@ -324,8 +333,20 @@ export default function KasirDashboardPage() {
         newBannerUrl = data.publicUrl
       }
 
+      if (bgImageFile) {
+        const fileExt = bgImageFile.name.split('.').pop()
+        const filePath = `store/${storeId}/bg_${Date.now()}.${fileExt}`
+        await supabase.storage.from('menu-images').upload(filePath, bgImageFile)
+        const { data } = supabase.storage.from('menu-images').getPublicUrl(filePath)
+        newBgImageUrl = data.publicUrl
+      }
+
+      const meFasilitas = fasilitasInput ? fasilitasInput.split(',').map((f) => f.trim()).filter(Boolean) : []
+
       await supabase.from('stores').update({
         theme_config: themeConfig,
+        theme_style: themeStyle,
+        bg_image_url: newBgImageUrl,
         announcement: announcement,
         banner_url: newBannerUrl,
         is_open: isOpen,
@@ -335,9 +356,12 @@ export default function KasirDashboardPage() {
         wifi_active: wifiActive,
         wifi_name: wifiName,
         wifi_password: wifiPassword,
+        jam_operasional: jamOperasional,
+        fasilitas: meFasilitas,
       }).eq('id', storeId)
 
       setBannerUrl(newBannerUrl)
+      setBgImageUrl(newBgImageUrl)
       setShowTampilanModal(false)
       alert('🎨 Tampilan & Fitur Toko Berhasil Diperbarui!')
     } catch (e: any) {
@@ -490,7 +514,7 @@ export default function KasirDashboardPage() {
               </div>
             </div>
 
-            {/* 🌟 RINCIAN ITEM PESANAN: PANAS/DINGIN + CATATAN */}
+            {/* RINCIAN ITEM PESANAN: PANAS/DINGIN + CATATAN */}
             <ul className="space-y-2 text-xs text-slate-300">
               {ord.order_items?.map((item: any) => (
                 <li key={item.id} className="bg-slate-950/60 p-2 rounded-xl border border-slate-800/60 space-y-1">
@@ -538,13 +562,13 @@ export default function KasirDashboardPage() {
         ))}
       </div>
 
-      {/* 🌟 MODAL PROFIL & LANGGANAN KASIR */}
+      {/* MODAL PROFIL & LANGGANAN KASIR */}
       {showProfileModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-base font-bold text-emerald-400">👤 Pengaturan Profil & QRIS</h2>
             
-            {/* 🌟 KOTAK SISA HARI LANGGANAN */}
+            {/* KOTAK SISA HARI LANGGANAN */}
             <div className="bg-slate-950 border border-amber-500/40 p-3.5 rounded-2xl space-y-2">
               <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider">⏳ Masa Aktif Langganan Toko</span>
               <p className="text-xs font-bold text-white">
@@ -589,17 +613,44 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* 🌟 MODAL EDIT TAMPILAN, 10 PRESET TEMA, WIFI, MAPS, & SOSMED */}
+      {/* MODAL EDIT TEMA VISUAL, BACKGROUND GAMBAR, WIFI, MAPS, SOSMED & FASILITAS TOKO */}
       {showTampilanModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-lg rounded-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-base font-bold text-amber-400">🎨 Edit Tema & Info Toko</h2>
             
             <div className="space-y-4">
-              {/* Pilihan 10 Preset Tema */}
+              {/* PILIHAN TEMA VISUAL PELANGGAN */}
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase">Pilih 10 Preset Tema Toko</label>
-                <div className="grid grid-cols-2 gap-2 mt-1 max-h-40 overflow-y-auto p-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Pilih Gaya Tema Visual Toko</label>
+                <select
+                  value={themeStyle}
+                  onChange={(e) => setThemeStyle(e.target.value)}
+                  className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white font-bold"
+                >
+                  <option value="glassmorphic">🍸 Gelas Kaca / Frosted Glass (Cerah Transparan)</option>
+                  <option value="bubble">🫧 Gelembung Ceria (Merah Muda / Pink Pastel)</option>
+                  <option value="fresh_mint">🍃 Fresh Mint (Hijau Muda)</option>
+                  <option value="sky_blue">☁️ Soft Sky (Biru Muda)</option>
+                  <option value="warm_latte">☕ Warm Latte (Cokelat Muda Aesthetic)</option>
+                </select>
+              </div>
+
+              {/* UPLOAD CUSTOM BACKGROUND GAMBAR TOKO */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Foto Background Toko (Wallpaper Pelanggan)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setBgImageFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-slate-400 file:py-1 file:px-3 file:rounded-xl file:bg-amber-950 file:text-amber-300"
+                />
+              </div>
+
+              {/* Pilihan 10 Preset Tema Warna */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Pilih 10 Preset Warna Toko</label>
+                <div className="grid grid-cols-2 gap-2 mt-1 max-h-36 overflow-y-auto p-1">
                   {THEME_PRESETS.map((preset) => (
                     <button
                       key={preset.name}
@@ -619,7 +670,7 @@ export default function KasirDashboardPage() {
                 </div>
               </div>
 
-              {/* Emoji Kustom & Banner Promosi */}
+              {/* Emoji & Status Toko */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase">Emoji Toko</label>
@@ -636,6 +687,29 @@ export default function KasirDashboardPage() {
                     {isOpen ? 'TOKO BUKA' : 'TOKO TUTUP'}
                   </button>
                 </div>
+              </div>
+
+              {/* Jam Operasional & Fasilitas Toko */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Jam Operasional Toko</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Setiap Hari 09.00 - 23.00 WIB"
+                  value={jamOperasional}
+                  onChange={(e) => setJamOperasional(e.target.value)}
+                  className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Fasilitas Toko (Pisahkan Koma)</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: 🔌 Colokan Listrik, ❄️ AC, 🚬 Smoking Area, 🎮 Board Game"
+                  value={fasilitasInput}
+                  onChange={(e) => setFasilitasInput(e.target.value)}
+                  className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
+                />
               </div>
 
               <div>
