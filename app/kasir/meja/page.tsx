@@ -35,15 +35,12 @@ export default function KasirMejaPage() {
 
     if (profile?.store_id) {
       setStoreId(profile.store_id)
-
       const rawStore: any = profile.stores
       const slugVal = Array.isArray(rawStore) ? rawStore[0]?.slug : rawStore?.slug
       setStoreSlug(slugVal || '')
-
       fetchTables(profile.store_id)
     } else {
       setLoading(false)
-      alert('Toko tidak ditemukan.')
     }
   }
 
@@ -61,7 +58,7 @@ export default function KasirMejaPage() {
     const num = parseInt(nomorMejaBaru)
     const exists = tables.some((t) => t.nomor === num)
     if (exists) {
-      alert(`Meja #${num} sudah ada!`)
+      alert(`Meja #${num} sudah ada di toko kamu!`)
       return
     }
 
@@ -91,22 +88,19 @@ export default function KasirMejaPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 font-sans pb-16">
       <div className="max-w-3xl mx-auto space-y-5">
-        
-        {/* Header Navigation */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div>
             <Link href="/kasir" className="text-xs text-emerald-400 font-bold hover:underline">← Kembali ke Dasbor</Link>
-            <h1 className="text-xl font-black text-white mt-1">🪑 Kelola Meja & QR Pemesanan</h1>
+            <h1 className="text-xl font-black text-white mt-1">🪑 Kelola Meja & QR Pemesanan Toko</h1>
           </div>
         </div>
 
-        {/* Form Tambah Meja */}
         <form onSubmit={handleAddTable} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex gap-2 items-center">
           <input
             type="number"
             value={nomorMejaBaru}
             onChange={(e) => setNomorMejaBaru(e.target.value)}
-            placeholder="Masukkan Nomor Meja Baru (misal: 6)"
+            placeholder="Masukkan Nomor Meja Baru (misal: 1, 2, 3)"
             required
             className="flex-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl font-bold focus:outline-none"
           />
@@ -115,15 +109,13 @@ export default function KasirMejaPage() {
           </button>
         </form>
 
-        {/* Grid Daftar Meja */}
         {loading ? (
-          <div className="p-8 text-xs text-slate-500 text-center">Memuat daftar meja...</div>
+          <div className="p-8 text-xs text-slate-500 text-center">Memuat meja toko kamu...</div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {tables.map((t) => {
-              const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-                `${typeof window !== 'undefined' ? window.location.origin : ''}/st/${storeSlug}?meja=${t.nomor}`
-              )}`
+              const tableLink = typeof window !== 'undefined' ? `${window.location.origin}/st/${storeSlug}?meja=${t.nomor}` : ''
+              const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(tableLink)}`
 
               return (
                 <div key={t.id} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl text-center space-y-3">
@@ -137,24 +129,15 @@ export default function KasirMejaPage() {
                     </button>
                   </div>
 
-                  {/* QR Code Meja Unik */}
-                  <div className="w-28 h-28 mx-auto bg-white p-1 rounded-xl overflow-hidden">
+                  <div className="w-28 h-28 mx-auto bg-white p-1.5 rounded-2xl overflow-hidden border">
                     <img src={qrUrl} alt={`QR Meja ${t.nomor}`} className="w-full h-full object-contain" />
                   </div>
 
-                  <a
-                    href={qrUrl}
-                    target="_blank"
-                    download={`QR_Meja_${t.nomor}.png`}
-                    className="block text-[10px] font-bold text-blue-400 hover:underline"
-                  >
-                    📥 Download QR Meja
+                  <a href={qrUrl} target="_blank" download={`QR_Toko_${storeSlug}_Meja_${t.nomor}.png`} className="block text-[10px] font-bold text-blue-400 hover:underline">
+                    📥 Cetak 1 Barcode Meja #{t.nomor}
                   </a>
 
-                  <button
-                    onClick={() => handleDeleteTable(t.id, t.nomor)}
-                    className="w-full py-1.5 bg-rose-950/60 text-rose-400 text-[10px] font-bold rounded-lg"
-                  >
+                  <button onClick={() => handleDeleteTable(t.id, t.nomor)} className="w-full py-1.5 bg-rose-950/60 text-rose-400 text-[10px] font-bold rounded-lg">
                     Hapus Meja
                   </button>
                 </div>
@@ -162,7 +145,6 @@ export default function KasirMejaPage() {
             })}
           </div>
         )}
-
       </div>
     </div>
   )
