@@ -13,14 +13,13 @@ function DynamicStoreContent() {
   const mejaParam = searchParams.get('meja')
   const supabase = createClient()
 
-  // --- STATE PWA INSTALLER UNTUK PELANGGAN ---
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  // --- STATE PWA INSTALLER & PEMBERITAHUAN SCAN BARCODE ---
   const [showInstallBtn, setShowInstallBtn] = useState<boolean>(true)
+  const [showScanNotice, setShowScanNotice] = useState<boolean>(true) // State untuk kotak pemberitahuan scan ulang
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
-      setDeferredPrompt(e)
       setShowInstallBtn(true)
     }
 
@@ -32,21 +31,12 @@ function DynamicStoreContent() {
   }, [])
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt()
-      const { outcome } = await deferredPrompt.userChoice
-      if (outcome === 'accepted') {
-        setShowInstallBtn(false)
-      }
-      setDeferredPrompt(null)
-    } else {
-      alert(
-        `Cara Pasang Aplikasi ${storeName}:\n\n` +
-        `1. Klik ikon titik tiga (⋮) atau tombol Share (📤) di browser HP kamu.\n` +
-        `2. Pilih menu "Tambahkan ke Layar Utama" / "Add to Home Screen".\n` +
-        `3. Aplikasi ${storeName} akan otomatis terpasang di HP kamu!`
-      )
-    }
+    alert(
+      `Cara Pasang Aplikasi ${storeName}:\n\n` +
+      `1. Klik ikon titik tiga (⋮) atau tombol Share (📤) di browser HP kamu.\n` +
+      `2. Pilih menu "Tambahkan ke Layar Utama" / "Add to Home Screen".\n` +
+      `3. Setelah aplikasi terpasang, SCAN KEMBALI barcode di meja agar nomor meja otomatis terdeteksi!`
+    )
   }
 
   // --- AUTH STATE & REFS ---
@@ -915,6 +905,28 @@ function DynamicStoreContent() {
         </div>
       )}
 
+      {/* 🌟 KOTAK PEMBERITAHUAN BARU: SCAN KEMBALI BARCODE SETELAH INSTALL */}
+      {showScanNotice && (
+        <div className="max-w-md mx-auto p-3 pt-3">
+          <div className="bg-blue-950/80 border border-blue-500/50 p-3.5 rounded-2xl flex items-start gap-3 shadow-lg relative">
+            <div className="text-xl shrink-0 mt-0.5">📱</div>
+            <div className="flex-1 min-w-0 pr-6">
+              <h4 className="text-xs font-black text-blue-300 uppercase tracking-wider">Informasi Penting</h4>
+              <p className="text-[11px] text-slate-200 mt-1 leading-relaxed">
+                Setelah selesai menginstal aplikasi, harap <strong className="text-emerald-400">scan kembali barcode di meja</strong> agar nomor meja kamu terdeteksi otomatis!
+              </p>
+            </div>
+            <button
+              onClick={() => setShowScanNotice(false)}
+              className="absolute top-3 right-3 text-slate-400 hover:text-white text-xs font-bold px-1.5 py-0.5 rounded-lg bg-slate-900/50"
+              title="Tutup"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Banner Status Buka / Tutup Toko Realtime */}
       {!isOpen ? (
         <div className="bg-rose-600 text-white p-3 text-center text-xs font-black shadow-lg sticky top-0 z-30">
@@ -1368,7 +1380,7 @@ function calculateWinner(squares: any[]) {
 
 export default function StoreSlugPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-xs text-slate-500 text-center bg-slate-950 min-h-screen">Memuat warkop...</div>}>
+    <Suspense fallback={<p className="text-xs text-slate-500 text-center bg-slate-950 min-h-screen">Memuat warkop...</p>}>
       <DynamicStoreContent />
     </Suspense>
   )
