@@ -15,7 +15,7 @@ function DynamicStoreContent() {
 
   // --- STATE PWA INSTALLER UNTUK PELANGGAN ---
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
-  const [showInstallBtn, setShowInstallBtn] = useState<boolean>(true) // Default true agar banner selalu tampil
+  const [showInstallBtn, setShowInstallBtn] = useState<boolean>(true)
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -616,6 +616,11 @@ function DynamicStoreContent() {
   if (!session) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-3 sm:p-6 font-sans">
+        {/* LINK MANIFEST DINAMIS SANGAT PENTING */}
+        <head>
+          <link rel="manifest" href={`/st/${slug}/manifest`} />
+        </head>
+
         <style jsx global>{`
           .pupil {
             transition: transform 0.05s ease-out;
@@ -884,6 +889,11 @@ function DynamicStoreContent() {
   return (
     <div className="min-h-screen text-slate-100 pb-28 font-sans transition-colors duration-300" style={{ backgroundColor: bgColor }}>
       
+      {/* LINK MANIFEST DINAMIS SANGAT PENTING */}
+      <head>
+        <link rel="manifest" href={`/st/${slug}/manifest`} />
+      </head>
+
       {/* BANNER FLOATING PWA INSTALLER UNTUK PELANGGAN */}
       {showInstallBtn && (
         <div className="bg-slate-900 border-b border-emerald-500/40 p-3 sticky top-0 z-40 shadow-lg flex items-center justify-between gap-3">
