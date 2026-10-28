@@ -47,16 +47,18 @@ export default function SuperAdminDashboard() {
     setLoading(true)
 
     // 1. Ambil Semua Toko
-    const { data: storeList } = await supabase.from('stores').select('*').order('created_at', { ascending: false })
+    const { data: storeList } = await supabase
+      .from('stores')
+      .select('*')
+      .order('created_at', { ascending: false })
 
     if (storeList) {
-      // Hitung tanggal awal hari ini untuk Omset & Pesanan Harian
       const startOfDay = new Date()
       startOfDay.setHours(0, 0, 0, 0)
 
       const enrichedStores = await Promise.all(
         storeList.map(async (st) => {
-          // 2. Hitung Omset Hari Ini
+          // 2. Hitung Omset & Total Pesanan Hari Ini
           const { data: todayOrders } = await supabase
             .from('orders')
             .select('total_harga, status')
@@ -69,8 +71,8 @@ export default function SuperAdminDashboard() {
 
           const totalOrdersCount = todayOrders ? todayOrders.length : 0
 
-          // 3. Hitung Sisa Hari Langganan
-          let daysRemaining = null
+          // 3. Hitung Sisa Hari Langganan Presisi
+          let daysRemaining = 0
           if (st.expired_at) {
             const now = new Date().getTime()
             const expiry = new Date(st.expired_at).getTime()
@@ -98,20 +100,35 @@ export default function SuperAdminDashboard() {
     fetchAllStoresWithStats()
   }
 
+  // LOGIKA PERPANJANG LANGGANAN PRESISI
   const updateSubscriptionDays = async (storeId: string, additionalDays: number) => {
     const target = stores.find((s) => s.id === storeId)
-    const currentExpiry = target?.expired_at && new Date(target.expired_at) > new Date()
-      ? new Date(target.expired_at)
-      : new Date()
+    
+    // Jika tanggal kadaluarsa sudah ada dan masih berlaku di masa depan, gunakan tanggal tersebut.
+    // Jika tidak ada / sudah lewat, gunakan waktu saat ini sebagai titik awal penambahan.
+    let baseDate = new Date()
+    if (target?.expired_at) {
+      const existingExpiry = new Date(target.expired_at)
+      if (existingExpiry > new Date()) {
+        baseDate = existingExpiry
+      }
+    }
 
-    const newExpiry = new Date(currentExpiry.getTime() + additionalDays * 24 * 60 * 60 * 1000)
+    const newExpiry = new Date(baseDate.getTime() + additionalDays * 24 * 60 * 60 * 1000)
 
-    await supabase.from('stores').update({
-      expired_at: newExpiry.toISOString(),
-    }).eq('id', storeId)
+    const { error } = await supabase
+      .from('stores')
+      .update({
+        expired_at: newExpiry.toISOString(),
+      })
+      .eq('id', storeId)
 
-    alert(`Masa langganan toko berhasil diperpanjang ${additionalDays} hari!`)
-    fetchAllStoresWithStats()
+    if (error) {
+      alert('Gagal memperbarui langganan: ' + error.message)
+    } else {
+      alert(`Masa langganan toko berhasil diperpanjang +${additionalDays} hari!`)
+      fetchAllStoresWithStats()
+    }
   }
 
   // TAMPILAN AUTENTIKASI PIN
@@ -216,33 +233,33 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
 
-                  {/* Informasi Langganan */}
+                  {/* Informasi Masa Aktif Langganan */}
                   <div className="pt-2 border-t border-sky-100 space-y-3">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-500">Sisa Waktu Langganan:</span>
-                      <span className={`font-black px-2.5 py-0.5 rounded-full text-[11px] ${st.daysRemaining !== null && st.daysRemaining <= 5 ? 'bg-red-100 text-red-700' : 'bg-sky-100 text-sky-800'}`}>
-                        {st.daysRemaining !== null ? `${st.daysRemaining} Hari Tersisa` : 'Aktif'}
+                      <span className={`font-black px-2.5 py-0.5 rounded-full text-[11px] ${st.daysRemaining <= 5 ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-sky-100 text-sky-800 border border-sky-200'}`}>
+                        {st.daysRemaining > 0 ? `${st.daysRemaining} Hari` : 'Expired / Belum Diisi'}
                       </span>
                     </div>
 
                     <div className="flex justify-between text-[11px] text-slate-500">
-                      <span>Expired:</span>
+                      <span>Tanggal Expired:</span>
                       <span className="font-bold text-slate-700">
-                        {st.expired_at ? new Date(st.expired_at).toLocaleDateString('id-ID') : 'Tidak Terbatas'}
+                        {st.expired_at ? new Date(st.expired_at).toLocaleDateString('id-ID') : 'Belum Ditentukan'}
                       </span>
                     </div>
 
-                    {/* Tombol Perpanjang Masa Langganan */}
+                    {/* Tombol Tambah Masa Langganan */}
                     <div className="flex gap-2 pt-1">
                       <button
                         onClick={() => updateSubscriptionDays(st.id, 30)}
-                        className="flex-1 py-2 bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs rounded-xl shadow-sm transition"
+                        className="flex-1 py-2 bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs rounded-xl shadow-sm transition active:scale-95"
                       >
                         +1 Bulan (30 Hari)
                       </button>
                       <button
                         onClick={() => updateSubscriptionDays(st.id, 365)}
-                        className="flex-1 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm transition"
+                        className="flex-1 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm transition active:scale-95"
                       >
                         +1 Tahun (365 Hari)
                       </button>
