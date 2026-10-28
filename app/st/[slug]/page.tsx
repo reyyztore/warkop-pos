@@ -14,12 +14,14 @@ function DynamicStoreContent() {
   const supabase = createClient()
 
   // --- STATE PWA INSTALLER UNTUK PELANGGAN ---
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [showInstallBtn, setShowInstallBtn] = useState<boolean>(true)
 
   useEffect(() => {
-    // Mencegah browser menangkap prompt global Reyyztore POS
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
+      setDeferredPrompt(e)
+      setShowInstallBtn(true)
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
@@ -30,13 +32,21 @@ function DynamicStoreContent() {
   }, [])
 
   const handleInstallClick = async () => {
-    // Menampilkan panduan manual agar browser membaca manifest /st/[slug]/manifest
-    alert(
-      `Cara Pasang Aplikasi ${storeName}:\n\n` +
-      `1. Klik ikon titik tiga (⋮) di pojok kanan atas browser HP kamu.\n` +
-      `2. Pilih menu "Tambahkan ke Layar Utama" / "Add to Home Screen".\n` +
-      `3. Aplikasi ${storeName} dengan logo dan nama aslinya akan langsung terpasang!`
-    )
+    if (deferredPrompt) {
+      deferredPrompt.prompt()
+      const { outcome } = await deferredPrompt.userChoice
+      if (outcome === 'accepted') {
+        setShowInstallBtn(false)
+      }
+      setDeferredPrompt(null)
+    } else {
+      alert(
+        `Cara Pasang Aplikasi ${storeName}:\n\n` +
+        `1. Klik ikon titik tiga (⋮) atau tombol Share (📤) di browser HP kamu.\n` +
+        `2. Pilih menu "Tambahkan ke Layar Utama" / "Add to Home Screen".\n` +
+        `3. Aplikasi ${storeName} akan otomatis terpasang di HP kamu!`
+      )
+    }
   }
 
   // --- AUTH STATE & REFS ---
