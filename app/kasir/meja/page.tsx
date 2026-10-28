@@ -27,11 +27,19 @@ export default function KasirMejaPage() {
       return
     }
 
-    const { data: profile } = await supabase.from('profiles').select('store_id, stores(slug)').eq('id', session.user.id).single()
-    
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('store_id, stores(slug)')
+      .eq('id', session.user.id)
+      .single()
+
     if (profile?.store_id) {
       setStoreId(profile.store_id)
-      setStoreSlug(profile.stores?.slug || '')
+
+      const rawStore: any = profile.stores
+      const slugVal = Array.isArray(rawStore) ? rawStore[0]?.slug : rawStore?.slug
+      setStoreSlug(slugVal || '')
+
       fetchTables(profile.store_id)
     } else {
       setLoading(false)
