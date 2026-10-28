@@ -20,7 +20,6 @@ function OrderContent() {
   const [storeAvatar, setStoreAvatar] = useState('')
   const [qrisUrl, setQrisUrl] = useState('')
   const [bgColor, setBgColor] = useState('#0f172a')
-  const [primaryColor, setPrimaryColor] = useState('#10b981')
   const [announcement, setAnnouncement] = useState('')
   const [bannerUrl, setBannerUrl] = useState('')
   const [isOpen, setIsOpen] = useState(true)
@@ -36,7 +35,7 @@ function OrderContent() {
   const [submitting, setSubmitting] = useState(false)
   const [selectedPayment, setSelectedPayment] = useState<'qris' | 'kasir'>('kasir')
 
-  // Bukti Transfer & Modal State
+  // Modal State
   const [showQrisModal, setShowQrisModal] = useState(false)
   const [activeOrderForQris, setActiveOrderForQris] = useState<any>(null)
   const [uploadingBukti, setUploadingBukti] = useState(false)
@@ -52,11 +51,31 @@ function OrderContent() {
   })
   const [editingName, setEditingName] = useState('')
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
-  const [soundOption, setSoundOption] = useState<number>(1)
 
-  // Games States
+  // --- 10 GAMES STATES ---
   const [tttBoard, setTttBoard] = useState(Array(9).fill(null))
   const [tttIsX, setTttIsX] = useState(true)
+  const [guessTarget, setGuessTarget] = useState(Math.floor(Math.random() * 20) + 1)
+  const [guessInput, setGuessInput] = useState('')
+  const [guessMsg, setGuessMsg] = useState('Tebak angka 1 - 20!')
+  const [rpsResult, setRpsResult] = useState('Pilih salah satu!')
+  const [cards, setCards] = useState(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5))
+  const [flipped, setFlipped] = useState<number[]>([])
+  const [matched, setMatched] = useState<number[]>([])
+  const [clicks, setClicks] = useState(0)
+  const [mathA, setMathA] = useState(Math.floor(Math.random() * 10) + 1)
+  const [mathB, setMathB] = useState(Math.floor(Math.random() * 10) + 1)
+  const [mathAns, setMathAns] = useState('')
+  const [mathMsg, setMathMsg] = useState('Jawab pertanyaan matematika!')
+  const [colorTarget, setColorTarget] = useState('#EF4444')
+  const [colorMsg, setColorMsg] = useState('Pilih warna yang sesuai!')
+  const [coinResult, setCoinResult] = useState('Tekan tombol untuk lempar koin!')
+  const [scrambleWord] = useState('WARKOP')
+  const [scrambleInput, setScrambleInput] = useState('')
+  const [scrambleMsg, setScrambleMsg] = useState('Susun kata: A K R P O W')
+  const [reactState, setReactState] = useState<'idle' | 'waiting' | 'ready'>('idle')
+  const [reactTime, setReactTime] = useState<number | null>(null)
+  const [startTime, setStartTime] = useState<number>(0)
 
   useEffect(() => {
     initData()
@@ -75,6 +94,9 @@ function OrderContent() {
           fetchMyOrders()
         }
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, () => {
+        fetchStoreConfig()
+      })
       .subscribe()
 
     return () => {
@@ -90,7 +112,6 @@ function OrderContent() {
       if (p.avatar_url) setStoreAvatar(p.avatar_url)
       if (p.qris_url) setQrisUrl(p.qris_url)
       if (p.bg_color) setBgColor(p.bg_color)
-      if (p.primary_color) setPrimaryColor(p.primary_color)
       if (p.announcement) setAnnouncement(p.announcement)
       if (p.banner_url) setBannerUrl(p.banner_url)
       if (p.is_open !== undefined) setIsOpen(p.is_open)
@@ -142,6 +163,7 @@ function OrderContent() {
   }
 
   const updateCart = (id: string, delta: number) => {
+    if (!isOpen) return
     setCart((prev) => {
       const current = prev[id] || 0
       const updated = current + delta
@@ -165,7 +187,7 @@ function OrderContent() {
 
   const handleCheckout = async () => {
     if (!isOpen) {
-      alert('Maaf, Toko sedang Tutup saat ini!')
+      alert('Maaf, Toko sedang TUTUP. Pemesanan tidak dapat diproses.')
       return
     }
     if (!selectedTable) {
@@ -266,6 +288,32 @@ function OrderContent() {
     }
   }
 
+  const handleSaveProfile = async () => {
+    try {
+      let avatarUrl = userData.avatarUrl
+      if (avatarFile) {
+        const fileExt = avatarFile.name.split('.').pop()
+        const filePath = `avatars/cust_${Date.now()}.${fileExt}`
+        await supabase.storage.from('menu-images').upload(filePath, avatarFile)
+        const { data } = supabase.storage.from('menu-images').getPublicUrl(filePath)
+        avatarUrl = data.publicUrl
+      }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        await supabase.auth.updateUser({
+          data: { full_name: editingName, avatar_url: avatarUrl },
+        })
+      }
+
+      localStorage.setItem('customer_name', editingName)
+      setUserData((prev) => ({ ...prev, name: editingName, avatarUrl }))
+      alert('Profil pelanggan berhasil diperbarui!')
+    } catch (e: any) {
+      alert(e.message)
+    }
+  }
+
   const filteredMenuItems = activeCategory === 'all' 
     ? menuItems 
     : menuItems.filter(m => m.category_id === activeCategory)
@@ -273,10 +321,14 @@ function OrderContent() {
   return (
     <div className="min-h-screen text-slate-100 pb-28 font-sans transition-colors duration-300" style={{ backgroundColor: bgColor }}>
       
-      {/* Peringatan Toko Tutup */}
-      {!isOpen && (
-        <div className="bg-rose-600 text-white p-2.5 text-center text-xs font-black">
+      {/* Banner Status Buka / Tutup Toko */}
+      {!isOpen ? (
+        <div className="bg-rose-600 text-white p-3 text-center text-xs font-black shadow-lg sticky top-0 z-30">
           🚫 TOKO SEDANG TUTUP. Anda hanya dapat melihat menu saat ini.
+        </div>
+      ) : (
+        <div className="bg-emerald-600 text-slate-950 p-1.5 text-center text-[10px] font-bold">
+          ● Toko Sedang Buka (Siap Menerima Pesanan)
         </div>
       )}
 
@@ -369,10 +421,10 @@ function OrderContent() {
                       <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5">
                         <button onClick={() => updateCart(item.id, -1)} className="w-7 h-7 bg-slate-800 text-white rounded-lg text-xs font-bold">-</button>
                         <span className="w-6 text-center text-xs font-black text-emerald-400">{qty}</span>
-                        <button onClick={() => updateCart(item.id, 1)} className="w-7 h-7 bg-emerald-500 text-slate-950 rounded-lg text-xs font-bold">+</button>
+                        <button onClick={() => updateCart(item.id, 1)} disabled={!isOpen} className="w-7 h-7 bg-emerald-500 text-slate-950 rounded-lg text-xs font-bold disabled:opacity-50">+</button>
                       </div>
                     ) : (
-                      <button onClick={() => updateCart(item.id, 1)} className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-xl">+ Tambah</button>
+                      <button onClick={() => updateCart(item.id, 1)} disabled={!isOpen} className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-xl disabled:opacity-50">+ Tambah</button>
                     )}
                   </div>
                 </div>
@@ -389,7 +441,9 @@ function OrderContent() {
               <button onClick={handleNudgeKasir} className="px-4 py-2 bg-amber-500 text-slate-950 text-xs font-black rounded-xl">🔔 Pencet Bel Panggil Kasir</button>
             </div>
 
-            {myOrders.map((ord) => (
+            {myOrders.length === 0 ? (
+              <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-2xl text-xs text-slate-400">Belum ada pesanan aktif saat ini.</div>
+            ) : myOrders.map((ord) => (
               <div key={ord.id} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
                 <div className="flex justify-between items-start">
                   <div>
@@ -405,6 +459,233 @@ function OrderContent() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* TAB 3: 10 MINI GAMES ANTI-BOSAN */}
+        {activeNav === 'game' && (
+          <div className="space-y-4 text-center">
+            <h2 className="text-base font-bold text-white">🎮 Arena 10 Games Anti-Bosan</h2>
+            
+            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[11px]">
+              {[
+                { id: 1, name: '1. TicTacToe' },
+                { id: 2, name: '2. Tebak Angka' },
+                { id: 3, name: '3. Su-Wit' },
+                { id: 4, name: '4. Memory' },
+                { id: 5, name: '5. Clicker' },
+                { id: 6, name: '6. Kuis Math' },
+                { id: 7, name: '7. Tebak Warna' },
+                { id: 8, name: '8. Lempar Koin' },
+                { id: 9, name: '9. Acak Kata' },
+                { id: 10, name: '10. Tes Reaksi' },
+              ].map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => setSelectedGame(g.id)}
+                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap ${
+                    selectedGame === g.id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 border border-slate-800 text-slate-400'
+                  }`}
+                >
+                  {g.name}
+                </button>
+              ))}
+            </div>
+
+            {/* Game 1: TicTacToe */}
+            {selectedGame === 1 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl inline-block max-w-xs w-full">
+                <div className="grid grid-cols-3 gap-2">
+                  {tttBoard.map((cell, idx) => (
+                    <button key={idx} onClick={() => {
+                      if (cell || calculateWinner(tttBoard)) return
+                      const next = [...tttBoard]
+                      next[idx] = tttIsX ? '❌' : '⭕'
+                      setTttBoard(next)
+                      setTttIsX(!tttIsX)
+                    }} className="h-16 bg-slate-950 border border-slate-800 text-xl font-black rounded-xl text-white">
+                      {cell}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => { setTttBoard(Array(9).fill(null)); setTttIsX(true); }} className="mt-4 px-4 py-2 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset Game</button>
+              </div>
+            )}
+
+            {/* Game 2: Tebak Angka */}
+            {selectedGame === 2 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">{guessMsg}</p>
+                <input type="number" value={guessInput} onChange={(e) => setGuessInput(e.target.value)} placeholder="Masukkan angka (1-20)" className="w-full p-2.5 bg-slate-950 border border-slate-800 text-center text-xs font-bold text-white rounded-xl" />
+                <div className="flex gap-2">
+                  <button onClick={() => {
+                    const num = parseInt(guessInput)
+                    if (num === guessTarget) setGuessMsg('🎉 BENAR KAN! Kamu menang!')
+                    else if (num < guessTarget) setGuessMsg('Too low! Angka lebih besar.')
+                    else setGuessMsg('Too high! Angka lebih kecil.')
+                  }} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl">Tebak!</button>
+                  <button onClick={() => { setGuessTarget(Math.floor(Math.random() * 20) + 1); setGuessInput(''); setGuessMsg('Tebak angka 1 - 20!'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
+                </div>
+              </div>
+            )}
+
+            {/* Game 3: Suwit */}
+            {selectedGame === 3 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">{rpsResult}</p>
+                <div className="flex justify-center gap-2">
+                  {['✊ Batu', '✋ Kertas', '✌️ Gunting'].map((choice, i) => (
+                    <button key={i} onClick={() => {
+                      const bot = ['✊ Batu', '✋ Kertas', '✌️ Gunting'][Math.floor(Math.random() * 3)]
+                      setRpsResult(`Kamu: ${choice} vs Bot: ${bot}`)
+                    }} className="px-3 py-2 bg-slate-950 border border-slate-800 text-xs font-bold rounded-xl">{choice}</button>
+                  ))}
+                </div>
+                <button onClick={() => setRpsResult('Pilih salah satu!')} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
+              </div>
+            )}
+
+            {/* Game 4: Memory */}
+            {selectedGame === 4 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <div className="grid grid-cols-4 gap-2">
+                  {cards.map((card, idx) => (
+                    <button key={idx} onClick={() => {
+                      if (flipped.length < 2 && !flipped.includes(idx)) {
+                        const nextFlipped = [...flipped, idx]
+                        setFlipped(nextFlipped)
+                        if (nextFlipped.length === 2) {
+                          if (cards[nextFlipped[0]] === cards[nextFlipped[1]]) setMatched((m) => [...m, nextFlipped[0], nextFlipped[1]])
+                          setTimeout(() => setFlipped([]), 800)
+                        }
+                      }
+                    }} className="h-14 bg-slate-950 border border-slate-800 text-lg rounded-xl">
+                      {flipped.includes(idx) || matched.includes(idx) ? card : '❓'}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => { setCards(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5)); setFlipped([]); setMatched([]); }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset Card</button>
+              </div>
+            )}
+
+            {/* Game 5: Clicker */}
+            {selectedGame === 5 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">Total Klik: {clicks}</p>
+                <button onClick={() => setClicks(clicks + 1)} className="w-full py-6 bg-emerald-500 text-slate-950 font-black text-lg rounded-2xl">⚡ KLIK SECEPATNYA!</button>
+                <button onClick={() => setClicks(0)} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset Skor</button>
+              </div>
+            )}
+
+            {/* Game 6: Kuis Math */}
+            {selectedGame === 6 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">{mathMsg}</p>
+                <p className="text-sm font-black text-white">{mathA} + {mathB} = ?</p>
+                <input type="number" value={mathAns} onChange={(e) => setMathAns(e.target.value)} placeholder="Hasil?" className="w-full p-2 bg-slate-950 border border-slate-800 text-center text-xs rounded-xl text-white" />
+                <div className="flex gap-2">
+                  <button onClick={() => {
+                    if (parseInt(mathAns) === mathA + mathB) setMathMsg('✅ Benar Sekali!')
+                    else setMathMsg('❌ Salah, coba lagi!')
+                  }} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-bold rounded-xl">Jawab</button>
+                  <button onClick={() => { setMathA(Math.floor(Math.random() * 10) + 1); setMathB(Math.floor(Math.random() * 10) + 1); setMathAns(''); setMathMsg('Jawab pertanyaan matematika!'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">🔄 Soal Baru</button>
+                </div>
+              </div>
+            )}
+
+            {/* Game 7: Color Guess */}
+            {selectedGame === 7 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">{colorMsg}</p>
+                <div className="w-16 h-16 rounded-2xl mx-auto border-2 border-white" style={{ backgroundColor: colorTarget }} />
+                <div className="flex justify-center gap-2">
+                  {['#EF4444', '#10B981', '#3B82F6'].map((c, i) => (
+                    <button key={i} onClick={() => {
+                      if (c === colorTarget) setColorMsg('🎉 Benar! Warna pas.')
+                      else setColorMsg('❌ Warna salah!')
+                    }} className="px-3 py-2 bg-slate-950 border border-slate-800 text-xs font-bold rounded-xl" style={{ color: c }}>Warna {i+1}</button>
+                  ))}
+                </div>
+                <button onClick={() => {
+                  const colors = ['#EF4444', '#10B981', '#3B82F6']
+                  setColorTarget(colors[Math.floor(Math.random() * colors.length)])
+                  setColorMsg('Pilih warna yang sesuai!')
+                }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Acak Warna</button>
+              </div>
+            )}
+
+            {/* Game 8: Lempar Koin */}
+            {selectedGame === 8 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">{coinResult}</p>
+                <button onClick={() => setCoinResult(Math.random() > 0.5 ? '🪙 HASIL: GAMBAR' : '🪙 HASIL: ANGKA')} className="w-full py-3 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Lempar Koin!</button>
+                <button onClick={() => setCoinResult('Tekan tombol untuk lempar koin!')} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
+              </div>
+            )}
+
+            {/* Game 9: Acak Kata */}
+            {selectedGame === 9 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <p className="text-xs font-bold text-emerald-400">{scrambleMsg}</p>
+                <input type="text" value={scrambleInput} onChange={(e) => setScrambleInput(e.target.value.toUpperCase())} placeholder="Jawaban kamu" className="w-full p-2 bg-slate-950 border border-slate-800 text-center text-xs font-bold text-white rounded-xl" />
+                <div className="flex gap-2">
+                  <button onClick={() => {
+                    if (scrambleInput === scrambleWord) setScrambleMsg('🎉 BENAR! KATA = WARKOP')
+                    else setScrambleMsg('❌ Masih Salah!')
+                  }} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-bold rounded-xl">Cek</button>
+                  <button onClick={() => { setScrambleInput(''); setScrambleMsg('Susun kata: A K R P O W'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
+                </div>
+              </div>
+            )}
+
+            {/* Game 10: Tes Reaksi */}
+            {selectedGame === 10 && (
+              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                {reactState === 'idle' && (
+                  <button onClick={() => {
+                    setReactState('waiting')
+                    setTimeout(() => {
+                      setReactState('ready')
+                      setStartTime(Date.now())
+                    }, Math.random() * 2000 + 1000)
+                  }} className="w-full py-4 bg-emerald-500 text-slate-950 font-bold text-xs rounded-xl">Mulai Tes Reaksi</button>
+                )}
+                {reactState === 'waiting' && <p className="text-xs text-amber-400 font-bold animate-pulse">Tunggu warna berubah hijau...</p>}
+                {reactState === 'ready' && (
+                  <button onClick={() => {
+                    setReactTime(Date.now() - startTime)
+                    setReactState('idle')
+                  }} className="w-full py-6 bg-emerald-400 text-slate-950 font-black text-base rounded-xl">KLIK SEKARANG!</button>
+                )}
+                {reactTime && <p className="text-xs font-bold text-emerald-300">Kecepatan Reaksi: {reactTime} ms</p>}
+                <button onClick={() => { setReactState('idle'); setReactTime(null); }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset Game</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: PROFIL PELANGGAN */}
+        {activeNav === 'profile' && (
+          <div className="space-y-4">
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4 text-center">
+              <div className="w-24 h-24 mx-auto rounded-full overflow-hidden bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center text-3xl">
+                {userData.avatarUrl ? <img src={userData.avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : '👤'}
+              </div>
+
+              <div className="space-y-3 text-left">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Ubah Foto Profil Pelanggan</label>
+                  <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-xl file:bg-emerald-950 file:text-emerald-300" />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Ganti Nama Pelanggan</label>
+                  <input type="text" value={editingName} onChange={(e) => setEditingName(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs font-bold text-white rounded-xl" />
+                </div>
+
+                <button onClick={handleSaveProfile} className="w-full py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl">💾 Simpan Perubahan Profil</button>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -424,8 +705,8 @@ function OrderContent() {
               </div>
             </div>
 
-            <button onClick={handleCheckout} disabled={submitting || !isOpen} className="w-full py-2.5 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl">
-              {submitting ? 'Mengirim...' : 'Pesan Sekarang →'}
+            <button onClick={handleCheckout} disabled={submitting || !isOpen} className="w-full py-2.5 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl disabled:opacity-50">
+              {submitting ? 'Mengirim...' : !isOpen ? 'Toko Sedang Tutup' : 'Pesan Sekarang →'}
             </button>
           </div>
         </div>
@@ -454,13 +735,24 @@ function OrderContent() {
 
       {/* Bottom Nav */}
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800 p-2 z-40">
-        <div className="max-w-md mx-auto grid grid-cols-2 gap-1 text-center">
+        <div className="max-w-md mx-auto grid grid-cols-4 gap-1 text-center">
           <button onClick={() => setActiveNav('menu')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'menu' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>☕ Menu</button>
           <button onClick={() => setActiveNav('status')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'status' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>📡 Status</button>
+          <button onClick={() => setActiveNav('game')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'game' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>🎮 Game</button>
+          <button onClick={() => setActiveNav('profile')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'profile' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>👤 Profil</button>
         </div>
       </div>
     </div>
   )
+}
+
+function calculateWinner(squares: any[]) {
+  const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]]
+  for (let i = 0; i < lines.length; i++) {
+    const [a, b, c] = lines[i]
+    if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) return squares[a]
+  }
+  return null
 }
 
 export default function MejaPage() {
