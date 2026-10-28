@@ -19,10 +19,12 @@ export async function GET(
 
   return NextResponse.json(
     {
+      id: `/st/${slug}/`,
       name: storeName,
       short_name: storeName,
       description: `Sistem Pemesanan Digital ${storeName}`,
       start_url: `/st/${slug}`,
+      scope: `/st/${slug}/`,
       display: 'standalone',
       background_color: '#0f172a',
       theme_color: '#10b981',
