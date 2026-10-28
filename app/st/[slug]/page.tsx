@@ -15,16 +15,14 @@ function DynamicStoreContent() {
 
   // --- STATE PWA INSTALLER & PEMBERITAHUAN SCAN BARCODE ---
   const [showInstallBtn, setShowInstallBtn] = useState<boolean>(true)
-  const [showScanNotice, setShowScanNotice] = useState<boolean>(true) // State untuk kotak pemberitahuan scan ulang
+  const [showScanNotice, setShowScanNotice] = useState<boolean>(true)
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
       setShowInstallBtn(true)
     }
-
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
     }
@@ -56,7 +54,6 @@ function DynamicStoreContent() {
   const [badgeText, setBadgeText] = useState('Mengawasimu 👀')
   const [badgeClass, setBadgeClass] = useState('bg-purple-950/80 text-purple-300 border-purple-800')
 
-  // Mouth Shapes & Eyelid State
   const [mouthPurple, setMouthPurple] = useState('M-8 18 Q0 24 8 18')
   const [mouthOrange, setMouthOrange] = useState('M-6 14 Q0 19 6 14')
   const [mouthBlack, setMouthBlack] = useState('M-4 10 Q0 14 4 10')
@@ -70,8 +67,7 @@ function DynamicStoreContent() {
 
   // Customer Sound Bell Option
   const [customerSoundOption, setCustomerSoundOption] = useState<number>(1)
-
-  const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'game' | 'profile'>('menu')
+  const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'info' | 'game' | 'profile'>('menu')
   const [selectedGame, setSelectedGame] = useState<number>(1)
 
   // Toko X State
@@ -80,15 +76,28 @@ function DynamicStoreContent() {
   const [storeName, setStoreName] = useState('Warung Kopi')
   const [storeAvatar, setStoreAvatar] = useState('')
   const [qrisUrl, setQrisUrl] = useState('')
-  const [bgColor, setBgColor] = useState('#0f172a')
   const [announcement, setAnnouncement] = useState('')
   const [bannerUrl, setBannerUrl] = useState('')
   const [isOpen, setIsOpen] = useState(true)
 
-  // Data Menu & Cart
+  // 🌟 FITUR BARU: Maps, WA Komplain, Sosmed, Wifi, & Tema Kustom
+  const [mapsUrl, setMapsUrl] = useState('')
+  const [waComplaint, setWaComplaint] = useState('')
+  const [socialLinks, setSocialLinks] = useState<{ platform: string; url: string }[]>([])
+  const [wifiActive, setWifiActive] = useState(false)
+  const [wifiName, setWifiName] = useState('')
+  const [wifiPassword, setWifiPassword] = useState('')
+  const [themeConfig, setThemeConfig] = useState({
+    bgColor: '#0f172a',
+    textColor: '#ffffff',
+    accentColor: '#10b981',
+    emoji: '☕'
+  })
+
+  // Data Menu & Cart Baru (Mendukung Varian Panas/Dingin & Catatan)
   const [menuItems, setMenuItems] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
-  const [cart, setCart] = useState<{ [key: string]: number }>({})
+  const [cart, setCart] = useState<{ [key: string]: { qty: number; varian: 'panas' | 'dingin'; catatan: string; menuId: string } }>({})
   const [selectedTable, setSelectedTable] = useState(mejaParam || '')
   const [tables, setTables] = useState<any[]>([])
   const [activeCategory, setActiveCategory] = useState<string>('all')
@@ -138,7 +147,7 @@ function DynamicStoreContent() {
   const [reactTime, setReactTime] = useState<number | null>(null)
   const [startTime, setStartTime] = useState<number>(0)
 
-  // --- EYE TRACKING LOGIC ---
+  // EYE TRACKING LOGIC
   const pupilsData = [
     { id: 'pupil-purple-l', center: { x: 176, y: 185 }, maxR: 6 },
     { id: 'pupil-purple-r', center: { x: 224, y: 185 }, maxR: 6 },
@@ -182,7 +191,6 @@ function DynamicStoreContent() {
     return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [isInputFocused, isPasswordFocused, isHoveringButton, isPasswordVisible])
 
-  // --- REACTION HANDLERS ---
   const handleInputFocus = (ref: React.RefObject<HTMLInputElement | null>) => {
     setIsInputFocused(true)
     setBadgeText('Memerhatikan input ✍️')
@@ -204,11 +212,8 @@ function DynamicStoreContent() {
 
   const handlePasswordFocus = () => {
     setIsPasswordFocused(true)
-    if (!isPasswordVisible) {
-      coverEyes()
-    } else {
-      showShockedState()
-    }
+    if (!isPasswordVisible) coverEyes()
+    else showShockedState()
   }
 
   const handlePasswordBlur = () => {
@@ -225,9 +230,7 @@ function DynamicStoreContent() {
     setMouthOrange('M-4 15 Q0 13 4 15')
   }
 
-  const uncoverEyes = () => {
-    setEyelidOpacity('0')
-  }
+  const uncoverEyes = () => setEyelidOpacity('0')
 
   const showShockedState = () => {
     uncoverEyes()
@@ -242,11 +245,8 @@ function DynamicStoreContent() {
   const togglePasswordVisibility = () => {
     const nextState = !isPasswordVisible
     setIsPasswordVisible(nextState)
-    if (nextState) {
-      showShockedState()
-    } else if (isPasswordFocused) {
-      coverEyes()
-    }
+    if (nextState) showShockedState()
+    else if (isPasswordFocused) coverEyes()
   }
 
   const handleButtonHover = () => {
@@ -265,9 +265,7 @@ function DynamicStoreContent() {
 
   const handleButtonLeave = () => {
     setIsHoveringButton(false)
-    if (!isInputFocused && !isPasswordFocused) {
-      resetState()
-    }
+    if (!isInputFocused && !isPasswordFocused) resetState()
   }
 
   const resetState = () => {
@@ -279,7 +277,6 @@ function DynamicStoreContent() {
     setMouthYellow('M-5 6 Q0 10 5 6')
   }
 
-  // --- SOUND ALERT HELPER ---
   const speakText = (text: string) => {
     if (!('speechSynthesis' in window)) return
     window.speechSynthesis.cancel()
@@ -417,10 +414,18 @@ function DynamicStoreContent() {
     if (store.store_name) setStoreName(store.store_name)
     if (store.avatar_url) setStoreAvatar(store.avatar_url)
     if (store.qris_url) setQrisUrl(store.qris_url)
-    if (store.bg_color) setBgColor(store.bg_color)
     if (store.announcement) setAnnouncement(store.announcement)
     if (store.banner_url) setBannerUrl(store.banner_url)
     if (store.is_open !== undefined) setIsOpen(store.is_open)
+
+    // Fitur Baru
+    if (store.maps_url) setMapsUrl(store.maps_url)
+    if (store.wa_complaint) setWaComplaint(store.wa_complaint)
+    if (store.social_links) setSocialLinks(store.social_links)
+    if (store.wifi_active !== undefined) setWifiActive(store.wifi_active)
+    if (store.wifi_name) setWifiName(store.wifi_name)
+    if (store.wifi_password) setWifiPassword(store.wifi_password)
+    if (store.theme_config) setThemeConfig(store.theme_config)
   }
 
   const fetchMyOrders = async (targetStoreId: string, nameFilter: string) => {
@@ -436,26 +441,37 @@ function DynamicStoreContent() {
     if (data) setMyOrders(data)
   }
 
-  const updateCart = (id: string, delta: number) => {
+  // 🌟 REVISI KERANJANG: VARIAN PANAS/DINGIN + CATATAN
+  const updateCartItem = (menuId: string, varian: 'panas' | 'dingin', delta: number) => {
     if (!isOpen) return
+    const key = `${menuId}_${varian}`
     setCart((prev) => {
-      const current = prev[id] || 0
-      const updated = current + delta
-      if (updated <= 0) {
+      const current = prev[key] || { qty: 0, varian, catatan: '', menuId }
+      const newQty = current.qty + delta
+      if (newQty <= 0) {
         const copy = { ...prev }
-        delete copy[id]
+        delete copy[key]
         return copy
       }
-      return { ...prev, [id]: updated }
+      return { ...prev, [key]: { ...current, qty: newQty } }
     })
   }
 
-  const getTotalHarga = () => Object.entries(cart).reduce((total, [id, qty]) => {
-    const item = menuItems.find((m) => m.id === id)
-    return total + (item ? item.harga * qty : 0)
+  const updateCartNotes = (key: string, catatan: string) => {
+    setCart((prev) => {
+      if (!prev[key]) return prev
+      return { ...prev, [key]: { ...prev[key], catatan } }
+    })
+  }
+
+  const getTotalHarga = () => Object.entries(cart).reduce((total, [key, item]) => {
+    const menu = menuItems.find((m) => m.id === item.menuId)
+    if (!menu) return total
+    const hargaSatuan = item.varian === 'dingin' && menu.harga_dingin ? menu.harga_dingin : (menu.harga_panas || menu.harga)
+    return total + hargaSatuan * item.qty
   }, 0)
 
-  const getTotalItem = () => Object.values(cart).reduce((a, b) => a + b, 0)
+  const getTotalItem = () => Object.values(cart).reduce((a, b) => a + b.qty, 0)
 
   const handleCheckout = async () => {
     if (!isOpen) {
@@ -494,13 +510,16 @@ function DynamicStoreContent() {
 
       if (orderErr) throw orderErr
 
-      const orderItems = Object.entries(cart).map(([menuId, qty]) => {
-        const item = menuItems.find((m) => m.id === menuId)
+      const orderItems = Object.entries(cart).map(([key, item]) => {
+        const menu = menuItems.find((m) => m.id === item.menuId)
+        const hargaSatuan = item.varian === 'dingin' && menu?.harga_dingin ? menu.harga_dingin : (menu?.harga_panas || menu?.harga || 0)
         return {
           order_id: orderData.id,
-          menu_id: menuId,
-          qty,
-          harga_satuan: item?.harga || 0,
+          menu_id: item.menuId,
+          qty: item.qty,
+          harga_satuan: hargaSatuan,
+          varian: item.varian,
+          catatan: item.catatan || null,
         }
       })
 
@@ -520,6 +539,34 @@ function DynamicStoreContent() {
       alert(err.message || 'Gagal mengirim pesanan.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // 🌟 REVISI: PEMBATALAN PESANAN OLEH PELANGGAN
+  const handleCancelOrder = async (orderId: string) => {
+    const confirmCancel = confirm('Apakah kamu yakin ingin membatalkan pesanan ini?')
+    if (!confirmCancel) return
+
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: 'batal' })
+        .eq('id', orderId)
+        .eq('status', 'pending')
+
+      if (error) throw error
+
+      // Kirim Notifikasi Broadcast Realtime ke Kasir
+      await supabase.channel(`kasir-dashboard-${storeId}`).send({
+        type: 'broadcast',
+        event: 'order-cancelled-by-customer',
+        payload: { orderId, tableNo: selectedTable, customerName: userData.name },
+      })
+
+      alert('❌ Pesanan berhasil dibatalkan.')
+      fetchMyOrders(storeId, userData.name)
+    } catch (err: any) {
+      alert(err.message || 'Gagal membatalkan pesanan. Pesanan mungkin sudah diproses oleh kasir.')
     }
   }
 
@@ -606,79 +653,49 @@ function DynamicStoreContent() {
   if (!session) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-3 sm:p-6 font-sans">
-        {/* LINK MANIFEST DINAMIS SANGAT PENTING */}
         <head>
           <link rel="manifest" href={`/st/${slug}/manifest`} />
         </head>
 
         <style jsx global>{`
-          .pupil {
-            transition: transform 0.05s ease-out;
-          }
-          .eyelid {
-            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
-            transform-origin: center;
-          }
-          .character-arm {
-            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-            transform-origin: bottom center;
-          }
-          .character-body {
-            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-          }
-          .mouth {
-            transition: d 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
-          }
-          @keyframes float-slow {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-6px) rotate(1deg); }
-          }
-          @keyframes float-reverse {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-8px) rotate(-1.5deg); }
-          }
+          .pupil { transition: transform 0.05s ease-out; }
+          .eyelid { transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease; transform-origin: center; }
+          .character-arm { transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); transform-origin: bottom center; }
+          .character-body { transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+          .mouth { transition: d 0.2s ease, transform 0.2s ease, opacity 0.2s ease; }
+          @keyframes float-slow { 0%, 100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-6px) rotate(1deg); } }
+          @keyframes float-reverse { 0%, 100% { transform: translateY(0px) rotate(0deg); } 50% { transform: translateY(-8px) rotate(-1.5deg); } }
           .animate-float-1 { animation: float-slow 4s ease-in-out infinite; }
           .animate-float-2 { animation: float-reverse 4.5s ease-in-out infinite 0.5s; }
-
           .is-covering .purple-arm-left { transform: translate(22px, -78px) rotate(42deg) scale(1.1); }
           .is-covering .purple-arm-right { transform: translate(-22px, -78px) rotate(-42deg) scale(1.1); }
           .is-covering .orange-hand-left { transform: translate(18px, -42px) rotate(35deg); }
           .is-covering .orange-hand-right { transform: translate(-18px, -42px) rotate(-35deg); }
           .is-covering .black-char { transform: translateY(70px) rotate(-8deg); }
-
           .is-shocked .pupil { transform: scale(1.4) !important; }
         `}</style>
 
         <div className="w-full max-w-5xl bg-slate-900/90 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[620px] backdrop-blur-xl">
-          
-          {/* Kolom Kiri: Stage Karakter Interaktif */}
-          <div
-            className={`lg:col-span-6 bg-slate-950/60 relative p-6 sm:p-8 flex flex-col justify-between items-center overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-800 select-none min-h-[320px] lg:min-h-full ${
-              isCovering ? 'is-covering' : ''
-            } ${isShocked ? 'is-shocked' : ''}`}
-          >
+          <div className={`lg:col-span-6 bg-slate-950/60 relative p-6 sm:p-8 flex flex-col justify-between items-center overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-800 select-none min-h-[320px] lg:min-h-full ${isCovering ? 'is-covering' : ''} ${isShocked ? 'is-shocked' : ''}`}>
             <div className="absolute top-10 left-10 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-10 right-10 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Header Toko Pelanggan */}
             <div className="w-full flex justify-between items-center z-10">
               <div className="flex items-center space-x-2.5">
                 <div className="w-7 h-7 rounded-full overflow-hidden bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-xs text-emerald-400 shrink-0">
-                  {storeAvatar ? <img src={storeAvatar} alt="Logo" className="w-full h-full object-cover" /> : '☕'}
+                  {storeAvatar ? <img src={storeAvatar} alt="Logo" className="w-full h-full object-cover" /> : themeConfig.emoji}
                 </div>
-                <span className="text-[11px] font-black tracking-wider text-slate-200 uppercase line-clamp-1">WARKOP {storeName}</span>
+                <span className="text-[11px] font-black tracking-wider text-slate-200 uppercase line-clamp-1">{storeName}</span>
               </div>
               <span className={`text-[11px] font-bold px-3 py-1 rounded-full border transition-all duration-300 ${badgeClass}`}>
                 {badgeText}
               </span>
             </div>
 
-            {/* Canvas SVG Karakter Interaktif */}
             <div className="relative w-full max-w-[400px] aspect-[4/3] my-auto flex items-center justify-center">
               <svg ref={svgRef} id="characters-svg" viewBox="0 0 500 400" className="w-full h-full overflow-visible">
                 <ellipse cx="250" cy="365" rx="190" ry="14" fill="#0F172A" />
 
-                {/* 1. Karakter Kuning */}
                 <g id="char-yellow" className="character-body animate-float-1" style={{ transformOrigin: '110px 320px' }}>
                   <rect x="75" y="275" width="70" height="70" rx="16" transform="rotate(45 110 310)" fill="#FACC15" />
                   <g transform="translate(110, 310)">
@@ -692,7 +709,6 @@ function DynamicStoreContent() {
                   </g>
                 </g>
 
-                {/* 2. Karakter Hitam */}
                 <g id="char-black" className="character-body animate-float-2" style={{ transformOrigin: '350px 180px' }}>
                   <rect className="black-char transition-transform duration-500" x="315" y="70" width="70" height="230" rx="35" fill="#1E293B" />
                   <g className="black-char transition-transform duration-500" transform="translate(350, 120)">
@@ -706,7 +722,6 @@ function DynamicStoreContent() {
                   </g>
                 </g>
 
-                {/* 3. Karakter Ungu Utama */}
                 <g id="char-purple" className="character-body animate-float-1" style={{ transformOrigin: '200px 240px' }}>
                   <path d="M130 360 V180 A70 70 0 0 1 270 180 V360 Z" fill="#6366F1" />
                   <g transform="translate(200, 185)">
@@ -722,7 +737,6 @@ function DynamicStoreContent() {
                   <path className="purple-arm-right character-arm" d="M270 260 C 290 260, 290 210, 270 200" stroke="#4F46E5" strokeWidth="16" strokeLinecap="round" fill="none" />
                 </g>
 
-                {/* 4. Karakter Oranye */}
                 <g id="char-orange" className="character-body animate-float-2" style={{ transformOrigin: '270px 290px' }}>
                   <path d="M205 360 V260 A55 55 0 0 1 315 260 V360 Z" fill="#F97316" />
                   <g transform="translate(260, 255)">
@@ -739,15 +753,13 @@ function DynamicStoreContent() {
                 </g>
               </svg>
             </div>
-
             <p className="text-[11px] text-slate-500 font-medium">Sistem Pemesanan Warkop POS Interaktif</p>
           </div>
 
-          {/* Kolom Kanan: Form Login Toko Pelanggan */}
           <div className="lg:col-span-6 p-6 sm:p-10 flex flex-col justify-center bg-slate-900/40">
             <div className="mb-6 flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-slate-950 border border-slate-800 overflow-hidden flex items-center justify-center text-xl shrink-0">
-                {storeAvatar ? <img src={storeAvatar} alt="Logo Toko" className="w-full h-full object-cover" /> : '☕'}
+                {storeAvatar ? <img src={storeAvatar} alt="Logo Toko" className="w-full h-full object-cover" /> : themeConfig.emoji}
               </div>
               <div>
                 <h1 className="text-xl font-black text-white tracking-tight">{storeName}</h1>
@@ -757,7 +769,6 @@ function DynamicStoreContent() {
               </div>
             </div>
 
-            {/* Tab Switcher */}
             <div className="w-full bg-slate-950 p-1 rounded-2xl flex mb-5 border border-slate-800">
               <button
                 type="button"
@@ -783,9 +794,7 @@ function DynamicStoreContent() {
               {isRegister && (
                 <>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Nama Lengkap
-                    </label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nama Lengkap</label>
                     <input
                       ref={nameRef}
                       type="text"
@@ -798,11 +807,8 @@ function DynamicStoreContent() {
                       className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-all"
                     />
                   </div>
-
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                      Nomor WhatsApp / HP
-                    </label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nomor WhatsApp / HP</label>
                     <input
                       type="tel"
                       value={phone}
@@ -818,9 +824,7 @@ function DynamicStoreContent() {
               )}
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  Email
-                </label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email</label>
                 <input
                   ref={emailRef}
                   type="email"
@@ -835,9 +839,7 @@ function DynamicStoreContent() {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                  Kata Sandi
-                </label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Kata Sandi</label>
                 <div className="relative">
                   <input
                     type={isPasswordVisible ? 'text' : 'password'}
@@ -877,19 +879,20 @@ function DynamicStoreContent() {
   }
 
   return (
-    <div className="min-h-screen text-slate-100 pb-28 font-sans transition-colors duration-300" style={{ backgroundColor: bgColor }}>
-      
-      {/* LINK MANIFEST DINAMIS SANGAT PENTING */}
+    <div
+      className="min-h-screen pb-28 font-sans transition-all duration-300"
+      style={{ backgroundColor: themeConfig.bgColor || '#0f172a', color: themeConfig.textColor || '#ffffff' }}
+    >
       <head>
         <link rel="manifest" href={`/st/${slug}/manifest`} />
       </head>
 
-      {/* BANNER FLOATING PWA INSTALLER UNTUK PELANGGAN */}
+      {/* PWA INSTALLER BANNER */}
       {showInstallBtn && (
-        <div className="bg-slate-900 border-b border-emerald-500/40 p-3 sticky top-0 z-40 shadow-lg flex items-center justify-between gap-3">
+        <div className="bg-slate-900 border-b border-emerald-500/40 p-3 sticky top-0 z-40 shadow-lg flex items-center justify-between gap-3 text-white">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl overflow-hidden bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
-              {storeAvatar ? <img src={storeAvatar} alt="Logo Toko" className="w-full h-full object-cover" /> : '☕'}
+              {storeAvatar ? <img src={storeAvatar} alt="Logo Toko" className="w-full h-full object-cover" /> : themeConfig.emoji}
             </div>
             <div>
               <p className="text-xs font-black text-white">Install App {storeName}</p>
@@ -905,10 +908,10 @@ function DynamicStoreContent() {
         </div>
       )}
 
-      {/* 🌟 KOTAK PEMBERITAHUAN BARU: SCAN KEMBALI BARCODE SETELAH INSTALL */}
+      {/* PEMBERITAHUAN SCAN KEMBALI BARCODE */}
       {showScanNotice && (
         <div className="max-w-md mx-auto p-3 pt-3">
-          <div className="bg-blue-950/80 border border-blue-500/50 p-3.5 rounded-2xl flex items-start gap-3 shadow-lg relative">
+          <div className="bg-blue-950/80 border border-blue-500/50 p-3.5 rounded-2xl flex items-start gap-3 shadow-lg relative text-white">
             <div className="text-xl shrink-0 mt-0.5">📱</div>
             <div className="flex-1 min-w-0 pr-6">
               <h4 className="text-xs font-black text-blue-300 uppercase tracking-wider">Informasi Penting</h4>
@@ -927,7 +930,7 @@ function DynamicStoreContent() {
         </div>
       )}
 
-      {/* Banner Status Buka / Tutup Toko Realtime */}
+      {/* Banner Status Buka / Tutup Toko */}
       {!isOpen ? (
         <div className="bg-rose-600 text-white p-3 text-center text-xs font-black shadow-lg sticky top-0 z-30">
           🚫 TOKO SEDANG TUTUP. Anda hanya dapat melihat menu saat ini.
@@ -938,12 +941,12 @@ function DynamicStoreContent() {
         </div>
       )}
 
-      {/* Top Header */}
-      <div className="sticky top-0 z-20 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800 p-4">
+      {/* Top Header Toko */}
+      <div className="sticky top-0 z-20 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800 p-4 text-white">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center text-lg shrink-0">
-              {storeAvatar ? <img src={storeAvatar} alt="Logo" className="w-full h-full object-cover" /> : '☕'}
+              {storeAvatar ? <img src={storeAvatar} alt="Logo" className="w-full h-full object-cover" /> : themeConfig.emoji}
             </div>
             <div>
               <span className="text-[9px] font-bold tracking-wider text-emerald-400 uppercase">Warkop Digital</span>
@@ -968,22 +971,19 @@ function DynamicStoreContent() {
       </div>
 
       <div className="max-w-md mx-auto p-4 space-y-4">
-        
-        {/* Banner Promosi dari Kasir Toko X */}
         {bannerUrl && (
           <div className="w-full h-36 rounded-2xl overflow-hidden border border-slate-800">
             <img src={bannerUrl} alt="Banner Promosi" className="w-full h-full object-cover" />
           </div>
         )}
 
-        {/* Pengumuman Toko X */}
         {announcement && (
           <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold rounded-2xl text-center">
             📢 {announcement}
           </div>
         )}
 
-        {/* TAB 1: MENU KATALOG */}
+        {/* TAB 1: MENU UTAMA (PANAS / DINGIN & CATATAN) */}
         {activeNav === 'menu' && (
           <div className="space-y-4">
             <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
@@ -1012,30 +1012,76 @@ function DynamicStoreContent() {
               <p className="text-xs text-slate-500 text-center py-8 bg-slate-900/40 border border-slate-800 rounded-2xl">Belum ada menu di toko ini.</p>
             ) : (
               filteredMenuItems.map((item) => {
-                const qty = cart[item.id] || 0
+                const keyPanas = `${item.id}_panas`
+                const keyDingin = `${item.id}_dingin`
+                const qtyPanas = cart[keyPanas]?.qty || 0
+                const qtyDingin = cart[keyDingin]?.qty || 0
+
                 return (
-                  <div key={item.id} className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex items-center gap-3.5">
-                    <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-800 shrink-0">
-                      {item.foto_url ? <img src={item.foto_url} alt={item.nama} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-3xl">☕</div>}
+                  <div key={item.id} className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl space-y-3 text-white">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 shrink-0 flex items-center justify-center text-2xl">
+                        {item.foto_url ? <img src={item.foto_url} alt={item.nama} className="w-full h-full object-cover" /> : themeConfig.emoji}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-white text-sm line-clamp-1">{item.nama}</h3>
+                        <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5">{item.deskripsi || 'Racikan khas toko kami.'}</p>
+                      </div>
                     </div>
 
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-white text-sm line-clamp-1">{item.nama}</h3>
-                      <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5">{item.deskripsi || 'Racikan khas toko kami.'}</p>
-                      <p className="text-xs font-black text-emerald-400 mt-1.5">Rp {item.harga?.toLocaleString('id-ID')}</p>
-                    </div>
-
-                    <div className="flex flex-col items-center">
-                      {qty > 0 ? (
-                        <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl p-0.5">
-                          <button onClick={() => updateCart(item.id, -1)} className="w-7 h-7 bg-slate-800 text-white rounded-lg text-xs font-bold">-</button>
-                          <span className="w-6 text-center text-xs font-black text-emerald-400">{qty}</span>
-                          <button onClick={() => updateCart(item.id, 1)} disabled={!isOpen} className="w-7 h-7 bg-emerald-500 text-slate-950 rounded-lg text-xs font-bold disabled:opacity-50">+</button>
+                    {/* Pilihan 2 Harga Varian (Panas / Dingin) */}
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80">
+                      <div className="bg-slate-950 p-2.5 rounded-xl flex items-center justify-between border border-slate-800/60">
+                        <div>
+                          <span className="text-[10px] text-amber-400 font-bold">🔥 Panas</span>
+                          <p className="text-xs font-black text-emerald-400">Rp {(item.harga_panas || item.harga)?.toLocaleString('id-ID')}</p>
                         </div>
-                      ) : (
-                        <button onClick={() => updateCart(item.id, 1)} disabled={!isOpen} className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold rounded-xl disabled:opacity-50">+ Tambah</button>
+                        <div className="flex items-center gap-1">
+                          {qtyPanas > 0 && <button onClick={() => updateCartItem(item.id, 'panas', -1)} className="w-6 h-6 bg-slate-800 text-xs font-bold rounded-md">-</button>}
+                          {qtyPanas > 0 && <span className="text-xs font-bold px-1 text-emerald-400">{qtyPanas}</span>}
+                          <button onClick={() => updateCartItem(item.id, 'panas', 1)} disabled={!isOpen} className="w-6 h-6 bg-emerald-500 text-slate-950 text-xs font-bold rounded-md disabled:opacity-50">+</button>
+                        </div>
+                      </div>
+
+                      {item.harga_dingin && (
+                        <div className="bg-slate-950 p-2.5 rounded-xl flex items-center justify-between border border-slate-800/60">
+                          <div>
+                            <span className="text-[10px] text-cyan-400 font-bold">🧊 Dingin</span>
+                            <p className="text-xs font-black text-emerald-400">Rp {item.harga_dingin?.toLocaleString('id-ID')}</p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {qtyDingin > 0 && <button onClick={() => updateCartItem(item.id, 'dingin', -1)} className="w-6 h-6 bg-slate-800 text-xs font-bold rounded-md">-</button>}
+                            {qtyDingin > 0 && <span className="text-xs font-bold px-1 text-emerald-400">{qtyDingin}</span>}
+                            <button onClick={() => updateCartItem(item.id, 'dingin', 1)} disabled={!isOpen} className="w-6 h-6 bg-emerald-500 text-slate-950 text-xs font-bold rounded-md disabled:opacity-50">+</button>
+                          </div>
+                        </div>
                       )}
                     </div>
+
+                    {/* Catatan Pemesanan Khusus */}
+                    {(qtyPanas > 0 || qtyDingin > 0) && (
+                      <div className="space-y-1.5 pt-1">
+                        {qtyPanas > 0 && (
+                          <input
+                            type="text"
+                            placeholder="Catatan porsi panas (misal: manis / sedikit gula)..."
+                            value={cart[keyPanas]?.catatan || ''}
+                            onChange={(e) => updateCartNotes(keyPanas, e.target.value)}
+                            className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                          />
+                        )}
+                        {qtyDingin > 0 && (
+                          <input
+                            type="text"
+                            placeholder="Catatan porsi dingin (misal: es sedikit)..."
+                            value={cart[keyDingin]?.catatan || ''}
+                            onChange={(e) => updateCartNotes(keyDingin, e.target.value)}
+                            className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                          />
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })
@@ -1043,10 +1089,10 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 2: STATUS PESANAN */}
+        {/* TAB 2: STATUS PESANAN & BATALKAN PESANAN */}
         {activeNav === 'status' && (
           <div className="space-y-4">
-            <div className="bg-amber-950/30 border border-amber-500/30 p-3.5 rounded-2xl text-center space-y-1">
+            <div className="bg-amber-950/30 border border-amber-500/30 p-3.5 rounded-2xl text-center space-y-1 text-white">
               <p className="text-xs font-bold text-amber-300">🔔 Panggil Kasir Ke Meja Kamu</p>
               <button onClick={handleNudgeKasir} className="px-4 py-2 bg-amber-500 text-slate-950 text-xs font-black rounded-xl">🔔 Pencet Bel Panggil Kasir Toko</button>
             </div>
@@ -1054,14 +1100,24 @@ function DynamicStoreContent() {
             {myOrders.length === 0 ? (
               <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-2xl text-xs text-slate-400">Belum ada pesanan aktif di toko ini saat ini.</div>
             ) : myOrders.map((ord) => (
-              <div key={ord.id} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
+              <div key={ord.id} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3 text-white">
                 <div className="flex justify-between items-start">
                   <div>
                     <span className="text-xs font-bold text-emerald-400">Meja #{ord.tables?.nomor || '-'}</span>
                     <p className="text-[10px] text-slate-500">{new Date(ord.created_at).toLocaleString('id-ID')}</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{ord.status}</span>
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-400' : ord.status === 'batal' ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{ord.status}</span>
                 </div>
+
+                {/* 🌟 REVISI: TOMBOL BATALKAN PESANAN PELANGGAN */}
+                {ord.status === 'pending' && (
+                  <button
+                    onClick={() => handleCancelOrder(ord.id)}
+                    className="w-full py-2 bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-bold rounded-xl transition active:scale-95"
+                  >
+                    🚫 Batalkan Pesanan Ini
+                  </button>
+                )}
 
                 <div className="flex gap-2 pt-1 border-t border-b border-slate-800/80 py-2">
                   <button onClick={() => { setActiveOrderForQris(ord); setShowQrisModal(true); }} className="flex-1 py-1.5 bg-emerald-950 text-emerald-300 border border-emerald-800/80 text-xs font-bold rounded-xl">📲 Lihat QRIS Toko</button>
@@ -1072,9 +1128,53 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 3: 10 MINI GAMES ANTI-BOSAN */}
+        {/* 🌟 TAB 3: INFO WIFI, MAPS, SOSMED, & WA KOMPLAIN */}
+        {activeNav === 'info' && (
+          <div className="space-y-4 text-white">
+            {/* Fasilitas Wifi */}
+            {wifiActive && (
+              <div className="bg-slate-900/90 border border-blue-800/80 p-4 rounded-2xl space-y-2">
+                <h3 className="text-xs font-black text-blue-300 uppercase tracking-wider">📶 Fasilitas Wi-Fi Toko</h3>
+                <div className="text-xs space-y-1">
+                  <p><span className="text-slate-400">Nama Wi-Fi:</span> <strong>{wifiName || 'Tidak Diset'}</strong></p>
+                  <p><span className="text-slate-400">Password:</span> <strong className="font-mono text-emerald-400">{wifiPassword || 'Tidak Diset'}</strong></p>
+                </div>
+              </div>
+            )}
+
+            {/* Google Maps Link */}
+            {mapsUrl && (
+              <a href={mapsUrl} target="_blank" rel="noreferrer" className="block p-4 bg-slate-900/90 border border-slate-800 rounded-2xl text-xs font-bold text-center text-sky-400 hover:underline">
+                📍 Buka Lokasi Toko di Google Maps ➔
+              </a>
+            )}
+
+            {/* WA Komplain */}
+            {waComplaint && (
+              <a href={`https://wa.me/${waComplaint.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className="block p-4 bg-emerald-950/80 border border-emerald-800 rounded-2xl text-xs font-bold text-center text-emerald-300 hover:underline">
+                💬 WhatsApp Layanan / Komplain Toko ➔
+              </a>
+            )}
+
+            {/* Social Media Links */}
+            {socialLinks && socialLinks.length > 0 && (
+              <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl space-y-2">
+                <h4 className="text-xs font-bold text-slate-400 uppercase">Media Sosial Toko</h4>
+                <div className="flex flex-col gap-2">
+                  {socialLinks.map((link, i) => (
+                    <a key={i} href={link.url} target="_blank" rel="noreferrer" className="p-2.5 bg-slate-950 rounded-xl text-xs font-bold text-emerald-400 hover:underline">
+                      🔗 {link.platform}: {link.url}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: 10 MINI GAMES */}
         {activeNav === 'game' && (
-          <div className="space-y-4 text-center">
+          <div className="space-y-4 text-center text-white">
             <h2 className="text-base font-bold text-white">🎮 Arena 10 Games Anti-Bosan</h2>
             
             <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[11px]">
@@ -1277,9 +1377,9 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 4: PROFIL PELANGGAN + NADA DERING */}
+        {/* TAB 5: PROFIL PELANGGAN */}
         {activeNav === 'profile' && (
-          <div className="space-y-4">
+          <div className="space-y-4 text-white">
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4 text-center">
               <div className="w-24 h-24 mx-auto rounded-full overflow-hidden bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center text-3xl">
                 {userData.avatarUrl ? <img src={userData.avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : '👤'}
@@ -1316,7 +1416,7 @@ function DynamicStoreContent() {
       {/* Floating Bottom Cart */}
       {activeNav === 'menu' && Object.keys(cart).length > 0 && (
         <div className="fixed bottom-20 left-4 right-4 max-w-md mx-auto z-30">
-          <div className="bg-slate-900/90 backdrop-blur-xl border border-emerald-500/40 p-3.5 rounded-2xl space-y-3">
+          <div className="bg-slate-900/95 backdrop-blur-xl border border-emerald-500/40 p-3.5 rounded-2xl space-y-3 text-white">
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase">{getTotalItem()} Menu Dipilih</p>
@@ -1335,7 +1435,7 @@ function DynamicStoreContent() {
         </div>
       )}
 
-      {/* Modal QRIS Toko X */}
+      {/* Modal QRIS Toko */}
       {showQrisModal && activeOrderForQris && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-6 text-center space-y-4">
@@ -1356,11 +1456,12 @@ function DynamicStoreContent() {
         </div>
       )}
 
-      {/* Bottom Nav */}
+      {/* Bottom Nav Bar Pelanggan */}
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800 p-2 z-40">
-        <div className="max-w-md mx-auto grid grid-cols-4 gap-1 text-center">
+        <div className="max-w-md mx-auto grid grid-cols-5 gap-1 text-center">
           <button onClick={() => setActiveNav('menu')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'menu' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>☕ Menu</button>
           <button onClick={() => setActiveNav('status')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'status' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>📡 Status</button>
+          <button onClick={() => setActiveNav('info')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'info' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>ℹ️ Info</button>
           <button onClick={() => setActiveNav('game')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'game' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>🎮 Game</button>
           <button onClick={() => setActiveNav('profile')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'profile' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>👤 Profil</button>
         </div>
