@@ -15,10 +15,15 @@ function OrderContent() {
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'game' | 'profile'>('menu')
   const [selectedGame, setSelectedGame] = useState<number>(1)
 
-  // Profile Warkop & QRIS dari Kasir
+  // Profile Warkop, Tampilan & Theme dari Kasir
   const [storeName, setStoreName] = useState('Warung Kopi Kita')
   const [storeAvatar, setStoreAvatar] = useState('')
   const [qrisUrl, setQrisUrl] = useState('')
+  const [bgColor, setBgColor] = useState('#0f172a')
+  const [primaryColor, setPrimaryColor] = useState('#10b981')
+  const [announcement, setAnnouncement] = useState('')
+  const [bannerUrl, setBannerUrl] = useState('')
+  const [isOpen, setIsOpen] = useState(true)
 
   // Data State
   const [menuItems, setMenuItems] = useState<any[]>([])
@@ -49,114 +54,24 @@ function OrderContent() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [soundOption, setSoundOption] = useState<number>(1)
 
-  // --- 10 GAMES STATES ---
-  // Game 1: Tic Tac Toe
+  // Games States
   const [tttBoard, setTttBoard] = useState(Array(9).fill(null))
   const [tttIsX, setTttIsX] = useState(true)
-
-  // Game 2: Tebak Angka
-  const [guessTarget, setGuessTarget] = useState(Math.floor(Math.random() * 20) + 1)
-  const [guessInput, setGuessInput] = useState('')
-  const [guessMsg, setGuessMsg] = useState('Tebak angka 1 - 20!')
-
-  // Game 3: Suwit
-  const [rpsResult, setRpsResult] = useState('Pilih salah satu!')
-
-  // Game 4: Memory Cards
-  const [cards, setCards] = useState(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5))
-  const [flipped, setFlipped] = useState<number[]>([])
-  const [matched, setMatched] = useState<number[]>([])
-
-  // Game 5: Clicker
-  const [clicks, setClicks] = useState(0)
-
-  // Game 6: Kuis Matematika
-  const [mathA, setMathA] = useState(Math.floor(Math.random() * 10) + 1)
-  const [mathB, setMathB] = useState(Math.floor(Math.random() * 10) + 1)
-  const [mathAns, setMathAns] = useState('')
-  const [mathMsg, setMathMsg] = useState('Jawab pertanyaan matematika!')
-
-  // Game 7: Color Guess
-  const [colorTarget, setColorTarget] = useState('#EF4444')
-  const [colorMsg, setColorMsg] = useState('Pilih warna yang sesuai!')
-
-  // Game 8: Lempar Koin
-  const [coinResult, setCoinResult] = useState('Tekan tombol untuk lempar koin!')
-
-  // Game 9: Acak Kata
-  const [scrambleWord] = useState('WARKOP')
-  const [scrambleInput, setScrambleInput] = useState('')
-  const [scrambleMsg, setScrambleMsg] = useState('Susun kata: A K R P O W')
-
-  // Game 10: Tes Reaksi
-  const [reactState, setReactState] = useState<'idle' | 'waiting' | 'ready'>('idle')
-  const [reactTime, setReactTime] = useState<number | null>(null)
-  const [startTime, setStartTime] = useState<number>(0)
-
-  // --- AUDIO GENERATOR HELPER ---
-  const speakText = (text: string, loop: boolean = false) => {
-    if (!('speechSynthesis' in window)) return
-    window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = 'id-ID'
-    if (loop) utterance.onend = () => window.speechSynthesis.speak(utterance)
-    window.speechSynthesis.speak(utterance)
-  }
-
-  const playBellSound = (loop: boolean = false) => {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
-      const audioCtx = new AudioCtx()
-      
-      const playTone = () => {
-        const osc = audioCtx.createOscillator()
-        const gain = audioCtx.createGain()
-        osc.type = 'sine'
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime)
-        gain.gain.setValueAtTime(0.5, audioCtx.currentTime)
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.2)
-        osc.connect(gain)
-        gain.connect(audioCtx.destination)
-        osc.start()
-        osc.stop(audioCtx.currentTime + 1.2)
-      }
-
-      playTone()
-      if (loop) {
-        const interval = setInterval(playTone, 8000)
-        setTimeout(() => clearInterval(interval), 24000)
-      }
-    } catch (e) {
-      console.log(e)
-    }
-  }
-
-  const triggerSoundByOption = (opt: number) => {
-    if (opt === 1) playBellSound(false)
-    if (opt === 2) playBellSound(true)
-    if (opt === 3) speakText('Pesanan anda sudah selesai', false)
-    if (opt === 4) speakText('Pesanan anda sudah selesai', true)
-  }
 
   useEffect(() => {
     initData()
     loadUserProfile()
     fetchStoreConfig()
 
-    // Realtime Broadcast Bel Spesifik Meja dari Kasir
     const channel = supabase
       .channel('meja-customer-realtime')
       .on('broadcast', { event: 'ring-table-bell' }, (payload: any) => {
         if (payload.payload?.tableNo?.toString() === selectedTable?.toString()) {
-          triggerSoundByOption(soundOption)
-          alert(`🔔 Meja #${selectedTable}: Dipanggil Kasir! Pesanan Kamu Siap/Selesai.`)
+          alert(`🔔 Meja #${selectedTable}: Dipanggil Kasir! Pesanan Kamu Siap.`)
         }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload: any) => {
         if (payload.new && payload.new.nama_pemesan === userData.name) {
-          if (payload.new.status === 'selesai') {
-            triggerSoundByOption(soundOption)
-          }
           fetchMyOrders()
         }
       })
@@ -165,14 +80,20 @@ function OrderContent() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [selectedTable, soundOption, userData.name])
+  }, [selectedTable, userData.name])
 
   const fetchStoreConfig = async () => {
-    const { data } = await supabase.from('profiles').select('store_name, avatar_url, qris_url').eq('role', 'cashier').limit(1)
+    const { data } = await supabase.from('profiles').select('*').eq('role', 'cashier').limit(1)
     if (data && data.length > 0) {
-      if (data[0].store_name) setStoreName(data[0].store_name)
-      if (data[0].avatar_url) setStoreAvatar(data[0].avatar_url)
-      if (data[0].qris_url) setQrisUrl(data[0].qris_url)
+      const p = data[0]
+      if (p.store_name) setStoreName(p.store_name)
+      if (p.avatar_url) setStoreAvatar(p.avatar_url)
+      if (p.qris_url) setQrisUrl(p.qris_url)
+      if (p.bg_color) setBgColor(p.bg_color)
+      if (p.primary_color) setPrimaryColor(p.primary_color)
+      if (p.announcement) setAnnouncement(p.announcement)
+      if (p.banner_url) setBannerUrl(p.banner_url)
+      if (p.is_open !== undefined) setIsOpen(p.is_open)
     }
   }
 
@@ -189,7 +110,7 @@ function OrderContent() {
     } else {
       const name = localStorage.getItem('customer_name') || 'Tamu'
       const phone = localStorage.getItem('customer_phone') || '-'
-      setUserData({ name, phone, email: '-', avatarUrl: '' })
+      setUserData({ name, phone, email: '', avatarUrl: '' })
       setEditingName(name)
       fetchMyOrders(name)
     }
@@ -243,6 +164,10 @@ function OrderContent() {
   const getTotalItem = () => Object.values(cart).reduce((a, b) => a + b, 0)
 
   const handleCheckout = async () => {
+    if (!isOpen) {
+      alert('Maaf, Toko sedang Tutup saat ini!')
+      return
+    }
     if (!selectedTable) {
       alert('Silakan pilih nomor meja kamu terlebih dahulu!')
       return
@@ -262,6 +187,7 @@ function OrderContent() {
         .insert({
           table_id: targetTable.id,
           nama_pemesan: userData.name,
+          email_pemesan: userData.email || null,
           phone_pemesan: userData.phone,
           total_harga: getTotalHarga(),
           status: 'pending',
@@ -283,8 +209,7 @@ function OrderContent() {
         }
       })
 
-      const { error: itemsErr } = await supabase.from('order_items').insert(orderItems)
-      if (itemsErr) throw itemsErr
+      await supabase.from('order_items').insert(orderItems)
 
       if (selectedPayment === 'qris') {
         setActiveOrderForQris(orderData)
@@ -341,50 +266,25 @@ function OrderContent() {
     }
   }
 
-  const handleSaveProfile = async () => {
-    try {
-      let avatarUrl = userData.avatarUrl
-      if (avatarFile) {
-        const fileExt = avatarFile.name.split('.').pop()
-        const filePath = `avatars/cust_${Date.now()}.${fileExt}`
-        await supabase.storage.from('menu-images').upload(filePath, avatarFile)
-        const { data } = supabase.storage.from('menu-images').getPublicUrl(filePath)
-        avatarUrl = data.publicUrl
-      }
-
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        await supabase.auth.updateUser({
-          data: { full_name: editingName, avatar_url: avatarUrl },
-        })
-      }
-
-      localStorage.setItem('customer_name', editingName)
-      setUserData((prev) => ({ ...prev, name: editingName, avatarUrl }))
-      alert('Profil berhasil diperbarui!')
-    } catch (e: any) {
-      alert(e.message)
-    }
-  }
-
-  const handleLogout = async () => {
-    window.speechSynthesis.cancel()
-    await supabase.auth.signOut()
-    localStorage.clear()
-    router.push('/')
-  }
-
   const filteredMenuItems = activeCategory === 'all' 
     ? menuItems 
     : menuItems.filter(m => m.category_id === activeCategory)
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pb-28 font-sans">
-      {/* Top Bar Header */}
-      <div className="sticky top-0 z-20 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80 p-4">
+    <div className="min-h-screen text-slate-100 pb-28 font-sans transition-colors duration-300" style={{ backgroundColor: bgColor }}>
+      
+      {/* Peringatan Toko Tutup */}
+      {!isOpen && (
+        <div className="bg-rose-600 text-white p-2.5 text-center text-xs font-black">
+          🚫 TOKO SEDANG TUTUP. Anda hanya dapat melihat menu saat ini.
+        </div>
+      )}
+
+      {/* Top Header */}
+      <div className="sticky top-0 z-20 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800 p-4">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full overflow-hidden bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-lg shrink-0">
+            <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center text-lg shrink-0">
               {storeAvatar ? <img src={storeAvatar} alt="Logo" className="w-full h-full object-cover" /> : '☕'}
             </div>
             <div>
@@ -397,11 +297,11 @@ function OrderContent() {
             <select
               value={selectedTable}
               onChange={(e) => setSelectedTable(e.target.value)}
-              className="appearance-none bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 font-bold text-xs px-3 py-2 pr-7 rounded-xl focus:outline-none"
+              className="appearance-none bg-slate-900 border border-slate-800 text-emerald-400 font-bold text-xs px-3 py-2 pr-7 rounded-xl focus:outline-none"
             >
-              <option value="" className="bg-slate-900 text-slate-300">Pilih Meja</option>
+              <option value="">Pilih Meja</option>
               {tables.map((t) => (
-                <option key={t.id} value={t.nomor} className="bg-slate-900 text-white">Meja #{t.nomor}</option>
+                <option key={t.id} value={t.nomor}>Meja #{t.nomor}</option>
               ))}
             </select>
             <span className="absolute right-2.5 top-2.5 text-[10px] text-emerald-400 pointer-events-none">▼</span>
@@ -409,14 +309,29 @@ function OrderContent() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto p-4">
+      <div className="max-w-md mx-auto p-4 space-y-4">
+        
+        {/* Banner Promosi dari Kasir */}
+        {bannerUrl && (
+          <div className="w-full h-36 rounded-2xl overflow-hidden border border-slate-800">
+            <img src={bannerUrl} alt="Banner Promosi" className="w-full h-full object-cover" />
+          </div>
+        )}
+
+        {/* Pengumuman Toko dari Kasir */}
+        {announcement && (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold rounded-2xl text-center">
+            📢 {announcement}
+          </div>
+        )}
+
         {/* TAB 1: MENU KATALOG */}
         {activeNav === 'menu' && (
           <div className="space-y-4">
             <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
               <button
                 onClick={() => setActiveCategory('all')}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 ${
+                className={`px-3.5 py-1.5 rounded-full text-xs font-bold ${
                   activeCategory === 'all' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-400 border border-slate-800'
                 }`}
               >
@@ -426,7 +341,7 @@ function OrderContent() {
                 <button
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 ${
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold ${
                     activeCategory === cat.id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-400 border border-slate-800'
                   }`}
                 >
@@ -435,22 +350,12 @@ function OrderContent() {
               ))}
             </div>
 
-            {loading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((n) => (
-                  <div key={n} className="h-24 bg-slate-900/60 rounded-2xl animate-pulse border border-slate-800/50" />
-                ))}
-              </div>
-            ) : filteredMenuItems.map((item) => {
+            {filteredMenuItems.map((item) => {
               const qty = cart[item.id] || 0
               return (
                 <div key={item.id} className="bg-slate-900/80 border border-slate-800 p-3 rounded-2xl flex items-center gap-3.5">
                   <div className="w-20 h-20 rounded-xl overflow-hidden bg-slate-800 shrink-0">
-                    {item.foto_url ? (
-                      <img src={item.foto_url} alt={item.nama} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-3xl">☕</div>
-                    )}
+                    {item.foto_url ? <img src={item.foto_url} alt={item.nama} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-3xl">☕</div>}
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -479,321 +384,27 @@ function OrderContent() {
         {/* TAB 2: STATUS PESANAN */}
         {activeNav === 'status' && (
           <div className="space-y-4">
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-2">
-              <label className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                <span>🔊</span> Pilih Nada Dering Selesai Pelanggan:
-              </label>
-              <select
-                value={soundOption}
-                onChange={(e) => setSoundOption(Number(e.target.value))}
-                className="w-full bg-slate-950 border border-slate-800 text-xs text-white p-2.5 rounded-xl focus:outline-none"
-              >
-                <option value={1}>1. Bel Biasa</option>
-                <option value={2}>2. Bel Berulang 10 Detik</option>
-                <option value={3}>3. "Pesanan anda sudah selesai"</option>
-                <option value={4}>4. "Pesanan anda sudah selesai" (Berulang)</option>
-              </select>
-            </div>
-
             <div className="bg-amber-950/30 border border-amber-500/30 p-3.5 rounded-2xl text-center space-y-1">
-              <p className="text-xs font-bold text-amber-300">🔔 Jika pesanan belum diproses, pencetlah bel!</p>
-              <button
-                onClick={handleNudgeKasir}
-                className="px-4 py-2 bg-amber-500 text-slate-950 text-xs font-black rounded-xl active:scale-95 transition mt-1 shadow-lg shadow-amber-500/20"
-              >
-                🔔 Pencet Bel Panggil Kasir
-              </button>
+              <p className="text-xs font-bold text-amber-300">🔔 Panggil Kasir Ke Meja Kamu</p>
+              <button onClick={handleNudgeKasir} className="px-4 py-2 bg-amber-500 text-slate-950 text-xs font-black rounded-xl">🔔 Pencet Bel Panggil Kasir</button>
             </div>
 
-            <h2 className="text-base font-bold text-white flex items-center gap-2"><span>📡</span> Status Pesanan Kamu</h2>
-
-            {myOrders.length === 0 ? (
-              <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-2xl text-xs text-slate-400">Belum ada pesanan aktif saat ini.</div>
-            ) : (
-              myOrders.map((ord) => (
-                <div key={ord.id} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-xs font-bold text-emerald-400">Meja #{ord.tables?.nomor || '-'}</span>
-                      <p className="text-[10px] text-slate-500">{new Date(ord.created_at).toLocaleString('id-ID')}</p>
-                    </div>
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
-                      ord.status === 'pending' ? 'bg-amber-500/20 text-amber-400' :
-                      ord.status === 'diproses' ? 'bg-blue-500/20 text-blue-400' :
-                      ord.status === 'selesai' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
-                    }`}>
-                      {ord.status}
-                    </span>
+            {myOrders.map((ord) => (
+              <div key={ord.id} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-xs font-bold text-emerald-400">Meja #{ord.tables?.nomor || '-'}</span>
+                    <p className="text-[10px] text-slate-500">{new Date(ord.created_at).toLocaleString('id-ID')}</p>
                   </div>
-
-                  <div className="flex gap-2 pt-1 border-t border-b border-slate-800/80 py-2">
-                    <button
-                      onClick={() => {
-                        setActiveOrderForQris(ord)
-                        setShowQrisModal(true)
-                      }}
-                      className="flex-1 py-1.5 bg-emerald-950 text-emerald-300 border border-emerald-800/80 text-xs font-bold rounded-xl flex items-center justify-center gap-1"
-                    >
-                      <span>📲</span> Lihat QRIS Toko
-                    </button>
-                    <button
-                      onClick={() => {
-                        setActiveOrderForQris(ord)
-                        setShowQrisModal(true)
-                      }}
-                      className="flex-1 py-1.5 bg-blue-950 text-blue-300 border border-blue-800/80 text-xs font-bold rounded-xl flex items-center justify-center gap-1"
-                    >
-                      <span>📤</span> {ord.bukti_pembayaran_url ? 'Bukti Terkirim ✅' : 'Kirim Bukti Bayar'}
-                    </button>
-                  </div>
-
-                  <ul className="divide-y divide-slate-800/60 text-xs text-slate-300">
-                    {ord.order_items?.map((it: any) => (
-                      <li key={it.id} className="py-1 flex justify-between">
-                        <span><strong className="text-emerald-400">{it.qty}x</strong> {it.menu_items?.nama}</span>
-                        <span className="text-slate-500">Rp {(it.harga_satuan * it.qty).toLocaleString('id-ID')}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="pt-2 flex justify-between text-xs font-bold">
-                    <span>Total: <strong className="text-emerald-400">Rp {ord.total_harga?.toLocaleString('id-ID')}</strong></span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded ${ord.is_paid ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'}`}>
-                      {ord.is_paid ? 'Lunas ✅' : 'Belum Lunas'}
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* TAB 3: 10 GAMES ANTI-BOSAN */}
-        {activeNav === 'game' && (
-          <div className="space-y-4 text-center">
-            <h2 className="text-base font-bold text-white">🎮 Arena 10 Games Anti-Bosan</h2>
-            
-            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[11px]">
-              {[
-                { id: 1, name: '1. TicTacToe' },
-                { id: 2, name: '2. Tebak Angka' },
-                { id: 3, name: '3. Su-Wit' },
-                { id: 4, name: '4. Memory' },
-                { id: 5, name: '5. Clicker' },
-                { id: 6, name: '6. Kuis Math' },
-                { id: 7, name: '7. Tebak Warna' },
-                { id: 8, name: '8. Lempar Koin' },
-                { id: 9, name: '9. Acak Kata' },
-                { id: 10, name: '10. Tes Reaksi' },
-              ].map((g) => (
-                <button
-                  key={g.id}
-                  onClick={() => setSelectedGame(g.id)}
-                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap ${
-                    selectedGame === g.id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 border border-slate-800 text-slate-400'
-                  }`}
-                >
-                  {g.name}
-                </button>
-              ))}
-            </div>
-
-            {/* Game 1: TicTacToe */}
-            {selectedGame === 1 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl inline-block max-w-xs w-full">
-                <div className="grid grid-cols-3 gap-2">
-                  {tttBoard.map((cell, idx) => (
-                    <button key={idx} onClick={() => {
-                      if (cell || calculateWinner(tttBoard)) return
-                      const next = [...tttBoard]
-                      next[idx] = tttIsX ? '❌' : '⭕'
-                      setTttBoard(next)
-                      setTttIsX(!tttIsX)
-                    }} className="h-16 bg-slate-950 border border-slate-800 text-xl font-black rounded-xl text-white">
-                      {cell}
-                    </button>
-                  ))}
-                </div>
-                <button onClick={() => { setTttBoard(Array(9).fill(null)); setTttIsX(true); }} className="mt-4 px-4 py-2 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset Game</button>
-              </div>
-            )}
-
-            {/* Game 2: Tebak Angka */}
-            {selectedGame === 2 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">{guessMsg}</p>
-                <input type="number" value={guessInput} onChange={(e) => setGuessInput(e.target.value)} placeholder="Masukkan angka (1-20)" className="w-full p-2.5 bg-slate-950 border border-slate-800 text-center text-xs font-bold text-white rounded-xl" />
-                <div className="flex gap-2">
-                  <button onClick={() => {
-                    const num = parseInt(guessInput)
-                    if (num === guessTarget) setGuessMsg('🎉 BENAR KAN! Kamu menang!')
-                    else if (num < guessTarget) setGuessMsg('Too low! Angka lebih besar.')
-                    else setGuessMsg('Too high! Angka lebih kecil.')
-                  }} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl">Tebak!</button>
-                  <button onClick={() => { setGuessTarget(Math.floor(Math.random() * 20) + 1); setGuessInput(''); setGuessMsg('Tebak angka 1 - 20!'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
-                </div>
-              </div>
-            )}
-
-            {/* Game 3: Suwit */}
-            {selectedGame === 3 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">{rpsResult}</p>
-                <div className="flex justify-center gap-2">
-                  {['✊ Batu', '✋ Kertas', '✌️ Gunting'].map((choice, i) => (
-                    <button key={i} onClick={() => {
-                      const bot = ['✊ Batu', '✋ Kertas', '✌️ Gunting'][Math.floor(Math.random() * 3)]
-                      setRpsResult(`Kamu: ${choice} vs Bot: ${bot}`)
-                    }} className="px-3 py-2 bg-slate-950 border border-slate-800 text-xs font-bold rounded-xl">{choice}</button>
-                  ))}
-                </div>
-                <button onClick={() => setRpsResult('Pilih salah satu!')} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
-              </div>
-            )}
-
-            {/* Game 4: Memory */}
-            {selectedGame === 4 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <div className="grid grid-cols-4 gap-2">
-                  {cards.map((card, idx) => (
-                    <button key={idx} onClick={() => {
-                      if (flipped.length < 2 && !flipped.includes(idx)) {
-                        const nextFlipped = [...flipped, idx]
-                        setFlipped(nextFlipped)
-                        if (nextFlipped.length === 2) {
-                          if (cards[nextFlipped[0]] === cards[nextFlipped[1]]) setMatched((m) => [...m, nextFlipped[0], nextFlipped[1]])
-                          setTimeout(() => setFlipped([]), 800)
-                        }
-                      }
-                    }} className="h-14 bg-slate-950 border border-slate-800 text-lg rounded-xl">
-                      {flipped.includes(idx) || matched.includes(idx) ? card : '❓'}
-                    </button>
-                  ))}
-                </div>
-                <button onClick={() => { setCards(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5)); setFlipped([]); setMatched([]); }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset Card</button>
-              </div>
-            )}
-
-            {/* Game 5: Clicker */}
-            {selectedGame === 5 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">Total Klik: {clicks}</p>
-                <button onClick={() => setClicks(clicks + 1)} className="w-full py-6 bg-emerald-500 text-slate-950 font-black text-lg rounded-2xl">⚡ KLIK SECEPATNYA!</button>
-                <button onClick={() => setClicks(0)} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset Skor</button>
-              </div>
-            )}
-
-            {/* Game 6: Kuis Math */}
-            {selectedGame === 6 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">{mathMsg}</p>
-                <p className="text-sm font-black text-white">{mathA} + {mathB} = ?</p>
-                <input type="number" value={mathAns} onChange={(e) => setMathAns(e.target.value)} placeholder="Hasil?" className="w-full p-2 bg-slate-950 border border-slate-800 text-center text-xs rounded-xl text-white" />
-                <div className="flex gap-2">
-                  <button onClick={() => {
-                    if (parseInt(mathAns) === mathA + mathB) setMathMsg('✅ Benar Sekali!')
-                    else setMathMsg('❌ Salah, coba lagi!')
-                  }} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-bold rounded-xl">Jawab</button>
-                  <button onClick={() => { setMathA(Math.floor(Math.random() * 10) + 1); setMathB(Math.floor(Math.random() * 10) + 1); setMathAns(''); setMathMsg('Jawab pertanyaan matematika!'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">🔄 Soal Baru</button>
-                </div>
-              </div>
-            )}
-
-            {/* Game 7: Color Guess */}
-            {selectedGame === 7 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">{colorMsg}</p>
-                <div className="w-16 h-16 rounded-2xl mx-auto border-2 border-white" style={{ backgroundColor: colorTarget }} />
-                <div className="flex justify-center gap-2">
-                  {['#EF4444', '#10B981', '#3B82F6'].map((c, i) => (
-                    <button key={i} onClick={() => {
-                      if (c === colorTarget) setColorMsg('🎉 Benar! Warna pas.')
-                      else setColorMsg('❌ Warna salah!')
-                    }} className="px-3 py-2 bg-slate-950 border border-slate-800 text-xs font-bold rounded-xl" style={{ color: c }}>Warna {i+1}</button>
-                  ))}
-                </div>
-                <button onClick={() => {
-                  const colors = ['#EF4444', '#10B981', '#3B82F6']
-                  setColorTarget(colors[Math.floor(Math.random() * colors.length)])
-                  setColorMsg('Pilih warna yang sesuai!')
-                }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Acak Warna</button>
-              </div>
-            )}
-
-            {/* Game 8: Lempar Koin */}
-            {selectedGame === 8 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">{coinResult}</p>
-                <button onClick={() => setCoinResult(Math.random() > 0.5 ? '🪙 HASIL: GAMBAR' : '🪙 HASIL: ANGKA')} className="w-full py-3 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Lempar Koin!</button>
-                <button onClick={() => setCoinResult('Tekan tombol untuk lempar koin!')} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
-              </div>
-            )}
-
-            {/* Game 9: Acak Kata */}
-            {selectedGame === 9 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">{scrambleMsg}</p>
-                <input type="text" value={scrambleInput} onChange={(e) => setScrambleInput(e.target.value.toUpperCase())} placeholder="Jawaban kamu" className="w-full p-2 bg-slate-950 border border-slate-800 text-center text-xs font-bold text-white rounded-xl" />
-                <div className="flex gap-2">
-                  <button onClick={() => {
-                    if (scrambleInput === scrambleWord) setScrambleMsg('🎉 BENAR! KATA = WARKOP')
-                    else setScrambleMsg('❌ Masih Salah!')
-                  }} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-bold rounded-xl">Cek</button>
-                  <button onClick={() => { setScrambleInput(''); setScrambleMsg('Susun kata: A K R P O W'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
-                </div>
-              </div>
-            )}
-
-            {/* Game 10: Tes Reaksi */}
-            {selectedGame === 10 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                {reactState === 'idle' && (
-                  <button onClick={() => {
-                    setReactState('waiting')
-                    setTimeout(() => {
-                      setReactState('ready')
-                      setStartTime(Date.now())
-                    }, Math.random() * 2000 + 1000)
-                  }} className="w-full py-4 bg-emerald-500 text-slate-950 font-bold text-xs rounded-xl">Mulai Tes Reaksi</button>
-                )}
-                {reactState === 'waiting' && <p className="text-xs text-amber-400 font-bold animate-pulse">Tunggu warna berubah hijau...</p>}
-                {reactState === 'ready' && (
-                  <button onClick={() => {
-                    setReactTime(Date.now() - startTime)
-                    setReactState('idle')
-                  }} className="w-full py-6 bg-emerald-400 text-slate-950 font-black text-base rounded-xl">KLIK SEKARANG!</button>
-                )}
-                {reactTime && <p className="text-xs font-bold text-emerald-300">Kecepatan Reaksi: {reactTime} ms</p>}
-                <button onClick={() => { setReactState('idle'); setReactTime(null); }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset Game</button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 4: PROFIL PELANGGAN */}
-        {activeNav === 'profile' && (
-          <div className="space-y-4">
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4 text-center">
-              <div className="w-24 h-24 mx-auto rounded-full overflow-hidden bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center text-3xl">
-                {userData.avatarUrl ? <img src={userData.avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : '👤'}
-              </div>
-
-              <div className="space-y-3 text-left">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Ubah Foto Profil Pelanggan</label>
-                  <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-xl file:bg-emerald-950 file:text-emerald-300" />
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{ord.status}</span>
                 </div>
 
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Ganti Nama Pelanggan</label>
-                  <input type="text" value={editingName} onChange={(e) => setEditingName(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs font-bold text-white rounded-xl" />
+                <div className="flex gap-2 pt-1 border-t border-b border-slate-800/80 py-2">
+                  <button onClick={() => { setActiveOrderForQris(ord); setShowQrisModal(true); }} className="flex-1 py-1.5 bg-emerald-950 text-emerald-300 border border-emerald-800/80 text-xs font-bold rounded-xl">📲 Lihat QRIS Toko</button>
+                  <button onClick={() => { setActiveOrderForQris(ord); setShowQrisModal(true); }} className="flex-1 py-1.5 bg-blue-950 text-blue-300 border border-blue-800/80 text-xs font-bold rounded-xl">📤 Kirim Bukti Bayar</button>
                 </div>
-
-                <button onClick={handleSaveProfile} className="w-full py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl">💾 Simpan Perubahan Profil</button>
               </div>
-
-              <button onClick={handleLogout} className="w-full py-2.5 bg-red-950/80 text-red-400 border border-red-800/80 text-xs font-bold rounded-xl">🚪 Keluar (Logout)</button>
-            </div>
+            ))}
           </div>
         )}
       </div>
@@ -813,37 +424,29 @@ function OrderContent() {
               </div>
             </div>
 
-            <button onClick={handleCheckout} disabled={submitting} className="w-full py-2.5 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl">
+            <button onClick={handleCheckout} disabled={submitting || !isOpen} className="w-full py-2.5 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl">
               {submitting ? 'Mengirim...' : 'Pesan Sekarang →'}
             </button>
           </div>
         </div>
       )}
 
-      {/* Modal Popup QRIS Toko */}
+      {/* Modal QRIS */}
       {showQrisModal && activeOrderForQris && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-6 text-center space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-6 text-center space-y-4">
             <h3 className="text-base font-bold text-emerald-400">📲 Pembayaran QRIS Toko</h3>
-            
             <div className="w-56 h-56 mx-auto bg-white p-2 rounded-2xl flex items-center justify-center">
               {qrisUrl ? <img src={qrisUrl} alt="QRIS" className="w-full h-full object-contain" /> : <p className="text-xs text-slate-500">QRIS belum diupload oleh kasir</p>}
             </div>
 
-            {/* Form Upload Bukti Transfer */}
             <div className="pt-2 border-t border-slate-800 text-left space-y-2">
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Kirim Bukti Pembayaran (Transfer/Struk)</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase">Kirim Bukti Pembayaran</label>
               <input type="file" accept="image/*" onChange={(e) => setBuktiFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-400 file:py-1 file:px-3 file:rounded-xl file:bg-emerald-950 file:text-emerald-300" />
-              
-              <button
-                onClick={() => handleUploadBukti(activeOrderForQris.id)}
-                disabled={uploadingBukti}
-                className="w-full py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl"
-              >
-                {uploadingBukti ? 'Mengirim Bukti...' : '📤 Kirim Bukti Ke Kasir'}
+              <button onClick={() => handleUploadBukti(activeOrderForQris.id)} disabled={uploadingBukti} className="w-full py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl">
+                {uploadingBukti ? 'Mengirim...' : '📤 Kirim Bukti Ke Kasir'}
               </button>
             </div>
-
             <button onClick={() => setShowQrisModal(false)} className="w-full py-2 bg-slate-950 border border-slate-800 text-xs font-bold rounded-xl text-slate-400">Tutup</button>
           </div>
         </div>
@@ -851,24 +454,13 @@ function OrderContent() {
 
       {/* Bottom Nav */}
       <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800 p-2 z-40">
-        <div className="max-w-md mx-auto grid grid-cols-4 gap-1 text-center">
+        <div className="max-w-md mx-auto grid grid-cols-2 gap-1 text-center">
           <button onClick={() => setActiveNav('menu')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'menu' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>☕ Menu</button>
           <button onClick={() => setActiveNav('status')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'status' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>📡 Status</button>
-          <button onClick={() => setActiveNav('game')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'game' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>🎮 Game</button>
-          <button onClick={() => setActiveNav('profile')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'profile' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>👤 Profil</button>
         </div>
       </div>
     </div>
   )
-}
-
-function calculateWinner(squares: any[]) {
-  const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]]
-  for (let i = 0; i < lines.length; i++) {
-    const [a, b, c] = lines[i]
-    if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) return squares[a]
-  }
-  return null
 }
 
 export default function MejaPage() {
