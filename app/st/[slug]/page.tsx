@@ -13,7 +13,7 @@ function DynamicStoreContent() {
   const mejaParam = searchParams.get('meja')
   const supabase = createClient()
 
-  // Auth & Interactive Mascot State
+  // Auth State & Mascot Eye Tracker
   const [session, setSession] = useState<any>(null)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [authEmail, setAuthEmail] = useState('')
@@ -21,18 +21,16 @@ function DynamicStoreContent() {
   const [authName, setAuthName] = useState('')
   const [authPhone, setAuthPhone] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
-  
-  // Interactive Mascot Hands State (Tutup Mata)
   const [isPasswordFocused, setIsPasswordFocused] = useState(false)
   const [pupilPos, setPupilPos] = useState({ x: 0, y: 0 })
 
-  // Customer Sound Option
+  // Customer Sound Bell Option
   const [customerSoundOption, setCustomerSoundOption] = useState<number>(1)
 
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'game' | 'profile'>('menu')
   const [selectedGame, setSelectedGame] = useState<number>(1)
 
-  // Toko X State
+  // Store X State
   const [storeData, setStoreData] = useState<any>(null)
   const [storeId, setStoreId] = useState<string>('')
   const [storeName, setStoreName] = useState('Warung Kopi')
@@ -96,7 +94,7 @@ function DynamicStoreContent() {
   const [reactTime, setReactTime] = useState<number | null>(null)
   const [startTime, setStartTime] = useState<number>(0)
 
-  // Audio Helper
+  // Sound Helper
   const speakText = (text: string) => {
     if (!('speechSynthesis' in window)) return
     window.speechSynthesis.cancel()
@@ -128,12 +126,12 @@ function DynamicStoreContent() {
     }
   }
 
-  // Tracking gerakan kursor untuk mata karakter
+  // Mouse Eye Tracking
   const handleEmailInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setAuthEmail(e.target.value)
     const len = e.target.value.length
-    const posX = Math.min(Math.max((len - 10) * 0.8, -8), 8)
-    setPupilPos({ x: posX, y: 3 })
+    const posX = Math.min(Math.max((len - 10) * 0.6, -6), 6)
+    setPupilPos({ x: posX, y: 2 })
   }
 
   useEffect(() => {
@@ -425,93 +423,150 @@ function DynamicStoreContent() {
     return <div className="min-h-screen bg-slate-950 text-rose-400 flex items-center justify-center text-xs">Toko tidak ditemukan.</div>
   }
 
-  // KARAKTER BEAR/ANIMASI INTERAKTIF LENGKAP DENGAN TUTUP MATA PAKAI TANGAN
+  // TAMPILAN LOGIN MASKOT KARTUN INTERAKTIF DENGAN KANTONG "MENGAWASIMU 👀"
   if (!session) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 font-sans relative overflow-hidden">
-        <div className="w-full max-w-sm bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-5 text-center shadow-2xl relative z-10">
+      <div className="min-h-screen bg-[#070b14] text-slate-100 flex items-center justify-center p-4 font-sans relative overflow-hidden">
+        <div className="w-full max-w-sm bg-[#0c1222] border border-slate-800/80 p-6 rounded-3xl space-y-5 shadow-2xl relative z-10">
           
-          {/* Visual Karakter Beruang 3D Interaktif */}
-          <div className="relative w-28 h-28 mx-auto bg-amber-900/40 border-2 border-amber-500 rounded-full flex flex-col items-center justify-center overflow-hidden transition-all duration-300">
-            {/* Telinga Beruang */}
-            <div className="absolute top-1 left-3 w-6 h-6 bg-amber-700 rounded-full border border-amber-500" />
-            <div className="absolute top-1 right-3 w-6 h-6 bg-amber-700 rounded-full border border-amber-500" />
+          {/* Header Top Bar Logo & Bubble Badge "Mengawasimu 👀" */}
+          <div className="flex items-center justify-between pb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-slate-800 overflow-hidden border border-slate-700 flex items-center justify-center shrink-0">
+                {storeAvatar ? <img src={storeAvatar} alt="Logo" className="w-full h-full object-cover" /> : '☕'}
+              </div>
+              <span className="text-xs font-bold text-white tracking-wider uppercase line-clamp-1">WARKOP {storeName}</span>
+            </div>
 
-            {/* Wajah Beruang */}
-            <div className="relative z-10 flex flex-col items-center mt-2">
-              {/* Mata & Bola Mata */}
-              <div className="flex gap-4">
-                <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center overflow-hidden relative">
-                  <div className="w-2.5 h-2.5 bg-slate-950 rounded-full transition-transform duration-100" style={{ transform: `translate(${pupilPos.x}px, ${pupilPos.y}px)` }} />
+            <div className="px-3 py-1 bg-purple-900/60 border border-purple-500/40 text-purple-300 rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-lg shadow-purple-500/10">
+              <span>Mengawasimu</span>
+              <span className="text-xs">👀</span>
+            </div>
+          </div>
+
+          {/* Area Maskot Kartun Warna-warni (Ungu, Oranye, Kuning, Abu-abu) */}
+          <div className="relative w-full h-44 bg-[#090e1a] rounded-2xl border border-slate-800/60 flex items-end justify-center pb-2 overflow-hidden">
+            <div className="flex items-end gap-1 relative z-10">
+              
+              {/* Karakter Kuning (Belah Ketupat/Kecil) */}
+              <div className="w-10 h-10 bg-amber-400 rounded-lg transform rotate-45 flex items-center justify-center shadow-md mb-1 -mr-2">
+                <div className="w-2 h-2 bg-slate-950 rounded-full" />
+              </div>
+
+              {/* Karakter Ungu Utama (Tinggi Besar) */}
+              <div className="w-20 h-28 bg-indigo-600 rounded-t-full flex flex-col items-center justify-start pt-4 relative shadow-lg">
+                <div className="flex gap-2">
+                  <div className="w-4 h-4 bg-white rounded-full flex items-center justify-center relative">
+                    {!isPasswordFocused ? (
+                      <div className="w-2 h-2 bg-slate-950 rounded-full transition-transform" style={{ transform: `translate(${pupilPos.x}px, ${pupilPos.y}px)` }} />
+                    ) : (
+                      <span className="text-[8px]">🙈</span>
+                    )}
+                  </div>
+                  <div className="w-4 h-4 bg-white rounded-full flex items-center justify-center relative">
+                    {!isPasswordFocused ? (
+                      <div className="w-2 h-2 bg-slate-950 rounded-full transition-transform" style={{ transform: `translate(${pupilPos.x}px, ${pupilPos.y}px)` }} />
+                    ) : (
+                      <span className="text-[8px]">🙈</span>
+                    )}
+                  </div>
                 </div>
-                <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center overflow-hidden relative">
-                  <div className="w-2.5 h-2.5 bg-slate-950 rounded-full transition-transform duration-100" style={{ transform: `translate(${pupilPos.x}px, ${pupilPos.y}px)` }} />
+                <div className="w-3 h-1 bg-indigo-950 rounded-full mt-1.5" />
+              </div>
+
+              {/* Karakter Oranye (Sedang) */}
+              <div className="w-16 h-20 bg-orange-500 rounded-t-full flex flex-col items-center justify-start pt-3 relative shadow-md -ml-3">
+                <div className="flex gap-2">
+                  <div className="w-3.5 h-3.5 bg-white rounded-full flex items-center justify-center relative">
+                    {!isPasswordFocused ? (
+                      <div className="w-1.5 h-1.5 bg-slate-950 rounded-full transition-transform" style={{ transform: `translate(${pupilPos.x}px, ${pupilPos.y}px)` }} />
+                    ) : (
+                      <span className="text-[7px]">🙈</span>
+                    )}
+                  </div>
+                  <div className="w-3.5 h-3.5 bg-white rounded-full flex items-center justify-center relative">
+                    {!isPasswordFocused ? (
+                      <div className="w-1.5 h-1.5 bg-slate-950 rounded-full transition-transform" style={{ transform: `translate(${pupilPos.x}px, ${pupilPos.y}px)` }} />
+                    ) : (
+                      <span className="text-[7px]">🙈</span>
+                    )}
+                  </div>
+                </div>
+                <div className="w-2 h-0.5 bg-orange-950 rounded-full mt-1" />
+              </div>
+
+              {/* Karakter Abu-abu Gelap (Tinggi Samping) */}
+              <div className="w-9 h-32 bg-slate-800 rounded-t-full flex flex-col items-center justify-start pt-5 shadow-inner -ml-2">
+                <div className="flex gap-1">
+                  <div className="w-2.5 h-2.5 bg-white rounded-full flex items-center justify-center">
+                    <div className="w-1 h-1 bg-slate-950 rounded-full" />
+                  </div>
+                  <div className="w-2.5 h-2.5 bg-white rounded-full flex items-center justify-center">
+                    <div className="w-1 h-1 bg-slate-950 rounded-full" />
+                  </div>
                 </div>
               </div>
 
-              {/* Hidung & Senyum */}
-              <div className="w-4 h-3 bg-slate-950 rounded-full mt-1" />
-              <div className="w-3 h-1 bg-amber-600 rounded-full mt-0.5" />
-            </div>
-
-            {/* Tangan Beruang Tutup Mata ketika fokus Kata Sandi */}
-            <div className={`absolute inset-0 z-20 bg-amber-800/90 flex items-center justify-center transition-all duration-300 ${isPasswordFocused ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12 pointer-events-none'}`}>
-              <span className="text-2xl font-black">🙈</span>
             </div>
           </div>
 
-          <div>
-            <h1 className="text-lg font-black text-white">{storeName}</h1>
-            <p className="text-xs text-slate-400 mt-1">Masuk untuk pesan makanan dari meja kamu.</p>
+          <p className="text-[11px] text-slate-400 text-center font-medium italic">Sistem Pemesanan Warkop POS Interaktif</p>
+
+          <div className="pt-2 text-left">
+            <h2 className="text-base font-black text-white">WARKOP {storeName}</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Silakan masuk ke akun pelanggan kamu</p>
           </div>
 
           <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-bold">
-            <button onClick={() => setAuthMode('login')} className={`flex-1 py-1.5 rounded-lg ${authMode === 'login' ? 'bg-emerald-500 text-slate-950' : 'text-slate-400'}`}>Masuk</button>
-            <button onClick={() => setAuthMode('register')} className={`flex-1 py-1.5 rounded-lg ${authMode === 'register' ? 'bg-emerald-500 text-slate-950' : 'text-slate-400'}`}>Daftar</button>
+            <button onClick={() => setAuthMode('login')} className={`flex-1 py-2 rounded-lg ${authMode === 'login' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400'}`}>Masuk</button>
+            <button onClick={() => setAuthMode('register')} className={`flex-1 py-2 rounded-lg ${authMode === 'register' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400'}`}>Daftar Akun</button>
           </div>
 
-          <form onSubmit={handleAuth} className="space-y-3 text-left">
+          <form onSubmit={handleAuth} className="space-y-3.5 text-left">
             {authMode === 'register' && (
               <>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Nama Lengkap</label>
-                  <input type="text" value={authName} onChange={(e) => setAuthName(e.target.value)} required placeholder="Budi Santoso" className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">NAMA LENGKAP</label>
+                  <input type="text" value={authName} onChange={(e) => setAuthName(e.target.value)} required placeholder="Budi Santoso" className="w-full mt-1 p-3 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">No. HP / WA</label>
-                  <input type="text" value={authPhone} onChange={(e) => setAuthPhone(e.target.value)} required placeholder="08123456789" className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">NO. HP / WA</label>
+                  <input type="text" value={authPhone} onChange={(e) => setAuthPhone(e.target.value)} required placeholder="08123456789" className="w-full mt-1 p-3 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
                 </div>
               </>
             )}
 
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Email Pelanggan</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase">EMAIL</label>
               <input
                 type="email"
                 value={authEmail}
                 onChange={handleEmailInputChange}
                 required
-                placeholder="pelanggan@gmail.com"
-                className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
+                placeholder="nama@email.com"
+                className="w-full mt-1 p-3 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl focus:border-emerald-500"
               />
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Kata Sandi</label>
-              <input
-                type="password"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                onFocus={() => setIsPasswordFocused(true)}
-                onBlur={() => setIsPasswordFocused(false)}
-                required
-                placeholder="••••••••"
-                className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
-              />
+              <label className="text-[10px] font-bold text-slate-400 uppercase">KATA SANDI</label>
+              <div className="relative">
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  onFocus={() => setIsPasswordFocused(true)}
+                  onBlur={() => setIsPasswordFocused(false)}
+                  required
+                  placeholder="••••••••"
+                  className="w-full mt-1 p-3 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl pr-10 focus:border-emerald-500"
+                />
+                <span className="absolute right-3 top-3.5 text-xs text-slate-500 pointer-events-none">👁️</span>
+              </div>
             </div>
 
-            <button type="submit" disabled={authLoading} className="w-full py-3 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl">
-              {authLoading ? 'Memproses...' : authMode === 'login' ? 'Masuk & Mulai Pesan ➔' : 'Daftar Akun Baru ➔'}
+            <button type="submit" disabled={authLoading} className="w-full py-3 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl transition active:scale-95 shadow-lg shadow-emerald-500/20">
+              {authLoading ? 'Memproses...' : authMode === 'login' ? 'Masuk Aplikasi ➔' : 'Daftar Akun Sekarang ➔'}
             </button>
           </form>
         </div>
@@ -697,7 +752,7 @@ function DynamicStoreContent() {
               ))}
             </div>
 
-            {/* Game 1: TicTacToe (Indikator Giliran & Pemenang) */}
+            {/* Game 1: TicTacToe */}
             {selectedGame === 1 && (
               <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl inline-block max-w-xs w-full space-y-3">
                 <p className="text-xs font-bold text-emerald-400">
@@ -872,7 +927,7 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 4: PROFIL PELANGGAN + PENGATURAN NADA DERING */}
+        {/* TAB 4: PROFIL PELANGGAN + NADA DERING */}
         {activeNav === 'profile' && (
           <div className="space-y-4">
             <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4 text-center">
