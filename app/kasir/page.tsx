@@ -6,6 +6,20 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
+// 10 PRESET TEMA DENGAN KOMBINASI WARNA LENGKAP
+const THEME_PRESETS = [
+  { name: 'Slate Dark', bgColor: '#0f172a', textColor: '#ffffff', accentColor: '#10b981', emoji: '☕' },
+  { name: 'Emerald Warkop', bgColor: '#064e3b', textColor: '#ecfdf5', accentColor: '#34d399', emoji: '🍵' },
+  { name: 'Midnight Purple', bgColor: '#311042', textColor: '#fae8ff', accentColor: '#c084fc', emoji: '🧋' },
+  { name: 'Warm Amber', bgColor: '#451a03', textColor: '#fef3c7', accentColor: '#f59e0b', emoji: '🥐' },
+  { name: 'Rose Velvet', bgColor: '#4c0519', textColor: '#ffe4e6', accentColor: '#f43f5e', emoji: '🍰' },
+  { name: 'Ocean Blue', bgColor: '#0c4a6e', textColor: '#e0f2fe', accentColor: '#38bdf8', emoji: '🍹' },
+  { name: 'Neon Cyber', bgColor: '#09090b', textColor: '#ffffff', accentColor: '#22c55e', emoji: '⚡' },
+  { name: 'Espresso Black', bgColor: '#121212', textColor: '#e5e5e5', accentColor: '#d97706', emoji: '☕' },
+  { name: 'Retro Brown', bgColor: '#271c19', textColor: '#f5e0dc', accentColor: '#fb923c', emoji: '🍩' },
+  { name: 'Mint Fresh', bgColor: '#022c22', textColor: '#a7f3d0', accentColor: '#10b981', emoji: '🍧' },
+]
+
 export default function KasirDashboardPage() {
   const [orders, setOrders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -19,20 +33,36 @@ export default function KasirDashboardPage() {
   const [storeName, setStoreName] = useState('Warung Kopi Kita')
   const [avatarUrl, setAvatarUrl] = useState('')
   const [qrisUrl, setQrisUrl] = useState('')
+  const [expiredAt, setExpiredAt] = useState<string | null>(null)
+  const [daysRemaining, setDaysRemaining] = useState<number>(0)
+
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [qrisFile, setQrisFile] = useState<File | null>(null)
   const [showProfileModal, setShowProfileModal] = useState(false)
 
-  // Tampilan Toko State
-  const [bgColor, setBgColor] = useState('#0f172a')
-  const [primaryColor, setPrimaryColor] = useState('#10b981')
+  // Tampilan Toko & Tema Kustom State
   const [announcement, setAnnouncement] = useState('')
   const [isOpen, setIsOpen] = useState(true)
   const [bannerUrl, setBannerUrl] = useState('')
   const [bannerFile, setBannerFile] = useState<File | null>(null)
   const [showTampilanModal, setShowTampilanModal] = useState(false)
 
-  // Sound Options
+  // 🌟 FITUR BARU: Wifi, Maps, WA Komplain, Sosmed, & Tema
+  const [mapsUrl, setMapsUrl] = useState('')
+  const [waComplaint, setWaComplaint] = useState('')
+  const [socialLinks, setSocialLinks] = useState<{ platform: string; url: string }[]>([])
+  const [wifiActive, setWifiActive] = useState(false)
+  const [wifiName, setWifiName] = useState('')
+  const [wifiPassword, setWifiPassword] = useState('')
+  const [selectedPreset, setSelectedPreset] = useState('Slate Dark')
+  const [themeConfig, setThemeConfig] = useState({
+    bgColor: '#0f172a',
+    textColor: '#ffffff',
+    accentColor: '#10b981',
+    emoji: '☕'
+  })
+
+  // Sound Options & Notifications
   const [kasirSoundOption, setKasirSoundOption] = useState<number>(2)
   const [customerBellAlert, setCustomerBellAlert] = useState<string | null>(null)
 
@@ -87,6 +117,16 @@ export default function KasirDashboardPage() {
         setCustomerBellAlert(`🔔 Meja #${table} memanggil kasir!`)
         setTimeout(() => setCustomerBellAlert(null), 8000)
       })
+      // 🌟 LISTENER PEMBATALAN PESANAN DARI PELANGGAN REALTIME
+      .on('broadcast', { event: 'order-cancelled-by-customer' }, (payload: any) => {
+        playBellSound()
+        const table = payload.payload?.tableNo || '??'
+        const name = payload.payload?.customerName || 'Pelanggan'
+        speakText(`Pesanan di meja ${table} dibatalkan oleh pembeli`, false)
+        setCustomerBellAlert(`🚫 Pesanan Meja #${table} (${name}) dibatalkan oleh pembeli!`)
+        fetchOrders(storeId)
+        setTimeout(() => setCustomerBellAlert(null), 10000)
+      })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `store_id=eq.${storeId}` }, () => {
         playIncomingOrderSound()
         fetchOrders(storeId)
@@ -108,19 +148,16 @@ export default function KasirDashboardPage() {
       return
     }
 
-    // Ambil Profile Kasir
     const { data: profile } = await supabase.from('profiles').select('*, stores(*)').eq('id', session.user.id).single()
 
     if (profile) {
       setCashierName(profile.full_name || session.user.email?.split('@')[0] || 'Kasir')
 
-      // Jika store_id belum di profile, coba cari store milik user ini
       let currentStoreId = profile.store_id
       if (!currentStoreId) {
         const { data: userStore } = await supabase.from('stores').select('id, slug').eq('owner_id', session.user.id).limit(1).single()
         if (userStore) {
           currentStoreId = userStore.id
-          // Auto link ke profiles
           await supabase.from('profiles').update({ store_id: userStore.id }).eq('id', session.user.id)
         }
       }
@@ -134,11 +171,25 @@ export default function KasirDashboardPage() {
           if (storeData.store_name) setStoreName(storeData.store_name)
           if (storeData.avatar_url) setAvatarUrl(storeData.avatar_url)
           if (storeData.qris_url) setQrisUrl(storeData.qris_url)
-          if (storeData.bg_color) setBgColor(storeData.bg_color)
-          if (storeData.primary_color) setPrimaryColor(storeData.primary_color)
           if (storeData.announcement) setAnnouncement(storeData.announcement)
           if (storeData.banner_url) setBannerUrl(storeData.banner_url)
           if (storeData.is_open !== undefined) setIsOpen(storeData.is_open)
+
+          // Load Fitur Baru
+          if (storeData.maps_url) setMapsUrl(storeData.maps_url)
+          if (storeData.wa_complaint) setWaComplaint(storeData.wa_complaint)
+          if (storeData.social_links) setSocialLinks(storeData.social_links || [])
+          if (storeData.wifi_active !== undefined) setWifiActive(storeData.wifi_active)
+          if (storeData.wifi_name) setWifiName(storeData.wifi_name)
+          if (storeData.wifi_password) setWifiPassword(storeData.wifi_password)
+          if (storeData.theme_config) setThemeConfig(storeData.theme_config)
+
+          // Hitung Sisa Langganan
+          if (storeData.expired_at) {
+            setExpiredAt(storeData.expired_at)
+            const diff = new Date(storeData.expired_at).getTime() - new Date().getTime()
+            setDaysRemaining(Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24))))
+          }
         }
 
         fetchOrders(currentStoreId)
@@ -235,6 +286,31 @@ export default function KasirDashboardPage() {
     }
   }
 
+  // 🌟 TERAPKAN KUSTOMISASI TEMA, WIFI, MAPS, SOSMED
+  const handleSelectPresetTheme = (preset: typeof THEME_PRESETS[0]) => {
+    setSelectedPreset(preset.name)
+    setThemeConfig({
+      bgColor: preset.bgColor,
+      textColor: preset.textColor,
+      accentColor: preset.accentColor,
+      emoji: preset.emoji,
+    })
+  }
+
+  const handleAddSocialLink = () => {
+    setSocialLinks([...socialLinks, { platform: 'Instagram', url: '' }])
+  }
+
+  const handleUpdateSocialLink = (index: number, key: 'platform' | 'url', value: string) => {
+    const updated = [...socialLinks]
+    updated[index][key] = value
+    setSocialLinks(updated)
+  }
+
+  const handleRemoveSocialLink = (index: number) => {
+    setSocialLinks(socialLinks.filter((_, i) => i !== index))
+  }
+
   const handleSaveTampilan = async () => {
     if (!storeId) return
     try {
@@ -249,16 +325,21 @@ export default function KasirDashboardPage() {
       }
 
       await supabase.from('stores').update({
-        bg_color: bgColor,
-        primary_color: primaryColor,
+        theme_config: themeConfig,
         announcement: announcement,
         banner_url: newBannerUrl,
         is_open: isOpen,
+        maps_url: mapsUrl,
+        wa_complaint: waComplaint,
+        social_links: socialLinks,
+        wifi_active: wifiActive,
+        wifi_name: wifiName,
+        wifi_password: wifiPassword,
       }).eq('id', storeId)
 
       setBannerUrl(newBannerUrl)
       setShowTampilanModal(false)
-      alert('🎨 Tampilan Toko Berhasil Diperbarui!')
+      alert('🎨 Tampilan & Fitur Toko Berhasil Diperbarui!')
     } catch (e: any) {
       alert(e.message)
     }
@@ -281,7 +362,7 @@ export default function KasirDashboardPage() {
       <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-800">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden flex items-center justify-center text-xl shrink-0">
-            {avatarUrl ? <img src={avatarUrl} alt="Logo" className="w-full h-full object-cover" /> : '☕'}
+            {avatarUrl ? <img src={avatarUrl} alt="Logo" className="w-full h-full object-cover" /> : themeConfig.emoji}
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -305,7 +386,7 @@ export default function KasirDashboardPage() {
             👤 Profil & QRIS
           </button>
           <button onClick={() => setShowTampilanModal(true)} className="px-3.5 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-amber-300 rounded-2xl">
-            🎨 Edit Tampilan
+            🎨 Edit Tema & Info Toko
           </button>
           <Link href="/kasir/menu" className="px-3.5 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-slate-200 rounded-2xl">
             🌸 Kelola Menu
@@ -345,9 +426,9 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* Alert Bell Pelanggan */}
+      {/* Alert Bell & Notifikasi Pembatalan Pelanggan */}
       {customerBellAlert && (
-        <div className="max-w-5xl mx-auto mt-4 p-3.5 bg-amber-500 text-slate-950 text-xs font-black rounded-2xl shadow-xl flex justify-between items-center">
+        <div className="max-w-5xl mx-auto mt-4 p-3.5 bg-amber-500 text-slate-950 text-xs font-black rounded-2xl shadow-xl flex justify-between items-center animate-bounce">
           <span>{customerBellAlert}</span>
           <button onClick={() => setCustomerBellAlert(null)} className="text-xs px-2 py-1 bg-slate-950 text-white rounded-lg">Tutup</button>
         </div>
@@ -371,7 +452,13 @@ export default function KasirDashboardPage() {
 
       {/* Filter Tabs */}
       <div className="max-w-5xl mx-auto flex gap-2 overflow-x-auto mt-6 pb-1 no-scrollbar">
-        {[{ id: 'semua', label: 'Semua Status' }, { id: 'pending', label: '⏳ Baru' }, { id: 'diproses', label: '🍳 Diproses' }, { id: 'selesai', label: '✅ Selesai' }].map((tab) => (
+        {[
+          { id: 'semua', label: 'Semua Status' },
+          { id: 'pending', label: '⏳ Baru' },
+          { id: 'diproses', label: '🍳 Diproses' },
+          { id: 'selesai', label: '✅ Selesai' },
+          { id: 'batal', label: '❌ Dibatalkan' }
+        ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2 rounded-2xl text-xs font-bold ${activeTab === tab.id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-400 border border-slate-800'}`}>
             {tab.label}
           </button>
@@ -396,18 +483,33 @@ export default function KasirDashboardPage() {
               </div>
 
               <div className="flex flex-col items-end gap-1.5">
-                <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>{ord.status}</span>
+                <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-300' : ord.status === 'batal' ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-300'}`}>{ord.status}</span>
                 <button onClick={() => ringSpecificTableBell(ord.tables?.nomor)} className="text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 px-2 py-1 rounded-lg font-bold">
                   🔔 Ring Meja #{ord.tables?.nomor}
                 </button>
               </div>
             </div>
 
-            <ul className="space-y-1 text-xs text-slate-300">
+            {/* 🌟 RINCIAN ITEM PESANAN: PANAS/DINGIN + CATATAN */}
+            <ul className="space-y-2 text-xs text-slate-300">
               {ord.order_items?.map((item: any) => (
-                <li key={item.id} className="flex justify-between">
-                  <span><strong className="text-emerald-400">{item.qty}x</strong> {item.menu_items?.nama}</span>
-                  <span className="text-slate-500">Rp {(item.harga_satuan * item.qty).toLocaleString('id-ID')}</span>
+                <li key={item.id} className="bg-slate-950/60 p-2 rounded-xl border border-slate-800/60 space-y-1">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="font-bold text-white"><strong className="text-emerald-400">{item.qty}x</strong> {item.menu_items?.nama}</span>
+                      {item.varian && (
+                        <span className={`ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${item.varian === 'dingin' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'bg-amber-950 text-amber-300 border border-amber-800'}`}>
+                          {item.varian === 'dingin' ? '🧊 Dingin' : '🔥 Panas'}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-slate-400 font-mono">Rp {(item.harga_satuan * item.qty).toLocaleString('id-ID')}</span>
+                  </div>
+                  {item.catatan && (
+                    <p className="text-[10px] text-amber-300/90 italic bg-amber-950/20 px-2 py-0.5 rounded border border-amber-900/30">
+                      📝 Catatan: "{item.catatan}"
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>
@@ -436,11 +538,31 @@ export default function KasirDashboardPage() {
         ))}
       </div>
 
-      {/* MODAL PROFIL */}
+      {/* 🌟 MODAL PROFIL & LANGGANAN KASIR */}
       {showProfileModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-4">
-            <h2 className="text-base font-bold text-emerald-400">👤 Pengaturan Profil Kasir & QRIS</h2>
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-base font-bold text-emerald-400">👤 Pengaturan Profil & QRIS</h2>
+            
+            {/* 🌟 KOTAK SISA HARI LANGGANAN */}
+            <div className="bg-slate-950 border border-amber-500/40 p-3.5 rounded-2xl space-y-2">
+              <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider">⏳ Masa Aktif Langganan Toko</span>
+              <p className="text-xs font-bold text-white">
+                Sisa Waktu: <span className="text-emerald-400 font-mono text-sm font-black">{daysRemaining} Hari</span>
+              </p>
+              <p className="text-[10px] text-slate-400">
+                Tanggal Kedaluwarsa: {expiredAt ? new Date(expiredAt).toLocaleDateString('id-ID') : 'Belum Ditentukan'}
+              </p>
+              <a
+                href="https://wa.me/6285150725531?text=Halo%20Raihan,%20saya%20mau%20tambah%20waktu%20langganan%20sistem%20POS%20toko%20saya"
+                target="_blank"
+                rel="noreferrer"
+                className="block text-center w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition"
+              >
+                ➕ Tambah Waktu Langganan (Chat Raihan WhatsApp)
+              </a>
+            </div>
+
             <div className="space-y-3">
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Nama Akun Kasir</label>
@@ -467,29 +589,108 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* MODAL TAMPILAN */}
+      {/* 🌟 MODAL EDIT TAMPILAN, 10 PRESET TEMA, WIFI, MAPS, & SOSMED */}
       {showTampilanModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-4">
-            <h2 className="text-base font-bold text-amber-400">🎨 Edit Tampilan Toko</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-slate-800">
-                <span className="text-xs font-bold">Status Buka Toko</span>
-                <button onClick={handleToggleStoreOpen} className={`px-4 py-1.5 rounded-xl text-xs font-black ${isOpen ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'}`}>
-                  {isOpen ? 'TOKO BUKA' : 'TOKO TUTUP'}
-                </button>
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-lg rounded-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-base font-bold text-amber-400">🎨 Edit Tema & Info Toko</h2>
+            
+            <div className="space-y-4">
+              {/* Pilihan 10 Preset Tema */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Pilih 10 Preset Tema Toko</label>
+                <div className="grid grid-cols-2 gap-2 mt-1 max-h-40 overflow-y-auto p-1">
+                  {THEME_PRESETS.map((preset) => (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      onClick={() => handleSelectPresetTheme(preset)}
+                      className={`p-2 rounded-xl text-left text-xs font-bold border flex items-center justify-between ${
+                        themeConfig.bgColor === preset.bgColor ? 'border-amber-400 bg-slate-950' : 'border-slate-800 bg-slate-950/40'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span>{preset.emoji}</span>
+                        <span className="text-white text-[11px]">{preset.name}</span>
+                      </span>
+                      <div className="w-4 h-4 rounded-full border border-slate-700" style={{ backgroundColor: preset.bgColor }} />
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* Emoji Kustom & Banner Promosi */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Emoji Toko</label>
+                  <input
+                    type="text"
+                    value={themeConfig.emoji}
+                    onChange={(e) => setThemeConfig({ ...themeConfig, emoji: e.target.value })}
+                    className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-center rounded-xl text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Status Toko</label>
+                  <button onClick={handleToggleStoreOpen} type="button" className={`w-full p-2.5 rounded-xl text-xs font-black ${isOpen ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'}`}>
+                    {isOpen ? 'TOKO BUKA' : 'TOKO TUTUP'}
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Pesan Pengumuman</label>
                 <input type="text" value={announcement} onChange={(e) => setAnnouncement(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
               </div>
+
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Banner Promosi</label>
                 <input type="file" accept="image/*" onChange={(e) => setBannerFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-400 file:py-1 file:px-3 file:rounded-xl file:bg-amber-950 file:text-amber-300" />
               </div>
+
+              {/* Pengaturan Wifi Toko */}
+              <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-blue-300">📶 Fasilitas Wi-Fi Toko</span>
+                  <input type="checkbox" checked={wifiActive} onChange={(e) => setWifiActive(e.target.checked)} className="w-4 h-4" />
+                </div>
+                {wifiActive && (
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <input type="text" placeholder="Nama Wifi (SSID)" value={wifiName} onChange={(e) => setWifiName(e.target.value)} className="p-2 bg-slate-900 border border-slate-800 text-xs text-white rounded-xl" />
+                    <input type="text" placeholder="Password Wifi" value={wifiPassword} onChange={(e) => setWifiPassword(e.target.value)} className="p-2 bg-slate-900 border border-slate-800 text-xs text-white rounded-xl" />
+                  </div>
+                )}
+              </div>
+
+              {/* Google Maps & WA Komplain */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Link Google Maps Toko</label>
+                <input type="text" placeholder="https://maps.google.com/..." value={mapsUrl} onChange={(e) => setMapsUrl(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Nomor WhatsApp Komplain Toko</label>
+                <input type="tel" placeholder="081234567890" value={waComplaint} onChange={(e) => setWaComplaint(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+              </div>
+
+              {/* Social Links Dynamic */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Link Media Sosial Toko</label>
+                  <button type="button" onClick={handleAddSocialLink} className="text-[10px] px-2 py-1 bg-amber-500/20 text-amber-300 rounded-lg font-bold">+ Tambah Sosmed</button>
+                </div>
+                {socialLinks.map((link, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <input type="text" placeholder="Instagram / TikTok" value={link.platform} onChange={(e) => handleUpdateSocialLink(idx, 'platform', e.target.value)} className="w-1/3 p-2 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+                    <input type="text" placeholder="https://instagram.com/..." value={link.url} onChange={(e) => handleUpdateSocialLink(idx, 'url', e.target.value)} className="flex-1 p-2 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+                    <button type="button" onClick={() => handleRemoveSocialLink(idx)} className="text-xs text-rose-400 font-bold px-1.5">✕</button>
+                  </div>
+                ))}
+              </div>
             </div>
+
             <div className="flex gap-2 pt-2">
-              <button onClick={handleSaveTampilan} className="flex-1 py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Terapkan Tampilan</button>
+              <button onClick={handleSaveTampilan} className="flex-1 py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Terapkan Perubahan</button>
               <button onClick={() => setShowTampilanModal(false)} className="px-4 py-2.5 bg-slate-800 text-xs font-bold rounded-xl">Batal</button>
             </div>
           </div>
