@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
@@ -21,8 +21,7 @@ export default function SuperAdminDashboard() {
     setPinLoading(true)
 
     try {
-      // Ambil PIN rahasia dari tabel super_admin_config
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('super_admin_config')
         .select('pin')
         .eq('id', 1)
@@ -32,9 +31,9 @@ export default function SuperAdminDashboard() {
 
       if (inputPin === correctPin) {
         setIsAuthenticated(true)
-        fetchAllStores()
+        fetchAllStoresWithStats()
       } else {
-        alert('❌ PIN Super Admin Salah!')
+        alert('PIN Super Admin Tidak Valid!')
         setInputPin('')
       }
     } catch (err: any) {
@@ -44,42 +43,88 @@ export default function SuperAdminDashboard() {
     }
   }
 
-  const fetchAllStores = async () => {
+  const fetchAllStoresWithStats = async () => {
     setLoading(true)
-    const { data } = await supabase.from('stores').select('*').order('created_at', { ascending: false })
-    if (data) setStores(data)
+
+    // 1. Ambil Semua Toko
+    const { data: storeList } = await supabase.from('stores').select('*').order('created_at', { ascending: false })
+
+    if (storeList) {
+      // Hitung tanggal awal hari ini untuk Omset & Pesanan Harian
+      const startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
+
+      const enrichedStores = await Promise.all(
+        storeList.map(async (st) => {
+          // 2. Hitung Omset Hari Ini
+          const { data: todayOrders } = await supabase
+            .from('orders')
+            .select('total_harga, status')
+            .eq('store_id', st.id)
+            .gte('created_at', startOfDay.toISOString())
+
+          const totalOmsetToday = todayOrders
+            ? todayOrders.reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
+            : 0
+
+          const totalOrdersCount = todayOrders ? todayOrders.length : 0
+
+          // 3. Hitung Sisa Hari Langganan
+          let daysRemaining = null
+          if (st.expired_at) {
+            const now = new Date().getTime()
+            const expiry = new Date(st.expired_at).getTime()
+            const diffDays = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24))
+            daysRemaining = diffDays > 0 ? diffDays : 0
+          }
+
+          return {
+            ...st,
+            totalOmsetToday,
+            totalOrdersCount,
+            daysRemaining,
+          }
+        })
+      )
+
+      setStores(enrichedStores)
+    }
+
     setLoading(false)
   }
 
   const toggleStoreStatus = async (storeId: string, currentStatus: boolean) => {
     await supabase.from('stores').update({ is_open: !currentStatus }).eq('id', storeId)
-    fetchAllStores()
+    fetchAllStoresWithStats()
   }
 
   const updateSubscriptionDays = async (storeId: string, additionalDays: number) => {
     const target = stores.find((s) => s.id === storeId)
-    const currentExpiry = target?.expired_at ? new Date(target.expired_at) : new Date()
+    const currentExpiry = target?.expired_at && new Date(target.expired_at) > new Date()
+      ? new Date(target.expired_at)
+      : new Date()
+
     const newExpiry = new Date(currentExpiry.getTime() + additionalDays * 24 * 60 * 60 * 1000)
 
     await supabase.from('stores').update({
       expired_at: newExpiry.toISOString(),
     }).eq('id', storeId)
 
-    alert(`✅ Masa langganan toko berhasil diperpanjang ${additionalDays} hari!`)
-    fetchAllStores()
+    alert(`Masa langganan toko berhasil diperpanjang ${additionalDays} hari!`)
+    fetchAllStoresWithStats()
   }
 
-  // TAMPILAN MASUKKAN PIN SUPER ADMIN
+  // TAMPILAN AUTENTIKASI PIN
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-[#070b14] text-white flex items-center justify-center p-4 font-sans">
-        <div className="w-full max-w-sm bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl text-center space-y-5 shadow-2xl">
-          <div className="w-16 h-16 mx-auto rounded-full bg-rose-950/60 border border-rose-800 flex items-center justify-center text-2xl">
-            🔒
+      <div className="min-h-screen bg-slate-50 text-slate-800 flex items-center justify-center p-4 font-sans">
+        <div className="w-full max-w-sm bg-white/70 backdrop-blur-xl border border-sky-200/80 p-8 rounded-3xl text-center space-y-5 shadow-xl shadow-sky-100/50">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-sky-100/80 border border-sky-300/50 flex items-center justify-center text-sky-600">
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
           </div>
           <div>
-            <h1 className="text-lg font-black text-rose-500">Super Admin Reyyztore</h1>
-            <p className="text-xs text-slate-400 mt-1">Masukkan PIN Rahasia untuk mengakses dashboard pengelola</p>
+            <h1 className="text-xl font-black text-slate-900">Super Admin <span className="text-red-600">REYYZTORE</span></h1>
+            <p className="text-xs text-slate-500 mt-1">Masukkan PIN Rahasia Pengelola</p>
           </div>
 
           <form onSubmit={handleVerifyPin} className="space-y-4">
@@ -89,21 +134,21 @@ export default function SuperAdminDashboard() {
               onChange={(e) => setInputPin(e.target.value)}
               required
               maxLength={10}
-              placeholder="Masukkan PIN Admin"
-              className="w-full p-3 bg-slate-950 border border-slate-800 text-center text-lg tracking-widest font-black text-white rounded-xl focus:border-rose-500 focus:outline-none"
+              placeholder="••••••"
+              className="w-full p-3 bg-white/90 border border-sky-200 text-center text-lg tracking-widest font-black text-slate-900 rounded-2xl focus:border-sky-400 focus:outline-none shadow-inner"
             />
 
             <button
               type="submit"
               disabled={pinLoading}
-              className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow-lg shadow-rose-600/20 active:scale-95 transition"
+              className="w-full py-3.5 bg-sky-500 hover:bg-sky-600 text-white font-black text-xs rounded-2xl shadow-md shadow-sky-200/80 transition"
             >
-              {pinLoading ? 'Memeriksa PIN...' : 'Buka Panel Super Admin ➔'}
+              {pinLoading ? 'Memeriksa...' : 'Buka Dashboard'}
             </button>
           </form>
 
           <p className="text-[10px] text-slate-500">
-            <Link href="/" className="hover:underline">← Kembali ke Halaman Utama</Link>
+            <Link href="/" className="hover:underline">Kembali ke Halaman Utama</Link>
           </p>
         </div>
       </div>
@@ -111,69 +156,95 @@ export default function SuperAdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-8 font-sans pb-20">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-800">
+    <div className="min-h-screen bg-slate-50 text-slate-800 p-4 sm:p-8 font-sans pb-20 selection:bg-sky-200">
+      <div className="max-w-6xl mx-auto space-y-6">
+        
+        {/* Header Admin */}
+        <div className="bg-white/70 backdrop-blur-xl border border-sky-200/80 p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
           <div>
-            <span className="text-[10px] font-black tracking-wider text-rose-500 uppercase">REYYZTORE SUPER ADMIN</span>
-            <h1 className="text-2xl font-black text-white">Kelola Semua Toko & Langganan</h1>
-            <p className="text-xs text-slate-400">Founder: Raihan Aji Saputra (sraihanaji@gmail.com)</p>
+            <span className="text-[10px] font-black tracking-wider text-red-600 uppercase">REYYZTORE SUPER ADMIN</span>
+            <h1 className="text-2xl font-black text-slate-900">Panel Informasi Semua Toko</h1>
+            <p className="text-xs text-slate-500">Pengelola Utama: Raihan Aji Saputra (sraihanaji@gmail.com)</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={fetchAllStores} className="px-4 py-2 bg-slate-800 text-xs font-bold rounded-xl text-white">
-              🔄 Refresh Data
+            <button onClick={fetchAllStoresWithStats} className="px-4 py-2 bg-white/80 border border-sky-200 text-xs font-bold rounded-xl text-sky-900 hover:bg-sky-50 transition">
+              Refresh Data
             </button>
-            <button onClick={() => setIsAuthenticated(false)} className="px-4 py-2 bg-rose-950 text-rose-400 border border-rose-800 text-xs font-bold rounded-xl">
-              🚪 Keluar
+            <button onClick={() => setIsAuthenticated(false)} className="px-4 py-2 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-xl hover:bg-red-100 transition">
+              Keluar
             </button>
           </div>
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-xs text-slate-500">Memuat data toko...</div>
+          <div className="p-8 text-center text-xs text-slate-500 font-bold">Memuat statistik toko realtime...</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {stores.length === 0 ? (
-              <div className="col-span-2 p-8 text-center text-xs text-slate-500 bg-slate-900/40 rounded-2xl border border-slate-800">
-                Belum ada toko yang terdaftar.
+              <div className="col-span-2 p-8 text-center text-xs text-slate-500 bg-white/70 rounded-3xl border border-sky-200">
+                Belum ada toko terdaftar saat ini.
               </div>
             ) : (
               stores.map((st) => (
-                <div key={st.id} className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+                <div key={st.id} className="bg-white/70 backdrop-blur-md border border-sky-200/80 p-6 rounded-3xl space-y-4 shadow-md shadow-sky-100/50">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="font-black text-white text-base">{st.store_name}</h3>
-                      <p className="text-xs text-rose-400 font-bold">URL Toko: /st/{st.slug}</p>
-                      <p className="text-[10px] text-slate-500">Terdaftar: {new Date(st.created_at).toLocaleDateString('id-ID')}</p>
+                      <h3 className="font-black text-slate-900 text-lg">{st.store_name}</h3>
+                      <p className="text-xs text-sky-600 font-bold">Link Toko: /st/{st.slug}</p>
                     </div>
                     <button
                       onClick={() => toggleStoreStatus(st.id, st.is_open)}
-                      className={`px-3 py-1 rounded-full text-[10px] font-bold ${st.is_open ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}
+                      className={`px-3 py-1 rounded-full text-[10px] font-bold border ${st.is_open ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}
                     >
-                      {st.is_open ? '● Toko Buka' : '○ Toko Tutup'}
+                      {st.is_open ? 'Toko Buka' : 'Toko Tutup'}
                     </button>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-800 space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-slate-400">Expired Masa Aktif:</span>
-                      <span className="font-bold text-amber-400">
-                        {st.expired_at ? new Date(st.expired_at).toLocaleDateString('id-ID') : 'Aktif Selamanya'}
+                  {/* Ringkasan Statistik Toko Realtime */}
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div className="bg-sky-50/70 border border-sky-100 p-3 rounded-2xl text-left">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">Omset Hari Ini</p>
+                      <p className="text-sm font-black text-sky-900 mt-0.5">
+                        Rp {st.totalOmsetToday?.toLocaleString('id-ID') || '0'}
+                      </p>
+                    </div>
+                    <div className="bg-sky-50/70 border border-sky-100 p-3 rounded-2xl text-left">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">Pesanan Hari Ini</p>
+                      <p className="text-sm font-black text-sky-900 mt-0.5">
+                        {st.totalOrdersCount || 0} Pesanan
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Informasi Langganan */}
+                  <div className="pt-2 border-t border-sky-100 space-y-3">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-500">Sisa Waktu Langganan:</span>
+                      <span className={`font-black px-2.5 py-0.5 rounded-full text-[11px] ${st.daysRemaining !== null && st.daysRemaining <= 5 ? 'bg-red-100 text-red-700' : 'bg-sky-100 text-sky-800'}`}>
+                        {st.daysRemaining !== null ? `${st.daysRemaining} Hari Tersisa` : 'Aktif'}
                       </span>
                     </div>
 
+                    <div className="flex justify-between text-[11px] text-slate-500">
+                      <span>Expired:</span>
+                      <span className="font-bold text-slate-700">
+                        {st.expired_at ? new Date(st.expired_at).toLocaleDateString('id-ID') : 'Tidak Terbatas'}
+                      </span>
+                    </div>
+
+                    {/* Tombol Perpanjang Masa Langganan */}
                     <div className="flex gap-2 pt-1">
                       <button
                         onClick={() => updateSubscriptionDays(st.id, 30)}
-                        className="flex-1 py-2 bg-emerald-950 text-emerald-300 border border-emerald-800/80 text-[10px] font-bold rounded-xl"
+                        className="flex-1 py-2 bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs rounded-xl shadow-sm transition"
                       >
-                        +30 Hari
+                        +1 Bulan (30 Hari)
                       </button>
                       <button
                         onClick={() => updateSubscriptionDays(st.id, 365)}
-                        className="flex-1 py-2 bg-blue-950 text-blue-300 border border-blue-800/80 text-[10px] font-bold rounded-xl"
+                        className="flex-1 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl shadow-sm transition"
                       >
-                        +1 Tahun
+                        +1 Tahun (365 Hari)
                       </button>
                     </div>
                   </div>
