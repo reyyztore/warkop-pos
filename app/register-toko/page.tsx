@@ -18,7 +18,6 @@ export default function RegisterTokoPage() {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
-  // Format slug otomatis (misal: "Warkop Raihan" -> "warkop-raihan")
   const handleStoreNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value
     setStoreName(val)
@@ -35,7 +34,7 @@ export default function RegisterTokoPage() {
         throw new Error('Semua kolom wajib diisi!')
       }
 
-      // 1. Buat Akun Auth untuk Pemilik / Kasir Toko
+      // 1. Buat Akun Auth
       const { data: authData, error: authErr } = await supabase.auth.signUp({
         email,
         password,
@@ -52,7 +51,7 @@ export default function RegisterTokoPage() {
 
       const userId = authData.user.id
 
-      // 2. Buat Toko Baru di Tabel `stores`
+      // 2. Buat Toko Baru
       const { data: storeData, error: storeErr } = await supabase
         .from('stores')
         .insert({
@@ -65,16 +64,29 @@ export default function RegisterTokoPage() {
 
       if (storeErr) throw storeErr
 
-      // 3. Hubungkan User Ke `store_id` Baru
-      await supabase.from('profiles').upsert({
-        id: userId,
-        full_name: cashierName || storeName,
-        role: 'cashier',
-        store_id: storeData.id,
-        store_name: storeName.trim(),
-      })
+      // 3. Update Profiles dengan store_id Baru
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .update({
+          full_name: cashierName || storeName,
+          role: 'cashier',
+          store_id: storeData.id,
+          store_name: storeName.trim(),
+        })
+        .eq('id', userId)
 
-      // 4. Otomatis Buatkan 5 Meja Standar untuk Toko Baru
+      if (profileErr) {
+        // Fallback jika profile belum ada
+        await supabase.from('profiles').upsert({
+          id: userId,
+          full_name: cashierName || storeName,
+          role: 'cashier',
+          store_id: storeData.id,
+          store_name: storeName.trim(),
+        })
+      }
+
+      // 4. Buat 5 Meja Standar
       const defaultTables = [1, 2, 3, 4, 5].map((num) => ({
         nomor: num,
         store_id: storeData.id,
@@ -82,7 +94,7 @@ export default function RegisterTokoPage() {
       }))
       await supabase.from('tables').insert(defaultTables)
 
-      alert('🎉 Toko berhasil dibuat! Silakan masuk ke Dashboard Kasir Kamu.')
+      alert('🎉 Toko berhasil dibuat! Silakan masuk dengan akun kasir kamu.')
       router.push('/kasir/login')
     } catch (err: any) {
       setErrorMsg(err.message || 'Gagal mendaftarkan toko.')
@@ -115,7 +127,7 @@ export default function RegisterTokoPage() {
               onChange={handleStoreNameChange}
               placeholder="Contoh: Warkop Kopi Kita"
               required
-              className="w-full mt-1 p-3 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl focus:border-emerald-500 font-bold"
+              className="w-full mt-1 p-3 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl font-bold"
             />
           </div>
 
@@ -141,7 +153,7 @@ export default function RegisterTokoPage() {
               onChange={(e) => setCashierName(e.target.value)}
               placeholder="Contoh: Budi"
               required
-              className="w-full mt-1 p-3 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl focus:border-emerald-500"
+              className="w-full mt-1 p-3 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
             />
           </div>
 
@@ -153,7 +165,7 @@ export default function RegisterTokoPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="budi@warkop.com"
               required
-              className="w-full mt-1 p-3 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl focus:border-emerald-500"
+              className="w-full mt-1 p-3 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
             />
           </div>
 
@@ -165,14 +177,14 @@ export default function RegisterTokoPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
-              className="w-full mt-1 p-3 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl focus:border-emerald-500"
+              className="w-full mt-1 p-3 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black rounded-xl transition active:scale-95 shadow-lg shadow-emerald-500/20"
+            className="w-full py-3 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl"
           >
             {loading ? 'Menyiapkan Toko Baru...' : 'Daftarkan Toko Sekarang ➔'}
           </button>
