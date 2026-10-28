@@ -70,7 +70,7 @@ function DynamicStoreContent() {
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'info' | 'game' | 'profile'>('menu')
   const [selectedGame, setSelectedGame] = useState<number>(1)
 
-  // Toko X State
+  // Toko State
   const [storeData, setStoreData] = useState<any>(null)
   const [storeId, setStoreId] = useState<string>('')
   const [storeName, setStoreName] = useState('Warung Kopi')
@@ -80,13 +80,17 @@ function DynamicStoreContent() {
   const [bannerUrl, setBannerUrl] = useState('')
   const [isOpen, setIsOpen] = useState(true)
 
-  // 🌟 FITUR BARU: Maps, WA Komplain, Sosmed, Wifi, & Tema Kustom
+  // 🌟 FITUR BARU TEMA VISUAL, BACKGROUND WALLPAPER & INFO TOKO
   const [mapsUrl, setMapsUrl] = useState('')
   const [waComplaint, setWaComplaint] = useState('')
   const [socialLinks, setSocialLinks] = useState<{ platform: string; url: string }[]>([])
   const [wifiActive, setWifiActive] = useState(false)
   const [wifiName, setWifiName] = useState('')
   const [wifiPassword, setWifiPassword] = useState('')
+  const [jamOperasional, setJamOperasional] = useState('')
+  const [fasilitas, setFasilitas] = useState<string[]>([])
+  const [bgImageUrl, setBgImageUrl] = useState('')
+  const [themeStyle, setThemeStyle] = useState('glassmorphic')
   const [themeConfig, setThemeConfig] = useState({
     bgColor: '#0f172a',
     textColor: '#ffffff',
@@ -94,7 +98,7 @@ function DynamicStoreContent() {
     emoji: '☕'
   })
 
-  // Data Menu & Cart Baru (Mendukung Varian Panas/Dingin & Catatan)
+  // Data Menu & Cart Baru (Varian Panas/Dingin & Catatan)
   const [menuItems, setMenuItems] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [cart, setCart] = useState<{ [key: string]: { qty: number; varian: 'panas' | 'dingin'; catatan: string; menuId: string } }>({})
@@ -418,13 +422,17 @@ function DynamicStoreContent() {
     if (store.banner_url) setBannerUrl(store.banner_url)
     if (store.is_open !== undefined) setIsOpen(store.is_open)
 
-    // Fitur Baru
+    // Fitur Baru Tema Visual & Background Wallpaper Toko
     if (store.maps_url) setMapsUrl(store.maps_url)
     if (store.wa_complaint) setWaComplaint(store.wa_complaint)
-    if (store.social_links) setSocialLinks(store.social_links)
+    if (store.social_links) setSocialLinks(store.social_links || [])
     if (store.wifi_active !== undefined) setWifiActive(store.wifi_active)
     if (store.wifi_name) setWifiName(store.wifi_name)
     if (store.wifi_password) setWifiPassword(store.wifi_password)
+    if (store.jam_operasional) setJamOperasional(store.jam_operasional)
+    if (store.fasilitas) setFasilitas(store.fasilitas || [])
+    if (store.bg_image_url) setBgImageUrl(store.bg_image_url)
+    if (store.theme_style) setThemeStyle(store.theme_style)
     if (store.theme_config) setThemeConfig(store.theme_config)
   }
 
@@ -441,7 +449,7 @@ function DynamicStoreContent() {
     if (data) setMyOrders(data)
   }
 
-  // 🌟 REVISI KERANJANG: VARIAN PANAS/DINGIN + CATATAN
+  // 🌟 KERANJANG: VARIAN PANAS/DINGIN + CATATAN
   const updateCartItem = (menuId: string, varian: 'panas' | 'dingin', delta: number) => {
     if (!isOpen) return
     const key = `${menuId}_${varian}`
@@ -542,7 +550,7 @@ function DynamicStoreContent() {
     }
   }
 
-  // 🌟 REVISI: PEMBATALAN PESANAN OLEH PELANGGAN
+  // 🌟 PEMBATALAN PESANAN OLEH PELANGGAN
   const handleCancelOrder = async (orderId: string) => {
     const confirmCancel = confirm('Apakah kamu yakin ingin membatalkan pesanan ini?')
     if (!confirmCancel) return
@@ -556,7 +564,6 @@ function DynamicStoreContent() {
 
       if (error) throw error
 
-      // Kirim Notifikasi Broadcast Realtime ke Kasir
       await supabase.channel(`kasir-dashboard-${storeId}`).send({
         type: 'broadcast',
         event: 'order-cancelled-by-customer',
@@ -640,6 +647,59 @@ function DynamicStoreContent() {
   const winner = calculateWinner(tttBoard)
   const isCovering = isPasswordFocused && !isPasswordVisible
   const isShocked = isPasswordVisible && isPasswordFocused
+
+  // 🌟 FUNGSI GENERATOR TEMA VISUAL CERAH
+  const getThemeClasses = (style: string) => {
+    switch (style) {
+      case 'bubble': // Merah Muda Ceria
+        return {
+          wrapper: 'bg-gradient-to-br from-pink-100 via-rose-50 to-pink-200 text-slate-800',
+          card: 'bg-white/90 border-2 border-pink-300 rounded-[2rem] shadow-lg shadow-pink-200/50 hover:scale-[1.01] transition-all',
+          header: 'bg-white/80 backdrop-blur-md border-b-2 border-pink-200 text-pink-900',
+          button: 'bg-pink-500 hover:bg-pink-600 text-white rounded-full font-black shadow-md shadow-pink-300',
+          badge: 'bg-pink-100 text-pink-700 border border-pink-300 rounded-full',
+          subCard: 'bg-pink-50/80 border border-pink-200 rounded-2xl',
+        }
+      case 'fresh_mint': // Hijau Muda
+        return {
+          wrapper: 'bg-gradient-to-br from-emerald-100 via-teal-50 to-emerald-200 text-slate-800',
+          card: 'bg-white/90 border border-emerald-300 rounded-3xl shadow-md shadow-emerald-100 hover:scale-[1.01] transition-all',
+          header: 'bg-white/80 backdrop-blur-md border-b border-emerald-200 text-emerald-900',
+          button: 'bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black shadow-md shadow-emerald-200',
+          badge: 'bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl',
+          subCard: 'bg-emerald-50/80 border border-emerald-200 rounded-xl',
+        }
+      case 'sky_blue': // Biru Muda
+        return {
+          wrapper: 'bg-gradient-to-br from-sky-100 via-blue-50 to-sky-200 text-slate-800',
+          card: 'bg-white/95 border border-sky-200 rounded-3xl shadow-md shadow-sky-100 hover:scale-[1.01] transition-all',
+          header: 'bg-white/85 backdrop-blur-md border-b border-sky-200 text-sky-900',
+          button: 'bg-sky-500 hover:bg-sky-600 text-white rounded-2xl font-black shadow-md shadow-sky-200',
+          badge: 'bg-sky-100 text-sky-800 border border-sky-300 rounded-xl',
+          subCard: 'bg-sky-50/80 border border-sky-200 rounded-xl',
+        }
+      case 'warm_latte': // Cokelat Muda Aesthetic
+        return {
+          wrapper: 'bg-gradient-to-br from-amber-100 via-orange-50 to-amber-200 text-amber-950',
+          card: 'bg-white/90 border border-amber-300 rounded-3xl shadow-md shadow-amber-200/50 hover:scale-[1.01] transition-all',
+          header: 'bg-white/80 backdrop-blur-md border-b border-amber-200 text-amber-900',
+          button: 'bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black shadow-md shadow-amber-300',
+          badge: 'bg-amber-100 text-amber-900 border border-amber-300 rounded-xl',
+          subCard: 'bg-amber-50/80 border border-amber-200 rounded-xl',
+        }
+      case 'glassmorphic': default: // Gelas Kaca / Frosted Glass Cerah
+        return {
+          wrapper: 'bg-gradient-to-br from-slate-100 via-sky-50 to-indigo-100 text-slate-900',
+          card: 'bg-white/60 backdrop-blur-md border border-white/80 rounded-3xl shadow-xl shadow-sky-950/5 hover:scale-[1.01] transition-all',
+          header: 'bg-white/40 backdrop-blur-xl border-b border-white/60 text-slate-900',
+          button: 'bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-md shadow-indigo-200',
+          badge: 'bg-white/70 backdrop-blur-sm text-indigo-900 border border-white/80 rounded-xl',
+          subCard: 'bg-white/40 backdrop-blur-sm border border-white/60 rounded-xl',
+        }
+    }
+  }
+
+  const themeClasses = getThemeClasses(themeStyle)
 
   if (loading) {
     return <div className="min-h-screen bg-slate-950 text-slate-400 flex items-center justify-center text-xs">Memuat toko {slug}...</div>
@@ -880,8 +940,13 @@ function DynamicStoreContent() {
 
   return (
     <div
-      className="min-h-screen pb-28 font-sans transition-all duration-300"
-      style={{ backgroundColor: themeConfig.bgColor || '#0f172a', color: themeConfig.textColor || '#ffffff' }}
+      className={`min-h-screen pb-28 font-sans transition-all duration-300 relative ${themeClasses.wrapper}`}
+      style={{
+        backgroundImage: bgImageUrl ? `linear-gradient(rgba(15, 23, 42, 0.75), rgba(15, 23, 42, 0.85)), url('${bgImageUrl}')` : undefined,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed',
+      }}
     >
       <head>
         <link rel="manifest" href={`/st/${slug}/manifest`} />
@@ -942,15 +1007,15 @@ function DynamicStoreContent() {
       )}
 
       {/* Top Header Toko */}
-      <div className="sticky top-0 z-20 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800 p-4 text-white">
+      <div className={`sticky top-0 z-20 ${themeClasses.header} p-4`}>
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-800 border border-slate-700 flex items-center justify-center text-lg shrink-0">
               {storeAvatar ? <img src={storeAvatar} alt="Logo" className="w-full h-full object-cover" /> : themeConfig.emoji}
             </div>
             <div>
-              <span className="text-[9px] font-bold tracking-wider text-emerald-400 uppercase">Warkop Digital</span>
-              <h1 className="text-base font-extrabold text-white line-clamp-1">{storeName}</h1>
+              <span className="text-[9px] font-bold tracking-wider text-emerald-600 uppercase">Warkop Digital</span>
+              <h1 className="text-base font-extrabold line-clamp-1">{storeName}</h1>
             </div>
           </div>
 
@@ -958,27 +1023,27 @@ function DynamicStoreContent() {
             <select
               value={selectedTable}
               onChange={(e) => setSelectedTable(e.target.value)}
-              className="appearance-none bg-slate-900 border border-slate-800 text-emerald-400 font-bold text-xs px-3 py-2 pr-7 rounded-xl focus:outline-none"
+              className="appearance-none bg-white/80 border border-slate-300 text-emerald-700 font-bold text-xs px-3 py-2 pr-7 rounded-xl focus:outline-none shadow-sm"
             >
               <option value="">Pilih Meja</option>
               {tables.map((t) => (
                 <option key={t.id} value={t.nomor}>Meja #{t.nomor}</option>
               ))}
             </select>
-            <span className="absolute right-2.5 top-2.5 text-[10px] text-emerald-400 pointer-events-none">▼</span>
+            <span className="absolute right-2.5 top-2.5 text-[10px] text-emerald-600 pointer-events-none">▼</span>
           </div>
         </div>
       </div>
 
       <div className="max-w-md mx-auto p-4 space-y-4">
         {bannerUrl && (
-          <div className="w-full h-36 rounded-2xl overflow-hidden border border-slate-800">
+          <div className="w-full h-36 rounded-2xl overflow-hidden border border-slate-800 shadow-md">
             <img src={bannerUrl} alt="Banner Promosi" className="w-full h-full object-cover" />
           </div>
         )}
 
         {announcement && (
-          <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold rounded-2xl text-center">
+          <div className="p-3 bg-amber-500/20 border border-amber-500/40 text-amber-900 text-xs font-bold rounded-2xl text-center shadow-sm">
             📢 {announcement}
           </div>
         )}
@@ -990,7 +1055,7 @@ function DynamicStoreContent() {
               <button
                 onClick={() => setActiveCategory('all')}
                 className={`px-3.5 py-1.5 rounded-full text-xs font-bold ${
-                  activeCategory === 'all' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-400 border border-slate-800'
+                  activeCategory === 'all' ? themeClasses.button : 'bg-white/80 text-slate-700 border border-slate-300'
                 }`}
               >
                 Semua Menu
@@ -1000,7 +1065,7 @@ function DynamicStoreContent() {
                   key={cat.id}
                   onClick={() => setActiveCategory(cat.id)}
                   className={`px-3.5 py-1.5 rounded-full text-xs font-bold ${
-                    activeCategory === cat.id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 text-slate-400 border border-slate-800'
+                    activeCategory === cat.id ? themeClasses.button : 'bg-white/80 text-slate-700 border border-slate-300'
                   }`}
                 >
                   {cat.nama}
@@ -1009,7 +1074,7 @@ function DynamicStoreContent() {
             </div>
 
             {filteredMenuItems.length === 0 ? (
-              <p className="text-xs text-slate-500 text-center py-8 bg-slate-900/40 border border-slate-800 rounded-2xl">Belum ada menu di toko ini.</p>
+              <p className={`text-xs text-slate-500 text-center py-8 ${themeClasses.card}`}>Belum ada menu di toko ini.</p>
             ) : (
               filteredMenuItems.map((item) => {
                 const keyPanas = `${item.id}_panas`
@@ -1018,42 +1083,42 @@ function DynamicStoreContent() {
                 const qtyDingin = cart[keyDingin]?.qty || 0
 
                 return (
-                  <div key={item.id} className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl space-y-3 text-white">
+                  <div key={item.id} className={`${themeClasses.card} p-3.5 space-y-3`}>
                     <div className="flex items-center gap-3.5">
-                      <div className="w-16 h-16 rounded-xl overflow-hidden bg-slate-800 shrink-0 flex items-center justify-center text-2xl">
+                      <div className="w-16 h-16 rounded-2xl overflow-hidden bg-slate-200 shrink-0 flex items-center justify-center text-2xl shadow-inner">
                         {item.foto_url ? <img src={item.foto_url} alt={item.nama} className="w-full h-full object-cover" /> : themeConfig.emoji}
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-white text-sm line-clamp-1">{item.nama}</h3>
-                        <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5">{item.deskripsi || 'Racikan khas toko kami.'}</p>
+                        <h3 className="font-bold text-sm line-clamp-1">{item.nama}</h3>
+                        <p className="text-[11px] opacity-75 line-clamp-2 mt-0.5">{item.deskripsi || 'Racikan khas toko kami.'}</p>
                       </div>
                     </div>
 
                     {/* Pilihan 2 Harga Varian (Panas / Dingin) */}
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80">
-                      <div className="bg-slate-950 p-2.5 rounded-xl flex items-center justify-between border border-slate-800/60">
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60">
+                      <div className={`${themeClasses.subCard} p-2.5 flex items-center justify-between`}>
                         <div>
-                          <span className="text-[10px] text-amber-400 font-bold">🔥 Panas</span>
-                          <p className="text-xs font-black text-emerald-400">Rp {(item.harga_panas || item.harga)?.toLocaleString('id-ID')}</p>
+                          <span className="text-[10px] text-amber-600 font-bold">🔥 Panas</span>
+                          <p className="text-xs font-black text-emerald-600">Rp {(item.harga_panas || item.harga)?.toLocaleString('id-ID')}</p>
                         </div>
                         <div className="flex items-center gap-1">
-                          {qtyPanas > 0 && <button onClick={() => updateCartItem(item.id, 'panas', -1)} className="w-6 h-6 bg-slate-800 text-xs font-bold rounded-md">-</button>}
-                          {qtyPanas > 0 && <span className="text-xs font-bold px-1 text-emerald-400">{qtyPanas}</span>}
-                          <button onClick={() => updateCartItem(item.id, 'panas', 1)} disabled={!isOpen} className="w-6 h-6 bg-emerald-500 text-slate-950 text-xs font-bold rounded-md disabled:opacity-50">+</button>
+                          {qtyPanas > 0 && <button onClick={() => updateCartItem(item.id, 'panas', -1)} className="w-6 h-6 bg-slate-200 text-slate-800 text-xs font-bold rounded-md">-</button>}
+                          {qtyPanas > 0 && <span className="text-xs font-bold px-1 text-emerald-600">{qtyPanas}</span>}
+                          <button onClick={() => updateCartItem(item.id, 'panas', 1)} disabled={!isOpen} className="w-6 h-6 bg-emerald-500 text-white text-xs font-bold rounded-md disabled:opacity-50">+</button>
                         </div>
                       </div>
 
                       {item.harga_dingin && (
-                        <div className="bg-slate-950 p-2.5 rounded-xl flex items-center justify-between border border-slate-800/60">
+                        <div className={`${themeClasses.subCard} p-2.5 flex items-center justify-between`}>
                           <div>
-                            <span className="text-[10px] text-cyan-400 font-bold">🧊 Dingin</span>
-                            <p className="text-xs font-black text-emerald-400">Rp {item.harga_dingin?.toLocaleString('id-ID')}</p>
+                            <span className="text-[10px] text-cyan-600 font-bold">🧊 Dingin</span>
+                            <p className="text-xs font-black text-emerald-600">Rp {item.harga_dingin?.toLocaleString('id-ID')}</p>
                           </div>
                           <div className="flex items-center gap-1">
-                            {qtyDingin > 0 && <button onClick={() => updateCartItem(item.id, 'dingin', -1)} className="w-6 h-6 bg-slate-800 text-xs font-bold rounded-md">-</button>}
-                            {qtyDingin > 0 && <span className="text-xs font-bold px-1 text-emerald-400">{qtyDingin}</span>}
-                            <button onClick={() => updateCartItem(item.id, 'dingin', 1)} disabled={!isOpen} className="w-6 h-6 bg-emerald-500 text-slate-950 text-xs font-bold rounded-md disabled:opacity-50">+</button>
+                            {qtyDingin > 0 && <button onClick={() => updateCartItem(item.id, 'dingin', -1)} className="w-6 h-6 bg-slate-200 text-slate-800 text-xs font-bold rounded-md">-</button>}
+                            {qtyDingin > 0 && <span className="text-xs font-bold px-1 text-emerald-600">{qtyDingin}</span>}
+                            <button onClick={() => updateCartItem(item.id, 'dingin', 1)} disabled={!isOpen} className="w-6 h-6 bg-emerald-500 text-white text-xs font-bold rounded-md disabled:opacity-50">+</button>
                           </div>
                         </div>
                       )}
@@ -1068,7 +1133,7 @@ function DynamicStoreContent() {
                             placeholder="Catatan porsi panas (misal: manis / sedikit gula)..."
                             value={cart[keyPanas]?.catatan || ''}
                             onChange={(e) => updateCartNotes(keyPanas, e.target.value)}
-                            className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                            className="w-full px-3 py-1.5 bg-white/80 border border-slate-300 text-xs rounded-xl focus:outline-none"
                           />
                         )}
                         {qtyDingin > 0 && (
@@ -1077,7 +1142,7 @@ function DynamicStoreContent() {
                             placeholder="Catatan porsi dingin (misal: es sedikit)..."
                             value={cart[keyDingin]?.catatan || ''}
                             onChange={(e) => updateCartNotes(keyDingin, e.target.value)}
-                            className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                            className="w-full px-3 py-1.5 bg-white/80 border border-slate-300 text-xs rounded-xl focus:outline-none"
                           />
                         )}
                       </div>
@@ -1092,77 +1157,99 @@ function DynamicStoreContent() {
         {/* TAB 2: STATUS PESANAN & BATALKAN PESANAN */}
         {activeNav === 'status' && (
           <div className="space-y-4">
-            <div className="bg-amber-950/30 border border-amber-500/30 p-3.5 rounded-2xl text-center space-y-1 text-white">
-              <p className="text-xs font-bold text-amber-300">🔔 Panggil Kasir Ke Meja Kamu</p>
-              <button onClick={handleNudgeKasir} className="px-4 py-2 bg-amber-500 text-slate-950 text-xs font-black rounded-xl">🔔 Pencet Bel Panggil Kasir Toko</button>
+            <div className={`${themeClasses.card} p-3.5 text-center space-y-1`}>
+              <p className="text-xs font-bold text-amber-600">🔔 Panggil Kasir Ke Meja Kamu</p>
+              <button onClick={handleNudgeKasir} className="px-4 py-2 bg-amber-500 text-white text-xs font-black rounded-xl shadow-md">🔔 Pencet Bel Panggil Kasir Toko</button>
             </div>
 
             {myOrders.length === 0 ? (
-              <div className="p-8 text-center bg-slate-900/40 border border-slate-800 rounded-2xl text-xs text-slate-400">Belum ada pesanan aktif di toko ini saat ini.</div>
+              <div className={`p-8 text-center text-xs opacity-75 ${themeClasses.card}`}>Belum ada pesanan aktif di toko ini saat ini.</div>
             ) : myOrders.map((ord) => (
-              <div key={ord.id} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3 text-white">
+              <div key={ord.id} className={`${themeClasses.card} p-4 space-y-3`}>
                 <div className="flex justify-between items-start">
                   <div>
-                    <span className="text-xs font-bold text-emerald-400">Meja #{ord.tables?.nomor || '-'}</span>
-                    <p className="text-[10px] text-slate-500">{new Date(ord.created_at).toLocaleString('id-ID')}</p>
+                    <span className="text-xs font-bold text-emerald-600">Meja #{ord.tables?.nomor || '-'}</span>
+                    <p className="text-[10px] opacity-60">{new Date(ord.created_at).toLocaleString('id-ID')}</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-400' : ord.status === 'batal' ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{ord.status}</span>
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-700' : ord.status === 'batal' ? 'bg-red-500/20 text-red-700' : 'bg-emerald-500/20 text-emerald-700'}`}>{ord.status}</span>
                 </div>
 
-                {/* 🌟 REVISI: TOMBOL BATALKAN PESANAN PELANGGAN */}
+                {/* TOMBOL BATALKAN PESANAN PELANGGAN */}
                 {ord.status === 'pending' && (
                   <button
                     onClick={() => handleCancelOrder(ord.id)}
-                    className="w-full py-2 bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-bold rounded-xl transition active:scale-95"
+                    className="w-full py-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl transition active:scale-95 shadow-sm"
                   >
                     🚫 Batalkan Pesanan Ini
                   </button>
                 )}
 
-                <div className="flex gap-2 pt-1 border-t border-b border-slate-800/80 py-2">
-                  <button onClick={() => { setActiveOrderForQris(ord); setShowQrisModal(true); }} className="flex-1 py-1.5 bg-emerald-950 text-emerald-300 border border-emerald-800/80 text-xs font-bold rounded-xl">📲 Lihat QRIS Toko</button>
-                  <button onClick={() => { setActiveOrderForQris(ord); setShowQrisModal(true); }} className="flex-1 py-1.5 bg-blue-950 text-blue-300 border border-blue-800/80 text-xs font-bold rounded-xl">📤 Kirim Bukti Bayar</button>
+                <div className="flex gap-2 pt-1 border-t border-b border-slate-200/60 py-2">
+                  <button onClick={() => { setActiveOrderForQris(ord); setShowQrisModal(true); }} className="flex-1 py-1.5 bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-xl">📲 Lihat QRIS Toko</button>
+                  <button onClick={() => { setActiveOrderForQris(ord); setShowQrisModal(true); }} className="flex-1 py-1.5 bg-blue-100 text-blue-800 border border-blue-300 text-xs font-bold rounded-xl">📤 Kirim Bukti Bayar</button>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* 🌟 TAB 3: INFO WIFI, MAPS, SOSMED, & WA KOMPLAIN */}
+        {/* 🌟 TAB 3: INFO TOKO LENGKAP (JAM OPERASIONAL, FASILITAS, WIFI, MAPS, SOSMED, WA) */}
         {activeNav === 'info' && (
-          <div className="space-y-4 text-white">
+          <div className="space-y-4">
+            {/* Jam Operasional */}
+            {jamOperasional && (
+              <div className={`${themeClasses.card} p-4 space-y-1`}>
+                <h3 className="text-xs font-black uppercase tracking-wider text-amber-600">🕒 Jam Operasional Toko</h3>
+                <p className="text-xs font-bold">{jamOperasional}</p>
+              </div>
+            )}
+
+            {/* Fasilitas Toko */}
+            {fasilitas && fasilitas.length > 0 && (
+              <div className={`${themeClasses.card} p-4 space-y-2`}>
+                <h3 className="text-xs font-black uppercase tracking-wider text-emerald-600">✨ Fasilitas Toko</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {fasilitas.map((fas, idx) => (
+                    <span key={idx} className={`${themeClasses.badge} px-2.5 py-1 text-[11px] font-bold`}>
+                      {fas}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Fasilitas Wifi */}
             {wifiActive && (
-              <div className="bg-slate-900/90 border border-blue-800/80 p-4 rounded-2xl space-y-2">
-                <h3 className="text-xs font-black text-blue-300 uppercase tracking-wider">📶 Fasilitas Wi-Fi Toko</h3>
+              <div className={`${themeClasses.card} p-4 space-y-2`}>
+                <h3 className="text-xs font-black uppercase tracking-wider text-blue-600">📶 Wi-Fi Toko Gratis</h3>
                 <div className="text-xs space-y-1">
-                  <p><span className="text-slate-400">Nama Wi-Fi:</span> <strong>{wifiName || 'Tidak Diset'}</strong></p>
-                  <p><span className="text-slate-400">Password:</span> <strong className="font-mono text-emerald-400">{wifiPassword || 'Tidak Diset'}</strong></p>
+                  <p><span className="opacity-70">Nama SSID:</span> <strong>{wifiName || 'Tidak Diset'}</strong></p>
+                  <p><span className="opacity-70">Password:</span> <strong className="font-mono text-emerald-600">{wifiPassword || 'Tidak Diset'}</strong></p>
                 </div>
               </div>
             )}
 
             {/* Google Maps Link */}
             {mapsUrl && (
-              <a href={mapsUrl} target="_blank" rel="noreferrer" className="block p-4 bg-slate-900/90 border border-slate-800 rounded-2xl text-xs font-bold text-center text-sky-400 hover:underline">
+              <a href={mapsUrl} target="_blank" rel="noreferrer" className={`${themeClasses.card} block p-4 text-xs font-bold text-center text-sky-600 hover:underline`}>
                 📍 Buka Lokasi Toko di Google Maps ➔
               </a>
             )}
 
             {/* WA Komplain */}
             {waComplaint && (
-              <a href={`https://wa.me/${waComplaint.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className="block p-4 bg-emerald-950/80 border border-emerald-800 rounded-2xl text-xs font-bold text-center text-emerald-300 hover:underline">
+              <a href={`https://wa.me/${waComplaint.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className={`${themeClasses.card} block p-4 text-xs font-bold text-center text-emerald-600 hover:underline`}>
                 💬 WhatsApp Layanan / Komplain Toko ➔
               </a>
             )}
 
             {/* Social Media Links */}
             {socialLinks && socialLinks.length > 0 && (
-              <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl space-y-2">
-                <h4 className="text-xs font-bold text-slate-400 uppercase">Media Sosial Toko</h4>
+              <div className={`${themeClasses.card} p-4 space-y-2`}>
+                <h4 className="text-xs font-bold opacity-75 uppercase">Media Sosial Toko</h4>
                 <div className="flex flex-col gap-2">
                   {socialLinks.map((link, i) => (
-                    <a key={i} href={link.url} target="_blank" rel="noreferrer" className="p-2.5 bg-slate-950 rounded-xl text-xs font-bold text-emerald-400 hover:underline">
+                    <a key={i} href={link.url} target="_blank" rel="noreferrer" className={`${themeClasses.subCard} p-2.5 text-xs font-bold text-emerald-700 hover:underline`}>
                       🔗 {link.platform}: {link.url}
                     </a>
                   ))}
@@ -1174,8 +1261,8 @@ function DynamicStoreContent() {
 
         {/* TAB 4: 10 MINI GAMES */}
         {activeNav === 'game' && (
-          <div className="space-y-4 text-center text-white">
-            <h2 className="text-base font-bold text-white">🎮 Arena 10 Games Anti-Bosan</h2>
+          <div className="space-y-4 text-center">
+            <h2 className="text-base font-bold">🎮 Arena 10 Games Anti-Bosan</h2>
             
             <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[11px]">
               {[
@@ -1194,7 +1281,7 @@ function DynamicStoreContent() {
                   key={g.id}
                   onClick={() => setSelectedGame(g.id)}
                   className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap ${
-                    selectedGame === g.id ? 'bg-emerald-500 text-slate-950' : 'bg-slate-900 border border-slate-800 text-slate-400'
+                    selectedGame === g.id ? themeClasses.button : 'bg-white/80 border border-slate-300 text-slate-700'
                   }`}
                 >
                   {g.name}
@@ -1204,8 +1291,8 @@ function DynamicStoreContent() {
 
             {/* Game 1: TicTacToe */}
             {selectedGame === 1 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl inline-block max-w-xs w-full space-y-3">
-                <p className="text-xs font-bold text-emerald-400">
+              <div className={`${themeClasses.card} p-5 inline-block max-w-xs w-full space-y-3`}>
+                <p className="text-xs font-bold text-emerald-600">
                   {winner ? `🎉 PEMENANG: ${winner}!` : tttBoard.every(Boolean) ? '🤝 HASIL SERI!' : `Giliran Main: ${tttIsX ? '❌' : '⭕'}`}
                 </p>
                 <div className="grid grid-cols-3 gap-2">
@@ -1216,7 +1303,7 @@ function DynamicStoreContent() {
                       next[idx] = tttIsX ? '❌' : '⭕'
                       setTttBoard(next)
                       setTttIsX(!tttIsX)
-                    }} className="h-16 bg-slate-950 border border-slate-800 text-xl font-black rounded-xl text-white">
+                    }} className="h-16 bg-white/80 border border-slate-300 text-xl font-black rounded-xl">
                       {cell}
                     </button>
                   ))}
@@ -1227,40 +1314,40 @@ function DynamicStoreContent() {
 
             {/* Game 2: Tebak Angka */}
             {selectedGame === 2 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">{guessMsg}</p>
-                <input type="number" value={guessInput} onChange={(e) => setGuessInput(e.target.value)} placeholder="Masukkan angka (1-20)" className="w-full p-2.5 bg-slate-950 border border-slate-800 text-center text-xs font-bold text-white rounded-xl" />
+              <div className={`${themeClasses.card} p-5 space-y-3`}>
+                <p className="text-xs font-bold text-emerald-600">{guessMsg}</p>
+                <input type="number" value={guessInput} onChange={(e) => setGuessInput(e.target.value)} placeholder="Masukkan angka (1-20)" className="w-full p-2.5 bg-white/80 border border-slate-300 text-center text-xs font-bold rounded-xl" />
                 <div className="flex gap-2">
                   <button onClick={() => {
                     const num = parseInt(guessInput)
                     if (num === guessTarget) setGuessMsg('🎉 BENAR KAN! Kamu menang!')
                     else if (num < guessTarget) setGuessMsg('Too low! Angka lebih besar.')
                     else setGuessMsg('Too high! Angka lebih kecil.')
-                  }} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl">Tebak!</button>
-                  <button onClick={() => { setGuessTarget(Math.floor(Math.random() * 20) + 1); setGuessInput(''); setGuessMsg('Tebak angka 1 - 20!'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
+                  }} className={`flex-1 py-2 ${themeClasses.button} text-xs`}>Tebak!</button>
+                  <button onClick={() => { setGuessTarget(Math.floor(Math.random() * 20) + 1); setGuessInput(''); setGuessMsg('Tebak angka 1 - 20!'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset</button>
                 </div>
               </div>
             )}
 
             {/* Game 3: Suwit */}
             {selectedGame === 3 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">{rpsResult}</p>
+              <div className={`${themeClasses.card} p-5 space-y-3`}>
+                <p className="text-xs font-bold text-emerald-600">{rpsResult}</p>
                 <div className="flex justify-center gap-2">
                   {['✊ Batu', '✋ Kertas', '✌️ Gunting'].map((choice, i) => (
                     <button key={i} onClick={() => {
                       const bot = ['✊ Batu', '✋ Kertas', '✌️ Gunting'][Math.floor(Math.random() * 3)]
                       setRpsResult(`Kamu: ${choice} vs Bot: ${bot}`)
-                    }} className="px-3 py-2 bg-slate-950 border border-slate-800 text-xs font-bold rounded-xl">{choice}</button>
+                    }} className="px-3 py-2 bg-white/80 border border-slate-300 text-xs font-bold rounded-xl">{choice}</button>
                   ))}
                 </div>
-                <button onClick={() => setRpsResult('Pilih salah satu!')} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
+                <button onClick={() => setRpsResult('Pilih salah satu!')} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset</button>
               </div>
             )}
 
             {/* Game 4: Memory */}
             {selectedGame === 4 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+              <div className={`${themeClasses.card} p-5 space-y-3`}>
                 <div className="grid grid-cols-4 gap-2">
                   {cards.map((card, idx) => (
                     <button key={idx} onClick={() => {
@@ -1272,88 +1359,88 @@ function DynamicStoreContent() {
                           setTimeout(() => setFlipped([]), 800)
                         }
                       }
-                    }} className="h-14 bg-slate-950 border border-slate-800 text-lg rounded-xl">
+                    }} className="h-14 bg-white/80 border border-slate-300 text-lg rounded-xl">
                       {flipped.includes(idx) || matched.includes(idx) ? card : '❓'}
                     </button>
                   ))}
                 </div>
-                <button onClick={() => { setCards(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5)); setFlipped([]); setMatched([]); }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset Card</button>
+                <button onClick={() => { setCards(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5)); setFlipped([]); setMatched([]); }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset Card</button>
               </div>
             )}
 
             {/* Game 5: Clicker */}
             {selectedGame === 5 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">Total Klik: {clicks}</p>
-                <button onClick={() => setClicks(clicks + 1)} className="w-full py-6 bg-emerald-500 text-slate-950 font-black text-lg rounded-2xl">⚡ KLIK SECEPATNYA!</button>
-                <button onClick={() => setClicks(0)} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset Skor</button>
+              <div className={`${themeClasses.card} p-5 space-y-3`}>
+                <p className="text-xs font-bold text-emerald-600">Total Klik: {clicks}</p>
+                <button onClick={() => setClicks(clicks + 1)} className={`w-full py-6 ${themeClasses.button} text-lg`}>⚡ KLIK SECEPATNYA!</button>
+                <button onClick={() => setClicks(0)} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset Skor</button>
               </div>
             )}
 
             {/* Game 6: Kuis Math */}
             {selectedGame === 6 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">{mathMsg}</p>
-                <p className="text-sm font-black text-white">{mathA} + {mathB} = ?</p>
-                <input type="number" value={mathAns} onChange={(e) => setMathAns(e.target.value)} placeholder="Hasil?" className="w-full p-2 bg-slate-950 border border-slate-800 text-center text-xs rounded-xl text-white" />
+              <div className={`${themeClasses.card} p-5 space-y-3`}>
+                <p className="text-xs font-bold text-emerald-600">{mathMsg}</p>
+                <p className="text-sm font-black">{mathA} + {mathB} = ?</p>
+                <input type="number" value={mathAns} onChange={(e) => setMathAns(e.target.value)} placeholder="Hasil?" className="w-full p-2 bg-white/80 border border-slate-300 text-center text-xs rounded-xl" />
                 <div className="flex gap-2">
                   <button onClick={() => {
                     if (parseInt(mathAns) === mathA + mathB) setMathMsg('✅ Benar Sekali!')
                     else setMathMsg('❌ Salah, coba lagi!')
-                  }} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-bold rounded-xl">Jawab</button>
-                  <button onClick={() => { setMathA(Math.floor(Math.random() * 10) + 1); setMathB(Math.floor(Math.random() * 10) + 1); setMathAns(''); setMathMsg('Jawab pertanyaan matematika!'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">🔄 Soal Baru</button>
+                  }} className={`flex-1 py-2 ${themeClasses.button} text-xs`}>Jawab</button>
+                  <button onClick={() => { setMathA(Math.floor(Math.random() * 10) + 1); setMathB(Math.floor(Math.random() * 10) + 1); setMathAns(''); setMathMsg('Jawab pertanyaan matematika!'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Soal Baru</button>
                 </div>
               </div>
             )}
 
             {/* Game 7: Color Guess */}
             {selectedGame === 7 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">{colorMsg}</p>
-                <div className="w-16 h-16 rounded-2xl mx-auto border-2 border-white" style={{ backgroundColor: colorTarget }} />
+              <div className={`${themeClasses.card} p-5 space-y-3`}>
+                <p className="text-xs font-bold text-emerald-600">{colorMsg}</p>
+                <div className="w-16 h-16 rounded-2xl mx-auto border-2 border-white shadow-md" style={{ backgroundColor: colorTarget }} />
                 <div className="flex justify-center gap-2">
                   {['#EF4444', '#10B981', '#3B82F6'].map((c, i) => (
                     <button key={i} onClick={() => {
                       if (c === colorTarget) setColorMsg('🎉 Benar! Warna pas.')
                       else setColorMsg('❌ Warna salah!')
-                    }} className="px-3 py-2 bg-slate-950 border border-slate-800 text-xs font-bold rounded-xl" style={{ color: c }}>Warna {i+1}</button>
+                    }} className="px-3 py-2 bg-white/80 border border-slate-300 text-xs font-bold rounded-xl" style={{ color: c }}>Warna {i+1}</button>
                   ))}
                 </div>
                 <button onClick={() => {
                   const colors = ['#EF4444', '#10B981', '#3B82F6']
                   setColorTarget(colors[Math.floor(Math.random() * colors.length)])
                   setColorMsg('Pilih warna yang sesuai!')
-                }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Acak Warna</button>
+                }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Acak Warna</button>
               </div>
             )}
 
             {/* Game 8: Lempar Koin */}
             {selectedGame === 8 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">{coinResult}</p>
-                <button onClick={() => setCoinResult(Math.random() > 0.5 ? '🪙 HASIL: GAMBAR' : '🪙 HASIL: ANGKA')} className="w-full py-3 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Lempar Koin!</button>
-                <button onClick={() => setCoinResult('Tekan tombol untuk lempar koin!')} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
+              <div className={`${themeClasses.card} p-5 space-y-3`}>
+                <p className="text-xs font-bold text-emerald-600">{coinResult}</p>
+                <button onClick={() => setCoinResult(Math.random() > 0.5 ? '🪙 HASIL: GAMBAR' : '🪙 HASIL: ANGKA')} className={`w-full py-3 ${themeClasses.button} text-xs`}>Lempar Koin!</button>
+                <button onClick={() => setCoinResult('Tekan tombol untuk lempar koin!')} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset</button>
               </div>
             )}
 
             {/* Game 9: Acak Kata */}
             {selectedGame === 9 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-                <p className="text-xs font-bold text-emerald-400">{scrambleMsg}</p>
-                <input type="text" value={scrambleInput} onChange={(e) => setScrambleInput(e.target.value.toUpperCase())} placeholder="Jawaban kamu" className="w-full p-2 bg-slate-950 border border-slate-800 text-center text-xs font-bold text-white rounded-xl" />
+              <div className={`${themeClasses.card} p-5 space-y-3`}>
+                <p className="text-xs font-bold text-emerald-600">{scrambleMsg}</p>
+                <input type="text" value={scrambleInput} onChange={(e) => setScrambleInput(e.target.value.toUpperCase())} placeholder="Jawaban kamu" className="w-full p-2 bg-white/80 border border-slate-300 text-center text-xs font-bold rounded-xl" />
                 <div className="flex gap-2">
                   <button onClick={() => {
                     if (scrambleInput === scrambleWord) setScrambleMsg('🎉 BENAR! KATA = WARKOP')
                     else setScrambleMsg('❌ Masih Salah!')
-                  }} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-bold rounded-xl">Cek</button>
-                  <button onClick={() => { setScrambleInput(''); setScrambleMsg('Susun kata: A K R P O W'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset</button>
+                  }} className={`flex-1 py-2 ${themeClasses.button} text-xs`}>Cek</button>
+                  <button onClick={() => { setScrambleInput(''); setScrambleMsg('Susun kata: A K R P O W'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset</button>
                 </div>
               </div>
             )}
 
             {/* Game 10: Tes Reaksi */}
             {selectedGame === 10 && (
-              <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+              <div className={`${themeClasses.card} p-5 space-y-3`}>
                 {reactState === 'idle' && (
                   <button onClick={() => {
                     setReactState('waiting')
@@ -1361,17 +1448,17 @@ function DynamicStoreContent() {
                       setReactState('ready')
                       setStartTime(Date.now())
                     }, Math.random() * 2000 + 1000)
-                  }} className="w-full py-4 bg-emerald-500 text-slate-950 font-bold text-xs rounded-xl">Mulai Tes Reaksi</button>
+                  }} className={`w-full py-4 ${themeClasses.button} text-xs`}>Mulai Tes Reaksi</button>
                 )}
-                {reactState === 'waiting' && <p className="text-xs text-amber-400 font-bold animate-pulse">Tunggu warna berubah hijau...</p>}
+                {reactState === 'waiting' && <p className="text-xs text-amber-600 font-bold animate-pulse">Tunggu warna berubah hijau...</p>}
                 {reactState === 'ready' && (
                   <button onClick={() => {
                     setReactTime(Date.now() - startTime)
                     setReactState('idle')
-                  }} className="w-full py-6 bg-emerald-400 text-slate-950 font-black text-base rounded-xl">KLIK SEKARANG!</button>
+                  }} className="w-full py-6 bg-emerald-500 text-white font-black text-base rounded-xl shadow-lg">KLIK SEKARANG!</button>
                 )}
-                {reactTime && <p className="text-xs font-bold text-emerald-300">Kecepatan Reaksi: {reactTime} ms</p>}
-                <button onClick={() => { setReactState('idle'); setReactTime(null); }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl">🔄 Reset Game</button>
+                {reactTime && <p className="text-xs font-bold text-emerald-600">Kecepatan Reaksi: {reactTime} ms</p>}
+                <button onClick={() => { setReactState('idle'); setReactTime(null); }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset Game</button>
               </div>
             )}
           </div>
@@ -1379,34 +1466,34 @@ function DynamicStoreContent() {
 
         {/* TAB 5: PROFIL PELANGGAN */}
         {activeNav === 'profile' && (
-          <div className="space-y-4 text-white">
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-4 text-center">
-              <div className="w-24 h-24 mx-auto rounded-full overflow-hidden bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center text-3xl">
+          <div className="space-y-4">
+            <div className={`${themeClasses.card} p-6 space-y-4 text-center`}>
+              <div className="w-24 h-24 mx-auto rounded-full overflow-hidden bg-slate-200 border-2 border-emerald-500 flex items-center justify-center text-3xl shadow-md">
                 {userData.avatarUrl ? <img src={userData.avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : '👤'}
               </div>
 
               <div className="space-y-3 text-left">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Ubah Foto Profil Pelanggan</label>
-                  <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-xl file:bg-emerald-950 file:text-emerald-300" />
+                  <label className="text-[10px] font-bold opacity-75 uppercase">Ubah Foto Profil Pelanggan</label>
+                  <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-600 file:mr-2 file:py-1 file:px-3 file:rounded-xl file:bg-emerald-100 file:text-emerald-800" />
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Ganti Nama Pelanggan</label>
-                  <input type="text" value={editingName} onChange={(e) => setEditingName(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs font-bold text-white rounded-xl" />
+                  <label className="text-[10px] font-bold opacity-75 uppercase">Ganti Nama Pelanggan</label>
+                  <input type="text" value={editingName} onChange={(e) => setEditingName(e.target.value)} className="w-full p-2.5 bg-white/80 border border-slate-300 text-xs font-bold rounded-xl" />
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Pilihan Nada Dering Panggilan Kasir</label>
-                  <select value={customerSoundOption} onChange={(e) => setCustomerSoundOption(Number(e.target.value))} className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl">
+                  <label className="text-[10px] font-bold opacity-75 uppercase">Pilihan Nada Dering Panggilan Kasir</label>
+                  <select value={customerSoundOption} onChange={(e) => setCustomerSoundOption(Number(e.target.value))} className="w-full mt-1 p-2.5 bg-white/80 border border-slate-300 text-xs rounded-xl">
                     <option value={1}>1. Bel Dering Biasa</option>
                     <option value={2}>2. "Pesanan kamu di Meja X sudah siap kak!"</option>
                     <option value={3}>3. "Halo, pesanan kamu sudah jadi, silakan diambil!"</option>
                   </select>
                 </div>
 
-                <button onClick={handleSaveProfile} className="w-full py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl">💾 Simpan Perubahan Profil</button>
-                <button onClick={async () => { await supabase.auth.signOut(); location.reload(); }} className="w-full py-2.5 bg-rose-950 text-rose-400 font-bold text-xs rounded-xl border border-rose-800">🚪 Keluar (Logout)</button>
+                <button onClick={handleSaveProfile} className={`w-full py-2.5 ${themeClasses.button} text-xs`}>💾 Simpan Perubahan Profil</button>
+                <button onClick={async () => { await supabase.auth.signOut(); location.reload(); }} className="w-full py-2.5 bg-rose-500 text-white font-bold text-xs rounded-xl">🚪 Keluar (Logout)</button>
               </div>
             </div>
           </div>
@@ -1416,19 +1503,19 @@ function DynamicStoreContent() {
       {/* Floating Bottom Cart */}
       {activeNav === 'menu' && Object.keys(cart).length > 0 && (
         <div className="fixed bottom-20 left-4 right-4 max-w-md mx-auto z-30">
-          <div className="bg-slate-900/95 backdrop-blur-xl border border-emerald-500/40 p-3.5 rounded-2xl space-y-3 text-white">
+          <div className={`${themeClasses.card} p-3.5 space-y-3 shadow-2xl backdrop-blur-xl border border-white/80`}>
             <div className="flex justify-between items-center">
               <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">{getTotalItem()} Menu Dipilih</p>
-                <p className="text-base font-black text-emerald-400">Rp {getTotalHarga().toLocaleString('id-ID')}</p>
+                <p className="text-[10px] font-bold opacity-75 uppercase">{getTotalItem()} Menu Dipilih</p>
+                <p className="text-base font-black text-emerald-600">Rp {getTotalHarga().toLocaleString('id-ID')}</p>
               </div>
               <div className="flex gap-2 text-[10px] font-bold">
-                <button onClick={() => setSelectedPayment('kasir')} className={`px-2.5 py-1.5 rounded-xl border ${selectedPayment === 'kasir' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>Bayar Kasir</button>
-                <button onClick={() => setSelectedPayment('qris')} className={`px-2.5 py-1.5 rounded-xl border ${selectedPayment === 'qris' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>QRIS</button>
+                <button onClick={() => setSelectedPayment('kasir')} className={`px-2.5 py-1.5 rounded-xl border ${selectedPayment === 'kasir' ? themeClasses.button : 'bg-white/80 text-slate-600 border-slate-300'}`}>Bayar Kasir</button>
+                <button onClick={() => setSelectedPayment('qris')} className={`px-2.5 py-1.5 rounded-xl border ${selectedPayment === 'qris' ? themeClasses.button : 'bg-white/80 text-slate-600 border-slate-300'}`}>QRIS</button>
               </div>
             </div>
 
-            <button onClick={handleCheckout} disabled={submitting || !isOpen} className="w-full py-2.5 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl disabled:opacity-50">
+            <button onClick={handleCheckout} disabled={submitting || !isOpen} className={`w-full py-2.5 ${themeClasses.button} text-xs disabled:opacity-50`}>
               {submitting ? 'Mengirim...' : !isOpen ? 'Toko Sedang Tutup' : 'Pesan Sekarang →'}
             </button>
           </div>
@@ -1438,32 +1525,32 @@ function DynamicStoreContent() {
       {/* Modal QRIS Toko */}
       {showQrisModal && activeOrderForQris && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-6 text-center space-y-4">
-            <h3 className="text-base font-bold text-emerald-400">📲 Pembayaran QRIS Toko</h3>
-            <div className="w-56 h-56 mx-auto bg-white p-2 rounded-2xl flex items-center justify-center">
+          <div className="bg-white text-slate-900 border border-slate-200 w-full max-w-sm rounded-3xl p-6 text-center space-y-4 shadow-2xl">
+            <h3 className="text-base font-bold text-emerald-600">📲 Pembayaran QRIS Toko</h3>
+            <div className="w-56 h-56 mx-auto bg-slate-50 p-2 rounded-2xl flex items-center justify-center border border-slate-200">
               {qrisUrl ? <img src={qrisUrl} alt="QRIS Toko" className="w-full h-full object-contain" /> : <p className="text-xs text-slate-500">QRIS belum diupload oleh kasir toko</p>}
             </div>
 
-            <div className="pt-2 border-t border-slate-800 text-left space-y-2">
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Kirim Bukti Pembayaran</label>
-              <input type="file" accept="image/*" onChange={(e) => setBuktiFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-400 file:py-1 file:px-3 file:rounded-xl file:bg-emerald-950 file:text-emerald-300" />
-              <button onClick={() => handleUploadBukti(activeOrderForQris.id)} disabled={uploadingBukti} className="w-full py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl">
+            <div className="pt-2 border-t border-slate-200 text-left space-y-2">
+              <label className="text-[10px] font-bold text-slate-500 uppercase">Kirim Bukti Pembayaran</label>
+              <input type="file" accept="image/*" onChange={(e) => setBuktiFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-600 file:py-1 file:px-3 file:rounded-xl file:bg-emerald-100 file:text-emerald-800" />
+              <button onClick={() => handleUploadBukti(activeOrderForQris.id)} disabled={uploadingBukti} className="w-full py-2.5 bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md">
                 {uploadingBukti ? 'Mengirim...' : '📤 Kirim Bukti Ke Kasir'}
               </button>
             </div>
-            <button onClick={() => setShowQrisModal(false)} className="w-full py-2 bg-slate-950 border border-slate-800 text-xs font-bold rounded-xl text-slate-400">Tutup</button>
+            <button onClick={() => setShowQrisModal(false)} className="w-full py-2 bg-slate-100 text-xs font-bold rounded-xl text-slate-600">Tutup</button>
           </div>
         </div>
       )}
 
       {/* Bottom Nav Bar Pelanggan */}
-      <div className="fixed bottom-0 left-0 right-0 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800 p-2 z-40">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200 p-2 z-40 shadow-lg">
         <div className="max-w-md mx-auto grid grid-cols-5 gap-1 text-center">
-          <button onClick={() => setActiveNav('menu')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'menu' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>☕ Menu</button>
-          <button onClick={() => setActiveNav('status')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'status' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>📡 Status</button>
-          <button onClick={() => setActiveNav('info')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'info' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>ℹ️ Info</button>
-          <button onClick={() => setActiveNav('game')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'game' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>🎮 Game</button>
-          <button onClick={() => setActiveNav('profile')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'profile' ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400'}`}>👤 Profil</button>
+          <button onClick={() => setActiveNav('menu')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'menu' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500'}`}>☕ Menu</button>
+          <button onClick={() => setActiveNav('status')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'status' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500'}`}>📡 Status</button>
+          <button onClick={() => setActiveNav('info')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'info' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500'}`}>ℹ️ Info</button>
+          <button onClick={() => setActiveNav('game')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'game' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500'}`}>🎮 Game</button>
+          <button onClick={() => setActiveNav('profile')} className={`py-1.5 text-xs font-bold rounded-xl ${activeNav === 'profile' ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500'}`}>👤 Profil</button>
         </div>
       </div>
     </div>
