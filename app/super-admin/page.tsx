@@ -46,11 +46,16 @@ export default function SuperAdminDashboard() {
   const fetchAllStoresWithStats = async () => {
     setLoading(true)
 
-    // 1. Ambil Semua Toko
-    const { data: storeList } = await supabase
+    const { data: storeList, error } = await supabase
       .from('stores')
       .select('*')
       .order('created_at', { ascending: false })
+
+    if (error) {
+      alert('Gagal mengambil data toko: ' + error.message)
+      setLoading(false)
+      return
+    }
 
     if (storeList) {
       const startOfDay = new Date()
@@ -58,7 +63,6 @@ export default function SuperAdminDashboard() {
 
       const enrichedStores = await Promise.all(
         storeList.map(async (st) => {
-          // 2. Hitung Omset & Total Pesanan Hari Ini
           const { data: todayOrders } = await supabase
             .from('orders')
             .select('total_harga, status')
@@ -71,7 +75,7 @@ export default function SuperAdminDashboard() {
 
           const totalOrdersCount = todayOrders ? todayOrders.length : 0
 
-          // 3. Hitung Sisa Hari Langganan Presisi
+          // Perhitungan Sisa Hari Langganan Presisi Realtime
           let daysRemaining = 0
           if (st.expired_at) {
             const now = new Date().getTime()
@@ -100,12 +104,10 @@ export default function SuperAdminDashboard() {
     fetchAllStoresWithStats()
   }
 
-  // LOGIKA PERPANJANG LANGGANAN PRESISI
+  // LOGIKA TAMBAH WAKTU LANGGANAN & REALTIME UPDATE
   const updateSubscriptionDays = async (storeId: string, additionalDays: number) => {
     const target = stores.find((s) => s.id === storeId)
     
-    // Jika tanggal kadaluarsa sudah ada dan masih berlaku di masa depan, gunakan tanggal tersebut.
-    // Jika tidak ada / sudah lewat, gunakan waktu saat ini sebagai titik awal penambahan.
     let baseDate = new Date()
     if (target?.expired_at) {
       const existingExpiry = new Date(target.expired_at)
@@ -126,8 +128,34 @@ export default function SuperAdminDashboard() {
     if (error) {
       alert('Gagal memperbarui langganan: ' + error.message)
     } else {
-      alert(`Masa langganan toko berhasil diperpanjang +${additionalDays} hari!`)
+      alert(`Masa langganan berhasil ditambah +${additionalDays} hari!`)
+      await fetchAllStoresWithStats()
+    }
+  }
+
+  // LOGIKA HAPUS TOKO & SELURUH SISTEMNYA
+  const handleDeleteStore = async (storeId: string, storeName: string) => {
+    const confirmDelete = confirm(`Apakah Anda yakin ingin MENGHAPUS PERMANEN toko "${storeName}"?\n\nSemua data pesanan, menu, dan kategori toko ini akan dihapus permanen!`)
+    if (!confirmDelete) return
+
+    setLoading(true)
+    try {
+      // 1. Hapus relasi data pesanan, menu, dan kategori terkait toko
+      await supabase.from('order_items').delete().eq('order_id', storeId)
+      await supabase.from('orders').delete().eq('store_id', storeId)
+      await supabase.from('menu_items').delete().eq('store_id', storeId)
+      await supabase.from('categories').delete().eq('store_id', storeId)
+      await supabase.from('tables').delete().eq('store_id', storeId)
+
+      // 2. Hapus data utama toko
+      const { error } = await supabase.from('stores').delete().eq('id', storeId)
+      if (error) throw error
+
+      alert(`Toko "${storeName}" beserta seluruh sistemnya berhasil dihapus permanen!`)
       fetchAllStoresWithStats()
+    } catch (err: any) {
+      alert('Gagal menghapus toko: ' + err.message)
+      setLoading(false)
     }
   }
 
@@ -194,7 +222,7 @@ export default function SuperAdminDashboard() {
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-xs text-slate-500 font-bold">Memuat statistik toko realtime...</div>
+          <div className="p-8 text-center text-xs text-slate-500 font-bold">Memuat data toko & statistik realtime...</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {stores.length === 0 ? (
@@ -209,12 +237,21 @@ export default function SuperAdminDashboard() {
                       <h3 className="font-black text-slate-900 text-lg">{st.store_name}</h3>
                       <p className="text-xs text-sky-600 font-bold">Link Toko: /st/{st.slug}</p>
                     </div>
-                    <button
-                      onClick={() => toggleStoreStatus(st.id, st.is_open)}
-                      className={`px-3 py-1 rounded-full text-[10px] font-bold border ${st.is_open ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}
-                    >
-                      {st.is_open ? 'Toko Buka' : 'Toko Tutup'}
-                    </button>
+                    <div className="flex gap-2 items-center">
+                      <button
+                        onClick={() => toggleStoreStatus(st.id, st.is_open)}
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold border ${st.is_open ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}
+                      >
+                        {st.is_open ? 'Toko Buka' : 'Toko Tutup'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteStore(st.id, st.store_name)}
+                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-extrabold rounded-full transition shadow-sm"
+                        title="Hapus Toko Permanen"
+                      >
+                        Hapus Toko
+                      </button>
+                    </div>
                   </div>
 
                   {/* Ringkasan Statistik Toko Realtime */}
@@ -238,7 +275,7 @@ export default function SuperAdminDashboard() {
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-500">Sisa Waktu Langganan:</span>
                       <span className={`font-black px-2.5 py-0.5 rounded-full text-[11px] ${st.daysRemaining <= 5 ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-sky-100 text-sky-800 border border-sky-200'}`}>
-                        {st.daysRemaining > 0 ? `${st.daysRemaining} Hari` : 'Expired / Belum Diisi'}
+                        {st.daysRemaining > 0 ? `${st.daysRemaining} Hari Tersisa` : 'Expired / Belum Ditambah'}
                       </span>
                     </div>
 
