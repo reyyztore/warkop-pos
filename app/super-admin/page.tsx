@@ -75,12 +75,13 @@ export default function SuperAdminDashboard() {
 
           const totalOrdersCount = todayOrders ? todayOrders.length : 0
 
-          // Perhitungan Sisa Hari Langganan Presisi Realtime
+          // Perhitungan Sisa Hari Langganan Presisi
           let daysRemaining = 0
           if (st.expired_at) {
-            const now = new Date().getTime()
-            const expiry = new Date(st.expired_at).getTime()
-            const diffDays = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24))
+            const now = new Date()
+            const expiry = new Date(st.expired_at)
+            const diffTime = expiry.getTime() - now.getTime()
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
             daysRemaining = diffDays > 0 ? diffDays : 0
           }
 
@@ -104,18 +105,20 @@ export default function SuperAdminDashboard() {
     fetchAllStoresWithStats()
   }
 
-  // LOGIKA TAMBAH WAKTU LANGGANAN & REALTIME UPDATE
+  // LOGIKA PENAMBAHAN MASA AKTIF AKUMULATIF PRESISI
   const updateSubscriptionDays = async (storeId: string, additionalDays: number) => {
     const target = stores.find((s) => s.id === storeId)
-    
-    let baseDate = new Date()
+    const now = new Date()
+
+    let baseDate = now
     if (target?.expired_at) {
-      const existingExpiry = new Date(target.expired_at)
-      if (existingExpiry > new Date()) {
-        baseDate = existingExpiry
+      const currentExpiry = new Date(target.expired_at)
+      if (currentExpiry > now) {
+        baseDate = currentExpiry
       }
     }
 
+    // Tambahkan hari dari tanggal kadaluarsa terakhir
     const newExpiry = new Date(baseDate.getTime() + additionalDays * 24 * 60 * 60 * 1000)
 
     const { error } = await supabase
@@ -128,26 +131,24 @@ export default function SuperAdminDashboard() {
     if (error) {
       alert('Gagal memperbarui langganan: ' + error.message)
     } else {
-      alert(`Masa langganan berhasil ditambah +${additionalDays} hari!`)
+      alert(`Masa langganan toko berhasil ditambah +${additionalDays} hari!`)
       await fetchAllStoresWithStats()
     }
   }
 
-  // LOGIKA HAPUS TOKO & SELURUH SISTEMNYA
+  // LOGIKA HAPUS TOKO PERMANEN
   const handleDeleteStore = async (storeId: string, storeName: string) => {
     const confirmDelete = confirm(`Apakah Anda yakin ingin MENGHAPUS PERMANEN toko "${storeName}"?\n\nSemua data pesanan, menu, dan kategori toko ini akan dihapus permanen!`)
     if (!confirmDelete) return
 
     setLoading(true)
     try {
-      // 1. Hapus relasi data pesanan, menu, dan kategori terkait toko
       await supabase.from('order_items').delete().eq('order_id', storeId)
       await supabase.from('orders').delete().eq('store_id', storeId)
       await supabase.from('menu_items').delete().eq('store_id', storeId)
       await supabase.from('categories').delete().eq('store_id', storeId)
       await supabase.from('tables').delete().eq('store_id', storeId)
 
-      // 2. Hapus data utama toko
       const { error } = await supabase.from('stores').delete().eq('id', storeId)
       if (error) throw error
 
@@ -159,7 +160,6 @@ export default function SuperAdminDashboard() {
     }
   }
 
-  // TAMPILAN AUTENTIKASI PIN
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-50 text-slate-800 flex items-center justify-center p-4 font-sans">
@@ -204,7 +204,6 @@ export default function SuperAdminDashboard() {
     <div className="min-h-screen bg-slate-50 text-slate-800 p-4 sm:p-8 font-sans pb-20 selection:bg-sky-200">
       <div className="max-w-6xl mx-auto space-y-6">
         
-        {/* Header Admin */}
         <div className="bg-white/70 backdrop-blur-xl border border-sky-200/80 p-6 rounded-3xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
           <div>
             <span className="text-[10px] font-black tracking-wider text-red-600 uppercase">REYYZTORE SUPER ADMIN</span>
@@ -247,14 +246,12 @@ export default function SuperAdminDashboard() {
                       <button
                         onClick={() => handleDeleteStore(st.id, st.store_name)}
                         className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-extrabold rounded-full transition shadow-sm"
-                        title="Hapus Toko Permanen"
                       >
                         Hapus Toko
                       </button>
                     </div>
                   </div>
 
-                  {/* Ringkasan Statistik Toko Realtime */}
                   <div className="grid grid-cols-2 gap-3 pt-1">
                     <div className="bg-sky-50/70 border border-sky-100 p-3 rounded-2xl text-left">
                       <p className="text-[10px] font-bold text-slate-500 uppercase">Omset Hari Ini</p>
@@ -270,7 +267,6 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
 
-                  {/* Informasi Masa Aktif Langganan */}
                   <div className="pt-2 border-t border-sky-100 space-y-3">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-500">Sisa Waktu Langganan:</span>
@@ -286,7 +282,6 @@ export default function SuperAdminDashboard() {
                       </span>
                     </div>
 
-                    {/* Tombol Tambah Masa Langganan */}
                     <div className="flex gap-2 pt-1">
                       <button
                         onClick={() => updateSubscriptionDays(st.id, 30)}
