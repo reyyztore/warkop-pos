@@ -13,6 +13,34 @@ function DynamicStoreContent() {
   const mejaParam = searchParams.get('meja')
   const supabase = createClient()
 
+  // --- STATE PWA INSTALLER UNTUK PELANGGAN ---
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [showInstallBtn, setShowInstallBtn] = useState<boolean>(false)
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+      setShowInstallBtn(true)
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    }
+  }, [])
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return
+    deferredPrompt.prompt()
+    const { outcome } = await deferredPrompt.userChoice
+    if (outcome === 'accepted') {
+      setShowInstallBtn(false)
+    }
+    setDeferredPrompt(null)
+  }
+
   // --- AUTH STATE & REFS ---
   const [session, setSession] = useState<any>(null)
   const [isRegister, setIsRegister] = useState(false)
@@ -848,6 +876,27 @@ function DynamicStoreContent() {
   return (
     <div className="min-h-screen text-slate-100 pb-28 font-sans transition-colors duration-300" style={{ backgroundColor: bgColor }}>
       
+      {/* BANNER FLOATING PWA INSTALLER UNTUK PELANGGAN */}
+      {showInstallBtn && (
+        <div className="bg-slate-900 border-b border-emerald-500/40 p-3 sticky top-0 z-40 shadow-lg flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl overflow-hidden bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+              {storeAvatar ? <img src={storeAvatar} alt="Logo Toko" className="w-full h-full object-cover" /> : '☕'}
+            </div>
+            <div>
+              <p className="text-xs font-black text-white">Install App {storeName}</p>
+              <p className="text-[10px] text-slate-400">Pesan menu cepat tanpa scan QR ulang</p>
+            </div>
+          </div>
+          <button
+            onClick={handleInstallClick}
+            className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition active:scale-95 shrink-0"
+          >
+            Install
+          </button>
+        </div>
+      )}
+
       {/* Banner Status Buka / Tutup Toko Realtime */}
       {!isOpen ? (
         <div className="bg-rose-600 text-white p-3 text-center text-xs font-black shadow-lg sticky top-0 z-30">
