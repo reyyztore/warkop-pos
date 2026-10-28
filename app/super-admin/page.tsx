@@ -81,12 +81,26 @@ export default function SuperAdminDashboard() {
 
           const totalOrdersCount = todayOrders ? todayOrders.length : 0
 
-          // 2. Cek Profil dari tabel profiles
-          const { data: ownerProfile } = await supabase
-            .from('profiles')
-            .select('full_name, email, phone')
-            .eq('store_id', st.id)
-            .maybeSingle()
+          // 2. Cari Profil Pemilik (Kasir/Admin Toko) dari tabel profiles berdasarkan store_id atau owner_id
+          let ownerProfile = null
+          
+          if (st.owner_id) {
+            const { data: profByOwner } = await supabase
+              .from('profiles')
+              .select('full_name, email, phone')
+              .eq('id', st.owner_id)
+              .maybeSingle()
+            ownerProfile = profByOwner
+          }
+
+          if (!ownerProfile) {
+            const { data: profByStore } = await supabase
+              .from('profiles')
+              .select('full_name, email, phone')
+              .eq('store_id', st.id)
+              .maybeSingle()
+            ownerProfile = profByStore
+          }
 
           // 3. Hitung sisa hari langganan
           let daysRemaining = 0
@@ -97,10 +111,10 @@ export default function SuperAdminDashboard() {
             daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
           }
 
-          // Pencarian berlapis agar tidak pernah bertuliskan "Tidak ada nama"
-          const resolvedName = st.owner_name || ownerProfile?.full_name || `Admin (${st.store_name})`
-          const resolvedEmail = st.owner_email || ownerProfile?.email || `${st.slug}@warkop.id`
-          const resolvedPhone = st.owner_phone || ownerProfile?.phone || 'Belum diisi'
+          // Deteksi Nama, Email, dan Phone dengan fallback yang akurat
+          const resolvedName = ownerProfile?.full_name || st.owner_name || `Admin (${st.store_name})`
+          const resolvedEmail = ownerProfile?.email || st.owner_email || 'Belum terdaftar'
+          const resolvedPhone = ownerProfile?.phone || st.owner_phone || 'Belum terdaftar'
 
           return {
             ...st,
