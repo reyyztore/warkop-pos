@@ -13,6 +13,7 @@ export default function RegisterTokoPage() {
   const [storeName, setStoreName] = useState('')
   const [slug, setSlug] = useState('')
   const [cashierName, setCashierName] = useState('')
+  const [phone, setPhone] = useState('') // 🌟 State baru untuk No WA / HP
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -30,7 +31,7 @@ export default function RegisterTokoPage() {
     setErrorMsg('')
 
     try {
-      if (!storeName.trim() || !slug.trim() || !email || !password) {
+      if (!storeName.trim() || !slug.trim() || !email || !password || !phone) {
         throw new Error('Semua kolom wajib diisi!')
       }
 
@@ -41,6 +42,7 @@ export default function RegisterTokoPage() {
         options: {
           data: {
             full_name: cashierName || storeName,
+            phone: phone.trim(),
             role: 'cashier',
           },
         },
@@ -51,39 +53,37 @@ export default function RegisterTokoPage() {
 
       const userId = authData.user.id
 
-      // 2. Buat Toko Baru
+      // 2. Buat Toko Baru + Simpan Data Pemilik Langsung ke Tabel stores 🌟
       const { data: storeData, error: storeErr } = await supabase
         .from('stores')
         .insert({
           owner_id: userId,
           slug: slug.trim(),
           store_name: storeName.trim(),
+          owner_name: cashierName.trim() || storeName.trim(),
+          owner_email: email.trim(),
+          owner_phone: phone.trim(),
         })
         .select()
         .single()
 
       if (storeErr) throw storeErr
 
-      // 3. Update Profiles dengan store_id Baru
+      // 3. Update / Upsert Profiles dengan Data Lengkap 🌟
       const { error: profileErr } = await supabase
         .from('profiles')
-        .update({
-          full_name: cashierName || storeName,
+        .upsert({
+          id: userId,
+          full_name: cashierName.trim() || storeName.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
           role: 'cashier',
           store_id: storeData.id,
           store_name: storeName.trim(),
         })
-        .eq('id', userId)
 
       if (profileErr) {
-        // Fallback jika profile belum ada
-        await supabase.from('profiles').upsert({
-          id: userId,
-          full_name: cashierName || storeName,
-          role: 'cashier',
-          store_id: storeData.id,
-          store_name: storeName.trim(),
-        })
+        console.error('Error updating profile:', profileErr.message)
       }
 
       // 4. Buat 5 Meja Standar
@@ -152,6 +152,19 @@ export default function RegisterTokoPage() {
               value={cashierName}
               onChange={(e) => setCashierName(e.target.value)}
               placeholder="Contoh: Budi"
+              required
+              className="w-full mt-1 p-3 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
+            />
+          </div>
+
+          {/* 🌟 KOLOM BARU: NOMOR WHATSAPP / HP */}
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase">Nomor WhatsApp / HP</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="081234567890"
               required
               className="w-full mt-1 p-3 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
             />
