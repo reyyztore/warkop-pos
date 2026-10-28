@@ -99,29 +99,41 @@ function KasirLoginContent() {
       if (authErr) throw authErr
       if (!authData.user) throw new Error('Gagal membuat akun pengelola toko.')
 
-      // 2. Buat Toko Baru di Supabase
+      // 2. Buat Toko Baru di Supabase + SIMPAN DATA PEMILIK LANGSUNG KE TABEL STORES 🌟
       const { data: newStore, error: storeErr } = await supabase
         .from('stores')
         .insert({
-          store_name: storeName,
-          slug: storeSlug,
+          store_name: storeName.trim(),
+          slug: storeSlug.trim(),
           is_open: true,
           owner_id: authData.user.id,
+          owner_name: ownerName.trim() || storeName.trim(), // 👈 Disimpan ke Super Admin
+          owner_email: regEmail.trim(),                     // 👈 Disimpan ke Super Admin
+          owner_phone: phone.trim(),                         // 👈 Disimpan ke Super Admin
         })
         .select()
         .single()
 
       if (storeErr) throw storeErr
 
-      // 3. Update Profil Kasir
+      // 3. Update Profil Kasir Lengkap 🌟
       await supabase.from('profiles').upsert({
         id: authData.user.id,
         store_id: newStore.id,
-        store_name: storeName,
+        store_name: storeName.trim(),
         role: 'cashier',
-        full_name: ownerName,
-        phone,
+        full_name: ownerName.trim() || storeName.trim(),
+        email: regEmail.trim(),
+        phone: phone.trim(),
       })
+
+      // 4. Buat 5 Meja Standar Otomatis
+      const defaultTables = [1, 2, 3, 4, 5].map((num) => ({
+        nomor: num,
+        store_id: newStore.id,
+        aktif: true,
+      }))
+      await supabase.from('tables').insert(defaultTables)
 
       alert('🎉 Toko Baru Berhasil Didaftarkan! Silakan login ke Dashboard Kasir Anda.')
       setIsRegister(false)
@@ -193,7 +205,7 @@ function KasirLoginContent() {
             disabled={loading}
             className="w-full py-3 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow-lg shadow-rose-600/20 active:scale-95 transition"
           >
-            {loading ? 'Memproses...' : 'Masuk Dashboard Kasir ➔'}
+            {loading ? 'Memeriksa...' : 'Masuk Dashboard Kasir ➔'}
           </button>
         </form>
       ) : (
