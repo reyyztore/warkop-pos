@@ -72,22 +72,24 @@ export default function LandingPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-100 font-sans pb-20">
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-20 selection:bg-sky-200">
       
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-40 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80 p-4">
+      {/* Top Navbar Glass Effect */}
+      <header className="sticky top-0 z-40 backdrop-blur-xl bg-white/70 border-b border-sky-200/60 p-4 shadow-sm">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl font-black text-rose-500 tracking-wider">REYYZTORE</span>
-            <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-950/80 border border-rose-800 text-rose-300 rounded-full">POS SYSTEM</span>
+            <span className="text-2xl font-black text-red-600 tracking-wider">REYYZTORE</span>
+            <span className="text-[10px] font-bold px-2.5 py-1 bg-sky-100/80 border border-sky-300/50 text-sky-700 rounded-full backdrop-blur-md">
+              POS SYSTEM
+            </span>
           </div>
 
           <div className="flex items-center gap-3">
-            <Link href="/kasir/login" className="px-4 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-white rounded-xl hover:bg-slate-800">
-              Login Kasir Toko
+            <Link href="/kasir/login" className="px-4 py-2 bg-white/80 border border-sky-200/80 text-xs font-bold text-sky-900 rounded-2xl hover:bg-sky-50 backdrop-blur-md shadow-sm transition">
+              Login Kasir
             </Link>
-            <Link href="/kasir/login?mode=register" className="px-4 py-2 bg-rose-600 text-white text-xs font-black rounded-xl hover:bg-rose-500 shadow-lg shadow-rose-600/20">
-              Daftar Toko Baru ➔
+            <Link href="/kasir/login?mode=register" className="px-5 py-2.5 bg-sky-500/90 hover:bg-sky-600 text-white text-xs font-black rounded-2xl shadow-md shadow-sky-300/40 backdrop-blur-md transition">
+              Daftar Toko Baru
             </Link>
           </div>
         </div>
@@ -95,102 +97,112 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="max-w-4xl mx-auto text-center px-4 pt-16 pb-12 space-y-6">
-        <div className="inline-block px-4 py-1.5 bg-rose-950/60 border border-rose-800/80 text-rose-400 text-xs font-black rounded-full uppercase tracking-wider">
-          🚀 Platform Kasir Multi-Tenant & POS Interaktif
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-sky-100/80 border border-sky-300/60 text-sky-800 text-xs font-bold rounded-full backdrop-blur-md shadow-sm">
+          <svg className="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+          <span>Platform Kasir Multi-Tenant & POS Interaktif</span>
         </div>
 
-        <h1 className="text-3xl sm:text-5xl font-black text-white leading-tight">
-          Transformasi Warkop Anda Menjadi <span className="text-rose-500">Warkop Digital Modern</span>
+        <h1 className="text-3xl sm:text-5xl font-black text-slate-900 leading-tight">
+          Transformasi Warkop Anda Menjadi <span className="text-red-600">Warkop Digital Modern</span>
         </h1>
 
-        <p className="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto">
-          Sistem pemesanan meja otomatis berbasis QR Code, dilengkapi Mini Games anti-bosan, panggilan bel kasir realtime, dan laporan keuangan pintar khusus usaha warkop & cafe.
+        <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
+          Sistem pemesanan meja otomatis berbasis QR Code, dilengkapi Mini Games interaktif, panggilan bel kasir realtime, dan laporan keuangan pintar.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-          <Link href="/kasir/login?mode=register" className="px-8 py-4 bg-rose-600 hover:bg-rose-500 text-white font-black text-sm rounded-2xl shadow-xl shadow-rose-600/30 transition active:scale-95">
-            Mulai Gunakan Sekarang (Daftar Toko) ➔
+          <Link href="/kasir/login?mode=register" className="px-8 py-4 bg-sky-500 hover:bg-sky-600 text-white font-black text-sm rounded-2xl shadow-lg shadow-sky-200/80 transition active:scale-95 flex items-center justify-center gap-2">
+            <span>Mulai Gunakan Sekarang</span>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
           </Link>
           <a
             href="https://wa.me/6285150725531?text=Halo%20Reyyztore,%20saya%20tertarik%20menggunakan%20sistem%20Warkop%20POS"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-sm rounded-2xl shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-2"
+            className="px-8 py-4 bg-white/80 border border-sky-200 text-sky-900 hover:bg-sky-50 font-black text-sm rounded-2xl shadow-sm backdrop-blur-md flex items-center justify-center gap-2 transition"
           >
-            💬 Tanya-tanya via WhatsApp (085150725531)
+            <svg className="w-5 h-5 text-emerald-500" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/></svg>
+            <span>Tanya via WhatsApp (085150725531)</span>
           </a>
         </div>
       </section>
 
-      {/* Benefit Grid */}
+      {/* Benefit Grid Kaca Transparan */}
       <section className="max-w-6xl mx-auto px-4 py-12">
         <div className="text-center space-y-2 mb-10">
-          <h2 className="text-2xl font-black text-white">Keunggulan Utama Reyyztore POS</h2>
-          <p className="text-xs text-slate-400">Semua fitur dirancang khusus untuk kenyamanan owner toko & pelanggan.</p>
+          <h2 className="text-2xl font-black text-slate-900">Keunggulan Utama Reyyztore POS</h2>
+          <p className="text-xs text-slate-500">Fitur cerdas yang siap mengoptimalkan operasional toko Anda.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-3xl space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-rose-950 border border-rose-800 flex items-center justify-center text-2xl">📱</div>
-            <h3 className="text-base font-bold text-white">QR Code Per Meja</h3>
-            <p className="text-xs text-slate-400">1 Meja punya 1 Barcode unik. Pelanggan scan, login instan, dan langsung pilih menu favorit.</p>
+          <div className="bg-white/70 backdrop-blur-md border border-sky-200/70 p-6 rounded-3xl space-y-3 shadow-md shadow-sky-100/50">
+            <div className="w-12 h-12 rounded-2xl bg-sky-100/80 border border-sky-300/50 flex items-center justify-center text-sky-600">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+            </div>
+            <h3 className="text-base font-bold text-slate-900">QR Code Per Meja</h3>
+            <p className="text-xs text-slate-600">Pelanggan cukup melakukan pemindaian barcode tanpa perlu mengunduh aplikasi tambahan.</p>
           </div>
 
-          <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-3xl space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-amber-950 border border-amber-800 flex items-center justify-center text-2xl">🔔</div>
-            <h3 className="text-base font-bold text-white">Bel Panggil Realtime</h3>
-            <p className="text-xs text-slate-400">Pelanggan bisa memanggil kasir dari meja hanya dengan sekali pencet bel ber-suara merdu.</p>
+          <div className="bg-white/70 backdrop-blur-md border border-sky-200/70 p-6 rounded-3xl space-y-3 shadow-md shadow-sky-100/50">
+            <div className="w-12 h-12 rounded-2xl bg-sky-100/80 border border-sky-300/50 flex items-center justify-center text-sky-600">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+            </div>
+            <h3 className="text-base font-bold text-slate-900">Bel Panggil Realtime</h3>
+            <p className="text-xs text-slate-600">Pelanggan dapat memanggil staf kasir langsung dari meja dengan nada panggil jernih.</p>
           </div>
 
-          <div className="bg-slate-900/60 border border-slate-800 p-6 rounded-3xl space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-purple-950 border border-purple-800 flex items-center justify-center text-2xl">🎮</div>
-            <h3 className="text-base font-bold text-white">10 Mini Games Anti-Bosan</h3>
-            <p className="text-xs text-slate-400">TicTacToe, Memory, Tebak Angka, Suwit, hingga Tes Reaksi buat nongkrong makin seru.</p>
+          <div className="bg-white/70 backdrop-blur-md border border-sky-200/70 p-6 rounded-3xl space-y-3 shadow-md shadow-sky-100/50">
+            <div className="w-12 h-12 rounded-2xl bg-sky-100/80 border border-sky-300/50 flex items-center justify-center text-sky-600">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /></svg>
+            </div>
+            <h3 className="text-base font-bold text-slate-900">10 Mini Games Interaktif</h3>
+            <p className="text-xs text-slate-600">Pengalaman menunggu hidangan menjadi menyenangkan dengan permainan di dalam web.</p>
           </div>
         </div>
       </section>
 
-      {/* Founder & Brand Info */}
-      <section className="max-w-4xl mx-auto mx-4 bg-slate-900/80 border border-slate-800 p-8 rounded-3xl text-center space-y-4 my-8">
-        <h3 className="text-xl font-black text-rose-500">Didevelop oleh Reyyztore</h3>
-        <p className="text-xs text-slate-300 max-w-xl mx-auto leading-relaxed">
-          Sistem ini diciptakan dan dikembangkan secara penuh oleh **Reyyztore** di bawah naungan founder **Raihan Aji Saputra**. Kami berkomitmen menyediakan solusi digitalisasi UMKM terjangkau, efisien, dan tanpa kerumitan teknis.
+      {/* Founder & Brand Card Glass */}
+      <section className="max-w-4xl mx-auto mx-4 bg-white/70 backdrop-blur-md border border-sky-200/80 p-8 rounded-3xl text-center space-y-3 shadow-md my-8">
+        <h3 className="text-xl font-black text-red-600">REYYZTORE</h3>
+        <p className="text-xs text-slate-600 max-w-xl mx-auto leading-relaxed">
+          Platform dikembangkan secara penuh oleh <strong>Reyyztore</strong> di bawah naungan founder <strong>Raihan Aji Saputra</strong>.
         </p>
-        <p className="text-xs text-slate-400 font-bold">📧 Kontak Email Founder: <a href="mailto:sraihanaji@gmail.com" className="text-rose-400 hover:underline">sraihanaji@gmail.com</a></p>
+        <p className="text-xs text-sky-800 font-bold">Email Founder: <a href="mailto:sraihanaji@gmail.com" className="text-sky-600 hover:underline">sraihanaji@gmail.com</a></p>
       </section>
 
       {/* Artikel Edukasi Owner Toko */}
       <section className="max-w-6xl mx-auto px-4 py-10 space-y-6">
-        <div className="border-b border-slate-800 pb-4">
-          <h2 className="text-xl font-black text-white">📚 10 Artikel & Panduan Bisnis Warkop</h2>
-          <p className="text-xs text-slate-400 mt-1">Pelajari strategi pengelolaan warkop modern dari ahli Reyyztore.</p>
+        <div className="border-b border-sky-200 pb-4">
+          <h2 className="text-xl font-black text-slate-900">Artikel & Panduan Bisnis Warkop</h2>
+          <p className="text-xs text-slate-500 mt-1">Panduan pengelolaan usaha warkop dari tim Reyyztore.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {articles.map((art) => (
-            <div key={art.id} className="bg-slate-900/40 border border-slate-800/80 p-5 rounded-2xl space-y-2 hover:border-slate-700 transition">
-              <h3 className="text-sm font-bold text-rose-400">{art.title}</h3>
-              <p className="text-xs text-slate-400 line-clamp-2">{art.desc}</p>
+            <div key={art.id} className="bg-white/70 backdrop-blur-md border border-sky-200/70 p-5 rounded-2xl space-y-2 hover:border-sky-300 transition shadow-sm">
+              <h3 className="text-sm font-bold text-sky-900">{art.title}</h3>
+              <p className="text-xs text-slate-600 line-clamp-2">{art.desc}</p>
               <button
                 onClick={() => setSelectedArticle(art)}
-                className="text-[11px] font-black text-emerald-400 hover:underline pt-1 block"
+                className="text-[11px] font-black text-sky-600 hover:underline pt-1 flex items-center gap-1"
               >
-                Baca Artikel Selengkapnya ➔
+                <span>Baca Selengkapnya</span>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
               </button>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Modal Baca Artikel */}
+      {/* Modal Artikel Glass Kaca */}
       {selectedArticle && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-lg rounded-3xl p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-base font-black text-rose-400">{selectedArticle.title}</h3>
-            <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-line">{selectedArticle.content}</p>
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white/90 backdrop-blur-xl border border-sky-200 text-slate-800 w-full max-w-lg rounded-3xl p-6 space-y-4 shadow-2xl max-h-[80vh] overflow-y-auto">
+            <h3 className="text-base font-black text-sky-900">{selectedArticle.title}</h3>
+            <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">{selectedArticle.content}</p>
             <button
               onClick={() => setSelectedArticle(null)}
-              className="w-full py-2.5 bg-slate-800 text-slate-300 font-bold text-xs rounded-xl hover:bg-slate-700"
+              className="w-full py-2.5 bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs rounded-xl shadow-md transition"
             >
               Tutup Artikel
             </button>
@@ -199,8 +211,8 @@ export default function LandingPage() {
       )}
 
       {/* Footer */}
-      <footer className="max-w-6xl mx-auto px-4 pt-12 border-t border-slate-800 text-center text-xs text-slate-500 space-y-2">
-        <p>© 2026 <strong className="text-rose-500">Reyyztore</strong>. Founder: Raihan Aji Saputra.</p>
+      <footer className="max-w-6xl mx-auto px-4 pt-12 border-t border-sky-200 text-center text-xs text-slate-500 space-y-1">
+        <p>© 2026 <strong className="text-red-600">Reyyztore</strong>. Founder: Raihan Aji Saputra.</p>
         <p>Email: sraihanaji@gmail.com | WhatsApp: 085150725531</p>
       </footer>
     </div>
