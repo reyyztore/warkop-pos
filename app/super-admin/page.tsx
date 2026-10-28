@@ -76,14 +76,23 @@ export default function SuperAdminDashboard() {
 
           const totalOrdersCount = todayOrders ? todayOrders.length : 0
 
-          // 2. Ambil Informasi Akun Pemilik Toko / Profil Kasir
+          // 2. Cari data pemilik dari tabel profiles
           const { data: ownerProfile } = await supabase
             .from('profiles')
             .select('full_name, email, phone')
             .eq('store_id', st.id)
             .maybeSingle()
 
-          // 3. Hitung Sisa Hari Masa Aktif Langganan
+          // 3. Cari data dari pesanan pertama jika profil kosong (Pencarian Cadangan)
+          const { data: firstOrder } = await supabase
+            .from('orders')
+            .select('nama_pemesan, email_pemesan, phone_pemesan')
+            .eq('store_id', st.id)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle()
+
+          // 4. Hitung Sisa Hari Masa Aktif Langganan
           let daysRemaining = 0
           if (st.expired_at) {
             const now = new Date().getTime()
@@ -92,14 +101,19 @@ export default function SuperAdminDashboard() {
             daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
           }
 
+          // Logika Penanganan Nama, Email & HP agar tidak pernah "Tidak ada nama"
+          const resolvedName = ownerProfile?.full_name || st.owner_name || firstOrder?.nama_pemesan || `Pemilik (${st.store_name})`
+          const resolvedEmail = ownerProfile?.email || st.owner_email || firstOrder?.email_pemesan || `${st.slug}@warkop.id`
+          const resolvedPhone = ownerProfile?.phone || st.owner_phone || firstOrder?.phone_pemesan || 'Belum diisi'
+
           return {
             ...st,
             totalOmsetToday,
             totalOrdersCount,
             daysRemaining,
-            ownerName: ownerProfile?.full_name || st.owner_name || 'Tidak ada nama',
-            ownerEmail: ownerProfile?.email || st.owner_email || 'Tidak ada email',
-            ownerPhone: ownerProfile?.phone || st.owner_phone || 'Tidak ada no hp',
+            ownerName: resolvedName,
+            ownerEmail: resolvedEmail,
+            ownerPhone: resolvedPhone,
           }
         })
       )
@@ -115,7 +129,6 @@ export default function SuperAdminDashboard() {
     fetchAllStoresWithStats()
   }
 
-  // FIX AKUMULASI HARI AKURAT
   const updateSubscriptionDays = async (storeId: string, additionalDays: number) => {
     setLoading(true)
     const target = stores.find((s) => s.id === storeId)
@@ -146,7 +159,6 @@ export default function SuperAdminDashboard() {
     }
   }
 
-  // FIX HAPUS TOKO PAKSA
   const handleDeleteStore = async (storeId: string, storeName: string) => {
     const confirmDelete = confirm(`HAPUS PERMANEN toko "${storeName}" beserta seluruh datanya?`)
     if (!confirmDelete) return
@@ -272,7 +284,7 @@ export default function SuperAdminDashboard() {
                     </div>
                   </div>
 
-                  {/* 🌟 KOTAK INFORMASI AKUN PEMILIK TOKO 🌟 */}
+                  {/* KOTAK INFORMASI AKUN PEMILIK TOKO */}
                   <div className="bg-slate-900/90 border border-slate-800 p-3.5 rounded-2xl text-white space-y-1.5 shadow-inner">
                     <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
                       <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">👤 Akun Pemilik / Admin</span>
