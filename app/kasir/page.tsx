@@ -24,7 +24,6 @@ export default function KasirDashboardPage() {
   // Tampilan Toko State (Warna, Banner, Pengumuman, Buka/Tutup)
   const [bgColor, setBgColor] = useState('#0f172a')
   const [primaryColor, setPrimaryColor] = useState('#10b981')
-  const [accentColor, setAccentColor] = useState('#f59e0b')
   const [announcement, setAnnouncement] = useState('')
   const [isOpen, setIsOpen] = useState(true)
   const [bannerUrl, setBannerUrl] = useState('')
@@ -111,10 +110,9 @@ export default function KasirDashboardPage() {
       if (profile.qris_url) setQrisUrl(profile.qris_url)
       if (profile.bg_color) setBgColor(profile.bg_color)
       if (profile.primary_color) setPrimaryColor(profile.primary_color)
-      if (profile.accent_color) setAccentColor(profile.accent_color)
       if (profile.announcement) setAnnouncement(profile.announcement)
       if (profile.banner_url) setBannerUrl(profile.banner_url)
-      if (profile.is_open !== undefined) setIsOpen(profile.is_open)
+      if (profile.is_open !== undefined && profile.is_open !== null) setIsOpen(profile.is_open)
     }
 
     fetchOrders()
@@ -148,6 +146,27 @@ export default function KasirDashboardPage() {
       payload: { tableNo },
     })
     alert(`🔔 Bel terkirim ke Meja #${tableNo}`)
+  }
+
+  // FUNGSI KHUSUS TOGGLE STATUS BUKA / TUTUP TOKO LANGSUNG KE SUPABASE
+  const handleToggleStoreOpen = async () => {
+    try {
+      const nextOpenState = !isOpen
+      setIsOpen(nextOpenState)
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const { error } = await supabase.from('profiles').update({
+        is_open: nextOpenState,
+      }).eq('id', session.user.id)
+
+      if (error) throw error
+
+      alert(`Status toko berhasil diubah menjadi: ${nextOpenState ? 'BUKA ✅' : 'TUTUP 🚫'}`)
+    } catch (e: any) {
+      alert(`Gagal mengubah status toko: ${e.message}`)
+    }
   }
 
   // SIMPAN PROFIL KASIR (Nama Kasir, Nama Toko, Foto Logo, QRIS)
@@ -210,7 +229,6 @@ export default function KasirDashboardPage() {
       await supabase.from('profiles').update({
         bg_color: bgColor,
         primary_color: primaryColor,
-        accent_color: accentColor,
         announcement: announcement,
         banner_url: newBannerUrl,
         is_open: isOpen,
@@ -253,9 +271,14 @@ export default function KasirDashboardPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-black text-white">{storeName}</h1>
-              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${isOpen ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
-                {isOpen ? '● Toko Buka' : '○ Toko Tutup'}
-              </span>
+              <button 
+                onClick={handleToggleStoreOpen}
+                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black transition active:scale-95 ${
+                  isOpen ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                }`}
+              >
+                {isOpen ? '● Toko Buka (Klik Tutup)' : '○ Toko Tutup (Klik Buka)'}
+              </button>
             </div>
             <p className="text-xs text-slate-400">Kasir Aktif: <strong className="text-emerald-400">{cashierName}</strong></p>
           </div>
@@ -429,7 +452,7 @@ export default function KasirDashboardPage() {
             <div className="space-y-3">
               <div className="flex justify-between items-center p-3 bg-slate-950 rounded-xl border border-slate-800">
                 <span className="text-xs font-bold">Status Buka Toko</span>
-                <button onClick={() => setIsOpen(!isOpen)} className={`px-4 py-1.5 rounded-xl text-xs font-black ${isOpen ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'}`}>
+                <button onClick={handleToggleStoreOpen} className={`px-4 py-1.5 rounded-xl text-xs font-black ${isOpen ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'}`}>
                   {isOpen ? 'TOKO BUKA' : 'TOKO TUTUP'}
                 </button>
               </div>
@@ -479,3 +502,4 @@ export default function KasirDashboardPage() {
     </div>
   )
 }
+
