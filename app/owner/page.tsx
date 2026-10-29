@@ -26,7 +26,11 @@ export default function OwnerPanelPage() {
   const [monthlyTarget, setMonthlyTarget] = useState<number>(10000000)
   const [isMultiBranch, setIsMultiBranch] = useState<boolean>(false)
 
-  // 🆕 MASTER PIN STATE
+  // 🆕 STATE MODAL UBAH TARGET OMZET
+  const [showTargetModal, setShowTargetModal] = useState<boolean>(false)
+  const [newTargetInput, setNewTargetInput] = useState<string>('10000000')
+
+  // MASTER PIN STATE
   const [currentMasterPin, setCurrentMasterPin] = useState<string>('123456')
   const [showPinChangeModal, setShowPinChangeModal] = useState<boolean>(false)
   const [oldPinInput, setOldPinInput] = useState<string>('')
@@ -69,6 +73,7 @@ export default function OwnerPanelPage() {
       setStores(userStores)
       setIsMultiBranch(userStores[0].is_multi_branch || false)
       setMonthlyTarget(userStores[0].monthly_target || 10000000)
+      setNewTargetInput((userStores[0].monthly_target || 10000000).toString())
       if (userStores[0].master_pin) {
         setCurrentMasterPin(userStores[0].master_pin)
       }
@@ -78,6 +83,8 @@ export default function OwnerPanelPage() {
         const { data: singleStore } = await supabase.from('stores').select('*').eq('id', profile.store_id)
         if (singleStore && singleStore.length > 0) {
           setStores(singleStore)
+          setMonthlyTarget(singleStore[0].monthly_target || 10000000)
+          setNewTargetInput((singleStore[0].monthly_target || 10000000).toString())
           if (singleStore[0].master_pin) {
             setCurrentMasterPin(singleStore[0].master_pin)
           }
@@ -87,6 +94,7 @@ export default function OwnerPanelPage() {
     setLoading(false)
   }
 
+  // 🛠️ PERBAIKAN FETCH ANALYTICS: Menghitung HPP / Modal dari order_items dan menu_items
   const fetchAnalytics = async (targetStoreId: string) => {
     setLoading(true)
 
@@ -102,9 +110,10 @@ export default function OwnerPanelPage() {
       return
     }
 
+    // Join order_items dengan menu_items untuk mengambil HPP/Modal master jika hpp_satuan di order_items belum terisi
     const { data: ordersData } = await supabase
       .from('orders')
-      .select('*, order_items(*, menu_items(nama))')
+      .select('*, order_items(*, menu_items(nama, hpp, hpp_satuan))')
       .in('store_id', targetIds)
       .eq('status', 'selesai')
 
@@ -128,7 +137,10 @@ export default function OwnerPanelPage() {
           const menuName = item.menu_items?.nama || 'Menu'
           const itemQty = item.qty || 1
           const itemPrice = (item.harga_satuan || 0) * itemQty
-          hppCalculated += (item.hpp_satuan || 0) * itemQty
+
+          // Mengambil HPP per item: prioritas hpp_satuan di item ➔ hpp di menu_items ➔ hpp_satuan di menu_items
+          const itemHpp = item.hpp_satuan ?? item.menu_items?.hpp ?? item.menu_items?.hpp_satuan ?? 0
+          hppCalculated += itemHpp * itemQty
 
           if (!itemMap[menuName]) {
             itemMap[menuName] = { nama: menuName, qty: 0, totalRp: 0 }
@@ -167,7 +179,30 @@ export default function OwnerPanelPage() {
     }
   }
 
-  // 🆕 FUNGSI MENGGANTI MASTER PIN 6-DIGIT
+  // 🆕 FUNGSI MENGUBAH TARGET OMZET BULANAN
+  const handleSaveTargetOmzet = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const targetVal = parseFloat(newTargetInput)
+    if (isNaN(targetVal) || targetVal <= 0) {
+      alert('⚠️ Masukkan nominal target yang valid!')
+      return
+    }
+
+    try {
+      const storeIds = stores.map((s) => s.id)
+      await supabase
+        .from('stores')
+        .update({ monthly_target: targetVal })
+        .in('id', storeIds)
+
+      setMonthlyTarget(targetVal)
+      setShowTargetModal(false)
+      alert('✅ Target Omzet Bulanan Berhasil Diperbarui!')
+    } catch (err: any) {
+      alert('Gagal memperbarui target: ' + err.message)
+    }
+  }
+
   const handleSaveNewPin = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -233,6 +268,7 @@ export default function OwnerPanelPage() {
       is_multi_branch: true,
       is_open: true,
       master_pin: currentMasterPin,
+      monthly_target: monthlyTarget,
     })
 
     if (error) {
@@ -261,7 +297,6 @@ export default function OwnerPanelPage() {
           </div>
 
           <div className="flex gap-2 items-center flex-wrap">
-            {/* 🆕 TOMBOL KELOLA PIN OWNER */}
             <button
               onClick={() => setShowPinChangeModal(true)}
               className="px-3.5 py-1.5 bg-slate-900 border border-amber-500/50 text-amber-300 text-xs font-bold rounded-xl shadow transition"
@@ -323,7 +358,7 @@ export default function OwnerPanelPage() {
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl space-y-1">
             <p className="text-[10px] font-bold text-slate-400 uppercase">Total HPP / Modal</p>
             <p className="text-xl font-black text-indigo-400">Rp {totalHpp.toLocaleString('id-ID')}</p>
-            <p className="text-[10px] text-slate-500">Estimasi Modal Bahan Baku</p>
+            <p className="text-[10px] text-slate-500">Modal Bahan Baku Terjual</p>
           </div>
 
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl space-y-1">
@@ -339,14 +374,23 @@ export default function OwnerPanelPage() {
           </div>
         </div>
 
-        {/* 🎯 PROGRESS BAR TARGET OMZET BULANAN */}
+        {/* 🎯 PROGRESS BAR & SETTING TARGET OMZET BULANAN */}
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center flex-wrap gap-2">
             <div>
               <h3 className="text-xs font-black text-amber-400 uppercase">🎯 Target Omzet Bulanan</h3>
               <p className="text-[10px] text-slate-400">Pencapaian omzet toko periode ini</p>
             </div>
-            <span className="text-xs font-black text-emerald-400 font-mono">{progressTargetPct}% Pencapaian</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-emerald-400 font-mono">{progressTargetPct}% Pencapaian</span>
+              {/* 🆕 TOMBOL UBAH TARGET */}
+              <button
+                onClick={() => setShowTargetModal(true)}
+                className="px-2.5 py-1 bg-slate-950 border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-slate-950 text-[10px] font-bold rounded-lg transition"
+              >
+                ⚙️ Ubah Target
+              </button>
+            </div>
           </div>
 
           <div className="w-full bg-slate-950 rounded-full h-3.5 p-0.5 border border-slate-800 overflow-hidden">
@@ -416,7 +460,41 @@ export default function OwnerPanelPage() {
 
       </div>
 
-      {/* 🆕 MODAL UBAH MASTER PIN OWNER */}
+      {/* 🆕 MODAL UBAH TARGET OMZET BULANAN */}
+      {showTargetModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <form onSubmit={handleSaveTargetOmzet} className="bg-slate-900 border border-slate-800 text-white w-full max-w-xs rounded-3xl p-6 space-y-3.5">
+            <div className="text-center space-y-1">
+              <div className="text-2xl">🎯</div>
+              <h3 className="text-sm font-bold text-amber-400">Atur Target Omzet Bulanan</h3>
+              <p className="text-[10px] text-slate-400">Tentukan target omzet kotor toko per bulan.</p>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase">Target Omzet (Rp)</label>
+              <input
+                type="number"
+                required
+                placeholder="10000000"
+                value={newTargetInput}
+                onChange={(e) => setNewTargetInput(e.target.value)}
+                className="w-full mt-1 text-center font-mono p-2.5 bg-slate-950 border border-slate-800 text-xs text-emerald-300 font-bold rounded-xl"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button type="submit" className="flex-1 py-2 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">
+                Simpan Target
+              </button>
+              <button type="button" onClick={() => setShowTargetModal(false)} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">
+                Batal
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL UBAH MASTER PIN OWNER */}
       {showPinChangeModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <form onSubmit={handleSaveNewPin} className="bg-slate-900 border border-slate-800 text-white w-full max-w-xs rounded-3xl p-6 space-y-3.5">
