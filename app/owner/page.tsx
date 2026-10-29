@@ -20,6 +20,16 @@ export default function OwnerDashboardPage() {
   const [expenseAmount, setExpenseAmount] = useState('')
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null)
 
+  // State Target Omzet Bulanan
+  const [monthlyTarget, setMonthlyTarget] = useState<number>(5000000)
+  const [showTargetModal, setShowTargetModal] = useState<boolean>(false)
+  const [inputTarget, setInputTarget] = useState<string>('')
+
+  // State Modal Tambah Cabang Toko Baru
+  const [showAddStoreModal, setShowAddStoreModal] = useState<boolean>(false)
+  const [newStoreName, setNewStoreName] = useState<string>('')
+  const [newStoreSlug, setNewStoreSlug] = useState<string>('')
+
   const supabase = createClient()
 
   useEffect(() => {
@@ -44,6 +54,9 @@ export default function OwnerDashboardPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cashier_shifts', filter: `store_id=eq.${selectedStoreId}` }, () => {
         fetchStoreTransactions(selectedStoreId)
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stores', filter: `id=eq.${selectedStoreId}` }, () => {
+        fetchStoreDetails(selectedStoreId)
+      })
       .subscribe()
 
     return () => {
@@ -58,7 +71,6 @@ export default function OwnerDashboardPage() {
       return
     }
 
-    // Ambil daftar toko milik owner
     const { data: storesList } = await supabase.from('stores').select('*').eq('owner_id', session.user.id)
     
     if (storesList && storesList.length > 0) {
@@ -71,27 +83,27 @@ export default function OwnerDashboardPage() {
 
   const fetchStoreDetails = async (storeId: string) => {
     const { data } = await supabase.from('stores').select('*').eq('id', storeId).single()
-    if (data) setStoreData(data)
+    if (data) {
+      setStoreData(data)
+      if (data.monthly_target) setMonthlyTarget(data.monthly_target)
+    }
   }
 
   const fetchStoreTransactions = async (storeId: string) => {
     setLoading(true)
 
-    // Ambil Orders
     const { data: orderData } = await supabase
       .from('orders')
       .select('*, tables(nomor), order_items(*, menu_items(nama))')
       .eq('store_id', storeId)
       .order('created_at', { ascending: false })
 
-    // Ambil Expenses (Pengeluaran)
     const { data: expenseData } = await supabase
       .from('expenses')
       .select('*')
       .eq('store_id', storeId)
       .order('created_at', { ascending: false })
 
-    // Ambil Cashier Shifts
     const { data: shiftData } = await supabase
       .from('cashier_shifts')
       .select('*')
@@ -121,7 +133,6 @@ export default function OwnerDashboardPage() {
       }
 
       if (editingExpenseId) {
-        // Update Pengeluaran
         const { error } = await supabase
           .from('expenses')
           .update({ title: expenseTitle, amount: amountVal })
@@ -130,7 +141,6 @@ export default function OwnerDashboardPage() {
         if (error) throw error
         alert('✅ Pengeluaran berhasil diperbarui!')
       } else {
-        // Tambah Pengeluaran Baru
         const { error } = await supabase
           .from('expenses')
           .insert({
@@ -153,14 +163,12 @@ export default function OwnerDashboardPage() {
     }
   }
 
-  // ✏️ Edit Pengeluaran (Load ke Form)
   const handleEditExpense = (item: any) => {
     setEditingExpenseId(item.id)
     setExpenseTitle(item.title)
     setExpenseAmount(item.amount.toString())
   }
 
-  // 🗑️ Hapus Pengeluaran
   const handleDeleteExpense = async (id: string) => {
     if (!confirm('Apakah kamu yakin ingin menghapus data pengeluaran ini?')) return
 
@@ -175,42 +183,109 @@ export default function OwnerDashboardPage() {
     }
   }
 
+  // 🎯 Simpan Target Omzet Bulanan ke DB
+  const handleSaveMonthlyTarget = async () => {
+    if (!selectedStoreId || !inputTarget) return
+    const targetVal = parseFloat(inputTarget)
+    if (isNaN(targetVal)) {
+      alert('⚠️ Masukkan angka target yang valid!')
+      return
+    }
+
+    const { error } = await supabase.from('stores').update({ monthly_target: targetVal }).eq('id', selectedStoreId)
+    if (error) {
+      alert('Gagal menyimpan target: ' + error.message)
+    } else {
+      setMonthlyTarget(targetVal)
+      setShowTargetModal(false)
+      setInputTarget('')
+      alert('🎯 Target omzet berhasil diperbarui!')
+    }
+  }
+
+  // 🏪 Tambah Cabang Toko Baru
+  const handleAddNewStore = async () => {
+    if (!newStoreName || !newStoreSlug) {
+      alert('Mohon isi nama cabang dan slug URL toko!')
+      return
+    }
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
+    const cleanSlug = newStoreSlug.toLowerCase().replace(/\s+/g, '-')
+
+    const { data, error } = await supabase.from('stores').insert({
+      owner_id: session.user.id,
+      store_name: newStoreName,
+      slug: cleanSlug,
+      is_open: true,
+      expired_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // Default 30 hari
+    }).select().single()
+
+    if (error) {
+      alert('Gagal membuat cabang baru: ' + error.message)
+    } else {
+      alert('✅ Cabang toko baru berhasil dibuat!')
+      setShowAddStoreModal(false)
+      setNewStoreName('')
+      setNewStoreSlug('')
+      checkOwnerAuthAndFetchStores()
+      if (data) setSelectedStoreId(data.id)
+    }
+  }
+
   // Kalkulasi Keuangan Real-Time
   const completedOrders = orders.filter((o) => o.status === 'selesai')
   const totalOmzet = completedOrders.reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
   const totalPengeluaran = expenses.reduce((acc, curr) => acc + (curr.amount || 0), 0)
   const bersihOmzet = totalOmzet - totalPengeluaran
 
+  const targetPercentage = monthlyTarget > 0 ? Math.min(100, Math.round((totalOmzet / monthlyTarget) * 100)) : 0
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 font-sans pb-20">
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 font-sans pb-20 relative">
       
       {/* Top Header */}
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
           <h1 className="text-2xl font-black text-amber-400">🚪 Panel Eksekutif Owner</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Pantau laporan keuangan, pengeluaran, dan rekap shift kasir secara real-time.</p>
+          <p className="text-xs text-slate-400 mt-0.5">Pantau laporan keuangan, multi-cabang, pengeluaran, dan rekap shift kasir secara real-time.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowAddStoreModal(true)}
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black rounded-xl shadow transition"
+          >
+            ➕ Tambah Cabang Toko
+          </button>
           <Link href="/kasir" className="px-4 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-slate-200 rounded-xl hover:bg-slate-800 transition">
             🔙 Kembali ke Kasir
           </Link>
         </div>
       </div>
 
-      {/* Selector Toko */}
-      <div className="max-w-6xl mx-auto mt-6 flex items-center gap-3 bg-slate-900 p-4 border border-slate-800 rounded-2xl">
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pilih Toko:</span>
-        <select
-          value={selectedStoreId}
-          onChange={(e) => setSelectedStoreId(e.target.value)}
-          className="bg-slate-950 border border-slate-800 text-xs font-bold text-amber-300 px-3 py-2 rounded-xl focus:outline-none"
-        >
-          {stores.map((s) => (
-            <option key={s.id} value={s.id}>
-              🏪 {s.store_name} ({s.slug})
-            </option>
-          ))}
-        </select>
+      {/* Selector Multi-Cabang Toko */}
+      <div className="max-w-6xl mx-auto mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 p-4 border border-slate-800 rounded-2xl">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">🏪 Pilih Cabang Toko:</span>
+          <select
+            value={selectedStoreId}
+            onChange={(e) => setSelectedStoreId(e.target.value)}
+            className="bg-slate-950 border border-slate-800 text-xs font-bold text-amber-300 px-3 py-2 rounded-xl focus:outline-none"
+          >
+            {stores.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.store_name} (Slug: /{s.slug})
+              </option>
+            ))}
+          </select>
+        </div>
+        {storeData && (
+          <div className="text-xs text-slate-300">
+            Status Toko: <strong className={storeData.is_open ? 'text-emerald-400' : 'text-rose-400'}>{storeData.is_open ? '● BUKA' : '○ TUTUP'}</strong>
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -218,6 +293,36 @@ export default function OwnerDashboardPage() {
       ) : (
         <div className="max-w-6xl mx-auto mt-6 space-y-6">
           
+          {/* Target Omzet & Progress Bar */}
+          <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">🎯 Target Omzet Bulanan Toko Ini</h3>
+                <p className="text-sm font-bold text-white mt-0.5">
+                  Rp {totalOmzet.toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-normal">dari target Rp {monthlyTarget.toLocaleString('id-ID')}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => { setInputTarget(monthlyTarget.toString()); setShowTargetModal(true); }}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold rounded-xl border border-slate-700"
+              >
+                ✏️ Atur Target
+              </button>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-slate-950 h-3.5 rounded-full overflow-hidden border border-slate-800 relative">
+              <div
+                className="bg-gradient-to-r from-amber-500 to-emerald-400 h-full rounded-full transition-all duration-500"
+                style={{ width: `${targetPercentage}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-slate-400 font-bold">
+              <span>Pencapaian: {targetPercentage}%</span>
+              <span>{targetPercentage >= 100 ? '🎉 Target Tercapai!' : 'Semangat Kejar Omzet!'}</span>
+            </div>
+          </div>
+
           {/* Ringkasan Grafik Keuangan Real-Time */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-1">
@@ -359,6 +464,60 @@ export default function OwnerDashboardPage() {
 
         </div>
       )}
+
+      {/* MODAL ATUR TARGET OMZET */}
+      {showTargetModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-xs rounded-3xl p-6 space-y-3">
+            <h3 className="text-sm font-bold text-amber-400">🎯 Atur Target Omzet Bulanan</h3>
+            <input
+              type="number"
+              placeholder="Contoh: 10000000"
+              value={inputTarget}
+              onChange={(e) => setInputTarget(e.target.value)}
+              className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-emerald-300 font-bold rounded-xl font-mono"
+            />
+            <div className="flex gap-2 pt-2">
+              <button onClick={handleSaveMonthlyTarget} className="flex-1 py-2 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Simpan Target</button>
+              <button onClick={() => setShowTargetModal(false)} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL TAMBAH CABANG TOKO BARU */}
+      {showAddStoreModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-6 space-y-3.5">
+            <h3 className="text-sm font-bold text-amber-400">🏪 Tambah Cabang Toko Baru</h3>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase">Nama Cabang Toko</label>
+              <input
+                type="text"
+                placeholder="Contoh: Warkop Kita Cabang 2"
+                value={newStoreName}
+                onChange={(e) => setNewStoreName(e.target.value)}
+                className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase">Slug URL Toko (Tanpa Spasi)</label>
+              <input
+                type="text"
+                placeholder="Contoh: warkop-cabang-2"
+                value={newStoreSlug}
+                onChange={(e) => setNewStoreSlug(e.target.value)}
+                className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl font-mono"
+              />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button onClick={handleAddNewStore} className="flex-1 py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Buat Cabang</button>
+              <button onClick={() => setShowAddStoreModal(false)} className="px-4 py-2.5 bg-slate-800 text-xs font-bold rounded-xl text-slate-400">Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
