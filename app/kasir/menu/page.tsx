@@ -20,8 +20,9 @@ export default function KasirMenuPage() {
   const [namaMenu, setNamaMenu] = useState('')
   const [deskripsiMenu, setDeskripsiMenu] = useState('')
   const [hargaMenu, setHargaMenu] = useState('')
-  const [hargaDinginMenu, setHargaDinginMenu] = useState('') // 🌟 State baru harga dingin
+  const [hargaDinginMenu, setHargaDinginMenu] = useState('')
   const [selectedCatId, setSelectedCatId] = useState('')
+  const [labelMenu, setLabelMenu] = useState('') // 🌟 State baru untuk Label Badge Menu
   const [fotoFile, setFotoFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -61,7 +62,7 @@ export default function KasirMenuPage() {
     setLoading(false)
   }
 
-  // TAMBAH / EDIT MENU (DENGAN REVISI HARGA PANAS & DINGIN)
+  // TAMBAH / EDIT MENU (DENGAN LABEL BADGE DAN HARGA PANAS/DINGIN)
   const handleSaveMenu = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!storeId) return
@@ -91,8 +92,9 @@ export default function KasirMenuPage() {
         nama: namaMenu.trim(),
         deskripsi: deskripsiMenu.trim(),
         harga: mainHarga,
-        harga_panas: mainHarga, // 🌟 Simpan ke kolom harga_panas
-        harga_dingin: dinginHarga, // 🌟 Simpan ke kolom harga_dingin
+        harga_panas: mainHarga,
+        harga_dingin: dinginHarga,
+        label: labelMenu.trim() || null, // 🌟 Simpan label badge menu
         foto_url: fotoUrl,
         tersedia: editingMenuItem ? editingMenuItem.tersedia : true,
       }
@@ -152,6 +154,7 @@ export default function KasirMenuPage() {
     setHargaMenu('')
     setHargaDinginMenu('')
     setSelectedCatId('')
+    setLabelMenu('')
     setFotoFile(null)
   }
 
@@ -162,6 +165,7 @@ export default function KasirMenuPage() {
     setHargaMenu((item.harga_panas || item.harga).toString())
     setHargaDinginMenu(item.harga_dingin ? item.harga_dingin.toString() : '')
     setSelectedCatId(item.category_id)
+    setLabelMenu(item.label || '')
     setShowMenuModal(true)
   }
 
@@ -173,7 +177,7 @@ export default function KasirMenuPage() {
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div>
             <Link href="/kasir" className="text-xs text-emerald-400 font-bold hover:underline">← Kembali ke Dasbor</Link>
-            <h1 className="text-xl font-black text-white mt-1">🌸 Kelola Menu & Kategori Warkop</h1>
+            <h1 className="text-xl font-black text-white mt-1">🌸 Kelola Menu & Label Promosi</h1>
           </div>
 
           <div className="flex gap-2">
@@ -196,13 +200,20 @@ export default function KasirMenuPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {menuItems.map((item) => (
-              <div key={item.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl flex items-center justify-between gap-3">
+              <div key={item.id} className="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl flex items-center justify-between gap-3 relative overflow-hidden">
                 <div className="flex items-center gap-3">
                   <div className="w-14 h-14 rounded-xl bg-slate-950 overflow-hidden flex items-center justify-center text-xl shrink-0">
                     {item.foto_url ? <img src={item.foto_url} alt={item.nama} className="w-full h-full object-cover" /> : '☕'}
                   </div>
                   <div>
-                    <span className="text-[9px] font-bold text-emerald-400 uppercase">{item.categories?.nama || 'Tanpa Kategori'}</span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[9px] font-bold text-emerald-400 uppercase">{item.categories?.nama || 'Tanpa Kategori'}</span>
+                      {item.label && (
+                        <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 font-black text-[9px] px-1.5 py-0.2 rounded uppercase">
+                          {item.label}
+                        </span>
+                      )}
+                    </div>
                     <h3 className="text-xs font-bold text-white line-clamp-1">{item.nama}</h3>
                     
                     {/* Display Harga Panas & Dingin */}
@@ -239,7 +250,7 @@ export default function KasirMenuPage() {
 
       </div>
 
-      {/* Modal Tambah/Edit Menu (Dengan Input Harga Panas/Dingin) */}
+      {/* Modal Tambah/Edit Menu (Dengan Input Label Badge & Harga) */}
       {showMenuModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <form onSubmit={handleSaveMenu} className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-3.5 max-h-[90vh] overflow-y-auto">
@@ -250,14 +261,28 @@ export default function KasirMenuPage() {
               <input type="text" value={namaMenu} onChange={(e) => setNamaMenu(e.target.value)} required placeholder="Contoh: Es Kopi Susu Gula Aren" className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white font-bold" />
             </div>
 
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Kategori</label>
-              <select value={selectedCatId} onChange={(e) => setSelectedCatId(e.target.value)} required className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white">
-                <option value="">Pilih Kategori</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nama}</option>
-                ))}
-              </select>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Kategori</label>
+                <select value={selectedCatId} onChange={(e) => setSelectedCatId(e.target.value)} required className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white">
+                  <option value="">Pilih Kategori</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nama}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Input Label Badge Menu */}
+              <div>
+                <label className="text-[10px] font-bold text-amber-400 uppercase">Label Badge Menu</label>
+                <input
+                  type="text"
+                  placeholder="misal: Best Seller / Terbatas"
+                  value={labelMenu}
+                  onChange={(e) => setLabelMenu(e.target.value)}
+                  className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-amber-300 font-bold"
+                />
+              </div>
             </div>
 
             {/* Input 2 Harga (Panas & Dingin) */}
@@ -270,7 +295,6 @@ export default function KasirMenuPage() {
               <div>
                 <label className="text-[10px] font-bold text-cyan-400 uppercase">🧊 Harga Dingin (Opsional)</label>
                 <input type="number" value={hargaDinginMenu} onChange={(e) => setHargaDinginMenu(e.target.value)} placeholder="17000" className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white font-bold" />
-                <span className="text-[9px] text-slate-500">Kosongkan jika bukan minuman varian dingin</span>
               </div>
             </div>
 
@@ -312,6 +336,11 @@ export default function KasirMenuPage() {
           </form>
         </div>
       )}
+
+      {/* FOOTER BRANDING REYYZTORE */}
+      <footer className="text-center py-6 text-[10px] text-slate-400 font-medium border-t border-slate-800 mt-8">
+        Powered by <strong className="text-emerald-400">Reyyztore</strong> • Digital POS System
+      </footer>
     </div>
   )
 }
