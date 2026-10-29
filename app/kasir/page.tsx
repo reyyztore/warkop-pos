@@ -372,7 +372,7 @@ export default function KasirDashboardPage() {
     }
   }
 
-  // ⏱️ FUNGSI BUKA SHIFT KASIR (PERBAIKAN LENGKAP)
+  // ⏱️ FUNGSI BUKA SHIFT KASIR (DENGAN FIELD cashier_name)
   const handleOpenShift = async () => {
     if (!modalAwalInput || !storeId) {
       alert('⚠️ Masukkan nominal modal awal kasir terlebih dahulu!')
@@ -390,6 +390,7 @@ export default function KasirDashboardPage() {
         .from('cashier_shifts')
         .insert({
           store_id: storeId,
+          cashier_name: cashierName || 'Kasir',
           starting_cash: modalVal,
           status: 'open',
           start_time: new Date().toISOString()
@@ -411,7 +412,7 @@ export default function KasirDashboardPage() {
     }
   }
 
-  // ⏱️ FUNGSI TUTUP SHIFT KASIR (PERBAIKAN LENGKAP)
+  // ⏱️ FUNGSI TUTUP SHIFT KASIR (HITUNG KAS FISIK & PENJUALAN TUNAI)
   const handleCloseShift = async () => {
     if (!kasFisikInput || !activeShift) {
       alert('⚠️ Masukkan nominal total kas fisik terlebih dahulu!')
@@ -425,8 +426,15 @@ export default function KasirDashboardPage() {
         return
       }
 
+      // Hitung total transaksi tunai selama shift berlangsung
+      const shiftStartTime = activeShift.start_time ? new Date(activeShift.start_time).getTime() : 0
       const totalCashSales = orders
-        .filter((o) => o.status === 'selesai' && o.metode_pembayaran === 'kasir')
+        .filter((o) => {
+          const isCompleted = o.status === 'selesai'
+          const isAfterShiftStart = new Date(o.created_at).getTime() >= shiftStartTime
+          const isCash = !o.metode_pembayaran || ['kasir', 'cash', 'tunai'].includes(o.metode_pembayaran.toLowerCase())
+          return isCompleted && isAfterShiftStart && isCash
+        })
         .reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
 
       const expectedCash = (activeShift.starting_cash || 0) + totalCashSales
