@@ -70,12 +70,17 @@ export default function OwnerDashboardPage() {
       return
     }
 
-    const { data: storesList } = await supabase.from('stores').select('*').eq('owner_id', session.user.id)
+    const { data: storesList } = await supabase.from('stores').select('*').eq('owner_id', session.user.id).order('created_at', { ascending: true })
     
     if (storesList && storesList.length > 0) {
       setStores(storesList)
-      setSelectedStoreId(storesList[0].id)
+      // Jika selectedStoreId belum ada atau tidak ada dalam list baru, set ke toko pertama
+      if (!selectedStoreId || !storesList.some(s => s.id === selectedStoreId)) {
+        setSelectedStoreId(storesList[0].id)
+      }
     } else {
+      setStores([])
+      setSelectedStoreId('')
       setLoading(false)
     }
   }
@@ -214,7 +219,6 @@ export default function OwnerDashboardPage() {
 
     const cleanSlug = newStoreSlug.toLowerCase().trim().replace(/\s+/g, '-')
 
-    // 1. Cari toko berdasarkan slug
     const { data: existingStore, error: fetchError } = await supabase
       .from('stores')
       .select('*')
@@ -226,7 +230,6 @@ export default function OwnerDashboardPage() {
       return
     }
 
-    // 2. Update owner_id toko tersebut ke user yang sedang login
     const { error: updateError } = await supabase
       .from('stores')
       .update({ owner_id: session.user.id })
@@ -240,6 +243,40 @@ export default function OwnerDashboardPage() {
       setNewStoreSlug('')
       checkOwnerAuthAndFetchStores()
       setSelectedStoreId(existingStore.id)
+    }
+  }
+
+  // 🔓 Lepas Tautan (Unlink) Cabang (Kecuali Cabang Utama/Pertama)
+  const handleUnlinkStore = async () => {
+    if (stores.length <= 1) {
+      alert('⚠️ Tidak dapat melepas tautan karena ini adalah satu-satunya cabang toko yang kamu miliki.')
+      return
+    }
+
+    // Cabang pertama (utama) di-indeks ke-0 berdasarkan created_at ascending
+    if (stores[0].id === selectedStoreId) {
+      alert('🔒 Cabang utama (pertama) tidak dapat dilepas tautannya demi keamanan kepemilikan toko!')
+      return
+    }
+
+    const storeToUnlink = stores.find(s => s.id === selectedStoreId)
+    const confirmUnlink = confirm(`⚠️ Apakah kamu yakin ingin melepas tautan cabang "${storeToUnlink?.store_name || 'ini'}" dari akun kamu?`)
+    
+    if (!confirmUnlink) return
+
+    try {
+      // Set owner_id menjadi null atau kosongkan kepemilikannya
+      const { error } = await supabase
+        .from('stores')
+        .update({ owner_id: null })
+        .eq('id', selectedStoreId)
+
+      if (error) throw error
+
+      alert('🔓 Tautan cabang berhasil dilepas!')
+      checkOwnerAuthAndFetchStores()
+    } catch (err: any) {
+      alert('❌ Gagal melepas tautan: ' + err.message)
     }
   }
 
@@ -273,22 +310,33 @@ export default function OwnerDashboardPage() {
         </div>
       </div>
 
-      {/* Selector Multi-Cabang Toko */}
+      {/* Selector Multi-Cabang Toko & Tombol Unlink */}
       <div className="max-w-6xl mx-auto mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 p-4 border border-slate-800 rounded-2xl">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">🏪 Pilih Cabang Tertaut:</span>
           <select
             value={selectedStoreId}
             onChange={(e) => setSelectedStoreId(e.target.value)}
             className="bg-slate-950 border border-slate-800 text-xs font-bold text-amber-300 px-3 py-2 rounded-xl focus:outline-none"
           >
-            {stores.map((s) => (
+            {stores.map((s, idx) => (
               <option key={s.id} value={s.id}>
-                {s.store_name} (Slug: /{s.slug})
+                {s.store_name} {idx === 0 ? '(Cabang Utama)' : ''} (Slug: /{s.slug})
               </option>
             ))}
           </select>
+
+          {/* Tombol Lepas Tautan (Unlink) - Sembunyikan untuk cabang utama */}
+          {stores.length > 1 && stores[0]?.id !== selectedStoreId && (
+            <button
+              onClick={handleUnlinkStore}
+              className="px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-xs font-bold rounded-xl transition"
+            >
+              🔓 Lepas Tautan Cabang Ini
+            </button>
+          )}
         </div>
+
         {storeData && (
           <div className="text-xs text-slate-300">
             Status Toko: <strong className={storeData.is_open ? 'text-emerald-400' : 'text-rose-400'}>{storeData.is_open ? '● BUKA' : '○ TUTUP'}</strong>
