@@ -26,6 +26,12 @@ export default function OwnerPanelPage() {
   const [monthlyTarget, setMonthlyTarget] = useState<number>(10000000)
   const [isMultiBranch, setIsMultiBranch] = useState<boolean>(false)
 
+  // 🆕 MASTER PIN STATE
+  const [currentMasterPin, setCurrentMasterPin] = useState<string>('123456')
+  const [showPinChangeModal, setShowPinChangeModal] = useState<boolean>(false)
+  const [oldPinInput, setOldPinInput] = useState<string>('')
+  const [newPinInput, setNewPinInput] = useState<string>('')
+
   // Form Modal Expense State
   const [showExpenseModal, setShowExpenseModal] = useState<boolean>(false)
   const [expenseDesc, setExpenseDesc] = useState<string>('')
@@ -54,7 +60,6 @@ export default function OwnerPanelPage() {
       return
     }
 
-    // Ambil seluruh cabang toko yang terikat dengan user ID owner ini
     const { data: userStores } = await supabase
       .from('stores')
       .select('*')
@@ -64,12 +69,19 @@ export default function OwnerPanelPage() {
       setStores(userStores)
       setIsMultiBranch(userStores[0].is_multi_branch || false)
       setMonthlyTarget(userStores[0].monthly_target || 10000000)
+      if (userStores[0].master_pin) {
+        setCurrentMasterPin(userStores[0].master_pin)
+      }
     } else {
-      // Fallback: Ambil dari store_id di profil jika owner_id belum terhubung
       const { data: profile } = await supabase.from('profiles').select('store_id').eq('id', session.user.id).single()
       if (profile?.store_id) {
         const { data: singleStore } = await supabase.from('stores').select('*').eq('id', profile.store_id)
-        if (singleStore) setStores(singleStore)
+        if (singleStore && singleStore.length > 0) {
+          setStores(singleStore)
+          if (singleStore[0].master_pin) {
+            setCurrentMasterPin(singleStore[0].master_pin)
+          }
+        }
       }
     }
     setLoading(false)
@@ -90,14 +102,12 @@ export default function OwnerPanelPage() {
       return
     }
 
-    // 1. Ambil Pesanan Selesai
     const { data: ordersData } = await supabase
       .from('orders')
       .select('*, order_items(*, menu_items(nama))')
       .in('store_id', targetIds)
       .eq('status', 'selesai')
 
-    // 2. Ambil Pengeluaran Operasional
     const { data: expenseData } = await supabase
       .from('store_expenses')
       .select('*')
@@ -107,11 +117,9 @@ export default function OwnerPanelPage() {
     if (ordersData) {
       setTotalOrdersCount(ordersData.length)
 
-      // Hitung Omzet Kotor
       const omzetCalculated = ordersData.reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
       setTotalOmzet(omzetCalculated)
 
-      // Hitung Total HPP / Modal
       let hppCalculated = 0
       const itemMap: { [key: string]: { nama: string; qty: number; totalRp: number } } = {}
 
@@ -132,7 +140,6 @@ export default function OwnerPanelPage() {
 
       setTotalHpp(hppCalculated)
 
-      // Ranking Top 5 Menu Terlaris
       const sortedTopItems = Object.values(itemMap)
         .sort((a, b) => b.qty - a.qty)
         .slice(0, 5)
@@ -149,7 +156,6 @@ export default function OwnerPanelPage() {
     setLoading(false)
   }
 
-  // Hitung Laba Bersih (Net Profit)
   useEffect(() => {
     setNetProfit(totalOmzet - totalHpp - totalExpense)
   }, [totalOmzet, totalHpp, totalExpense])
@@ -158,6 +164,37 @@ export default function OwnerPanelPage() {
     setIsMultiBranch(nextState)
     if (stores.length > 0) {
       await supabase.from('stores').update({ is_multi_branch: nextState }).in('id', stores.map((s) => s.id))
+    }
+  }
+
+  // 🆕 FUNGSI MENGGANTI MASTER PIN 6-DIGIT
+  const handleSaveNewPin = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (oldPinInput !== currentMasterPin) {
+      alert('❌ PIN Lama yang Anda masukkan salah!')
+      return
+    }
+
+    if (newPinInput.length !== 6 || !/^\d+$/.test(newPinInput)) {
+      alert('⚠️ Master PIN harus berupa 6 angka!')
+      return
+    }
+
+    try {
+      const storeIds = stores.map((s) => s.id)
+      await supabase
+        .from('stores')
+        .update({ master_pin: newPinInput })
+        .in('id', storeIds)
+
+      setCurrentMasterPin(newPinInput)
+      setOldPinInput('')
+      setNewPinInput('')
+      setShowPinChangeModal(false)
+      alert('✅ Master PIN 6-Digit Berhasil Diperbarui!')
+    } catch (err: any) {
+      alert('Gagal mengubah PIN: ' + err.message)
     }
   }
 
@@ -195,6 +232,7 @@ export default function OwnerPanelPage() {
       owner_id: session.user.id,
       is_multi_branch: true,
       is_open: true,
+      master_pin: currentMasterPin,
     })
 
     if (error) {
@@ -223,6 +261,14 @@ export default function OwnerPanelPage() {
           </div>
 
           <div className="flex gap-2 items-center flex-wrap">
+            {/* 🆕 TOMBOL KELOLA PIN OWNER */}
+            <button
+              onClick={() => setShowPinChangeModal(true)}
+              className="px-3.5 py-1.5 bg-slate-900 border border-amber-500/50 text-amber-300 text-xs font-bold rounded-xl shadow transition"
+            >
+              🔑 Ubah Master PIN
+            </button>
+
             <button
               onClick={() => handleToggleMultiBranch(!isMultiBranch)}
               className={`px-3 py-1.5 text-xs font-black rounded-xl border transition ${
@@ -243,7 +289,7 @@ export default function OwnerPanelPage() {
           </div>
         </div>
 
-        {/* 🏢 DROPDOWN SELECTOR CABANG (HANYA MUNCUL BILA MODE MULTI-CABANG ON) */}
+        {/* 🏢 DROPDOWN SELECTOR CABANG */}
         {isMultiBranch && (
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
@@ -266,30 +312,26 @@ export default function OwnerPanelPage() {
           </div>
         )}
 
-        {/* 📊 GRID METRIK RINGKASAN FINANSIAL (HPP & LABA BERSIH) */}
+        {/* 📊 GRID METRIK RINGKASAN FINANSIAL */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Total Omzet */}
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl space-y-1">
             <p className="text-[10px] font-bold text-slate-400 uppercase">Omzet Kotor (Gross)</p>
             <p className="text-xl font-black text-emerald-400">Rp {totalOmzet.toLocaleString('id-ID')}</p>
             <p className="text-[10px] text-slate-500">{totalOrdersCount} Pesanan Selesai</p>
           </div>
 
-          {/* Modal / HPP Bahan */}
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl space-y-1">
             <p className="text-[10px] font-bold text-slate-400 uppercase">Total HPP / Modal</p>
             <p className="text-xl font-black text-indigo-400">Rp {totalHpp.toLocaleString('id-ID')}</p>
             <p className="text-[10px] text-slate-500">Estimasi Modal Bahan Baku</p>
           </div>
 
-          {/* Pengeluaran Operasional */}
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl space-y-1">
             <p className="text-[10px] font-bold text-slate-400 uppercase">Biaya Operasional</p>
             <p className="text-xl font-black text-rose-400">Rp {totalExpense.toLocaleString('id-ID')}</p>
             <p className="text-[10px] text-slate-500">Es batu, galon, kebersihan, dll.</p>
           </div>
 
-          {/* Laba Bersih (Net Profit) */}
           <div className="bg-slate-900 border border-amber-500/40 p-4 rounded-3xl space-y-1 bg-amber-500/5">
             <p className="text-[10px] font-bold text-amber-400 uppercase">Laba Bersih (Net Profit)</p>
             <p className="text-xl font-black text-amber-300">Rp {netProfit.toLocaleString('id-ID')}</p>
@@ -322,8 +364,6 @@ export default function OwnerPanelPage() {
 
         {/* 🏆 TOP 5 MENU TERLARIS & EXPENSE TRACKER */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          
-          {/* Ranking Menu Terlaris */}
           <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
             <h3 className="text-xs font-black text-amber-400 uppercase">🏆 Top 5 Menu Terlaris</h3>
             {topMenuItems.length === 0 ? (
@@ -345,7 +385,6 @@ export default function OwnerPanelPage() {
             )}
           </div>
 
-          {/* Pencatatan Pengeluaran Operasional (Expense) */}
           <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-black text-rose-400 uppercase">💸 Pengeluaran Operasional</h3>
@@ -376,6 +415,54 @@ export default function OwnerPanelPage() {
         </div>
 
       </div>
+
+      {/* 🆕 MODAL UBAH MASTER PIN OWNER */}
+      {showPinChangeModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <form onSubmit={handleSaveNewPin} className="bg-slate-900 border border-slate-800 text-white w-full max-w-xs rounded-3xl p-6 space-y-3.5">
+            <div className="text-center space-y-1">
+              <div className="text-2xl">🔑</div>
+              <h3 className="text-sm font-bold text-amber-400">Pengaturan Master PIN Owner</h3>
+              <p className="text-[10px] text-slate-400">Ganti PIN 6-digit untuk proteksi mode owner dari kasir.</p>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase">PIN Lama</label>
+              <input
+                type="password"
+                maxLength={6}
+                required
+                placeholder="••••••"
+                value={oldPinInput}
+                onChange={(e) => setOldPinInput(e.target.value)}
+                className="w-full mt-1 text-center font-mono p-2 bg-slate-950 border border-slate-800 text-xs text-amber-300 rounded-xl"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase">PIN Baru (6 Angka)</label>
+              <input
+                type="password"
+                maxLength={6}
+                required
+                placeholder="••••••"
+                value={newPinInput}
+                onChange={(e) => setNewPinInput(e.target.value)}
+                className="w-full mt-1 text-center font-mono p-2 bg-slate-950 border border-slate-800 text-xs text-emerald-300 rounded-xl"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button type="submit" className="flex-1 py-2 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">
+                Simpan PIN Baru
+              </button>
+              <button type="button" onClick={() => setShowPinChangeModal(false)} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">
+                Batal
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* MODAL CATAT PENGELUARAN */}
       {showExpenseModal && (
