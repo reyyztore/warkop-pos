@@ -60,7 +60,7 @@ export default function KasirDashboardPage() {
   const [bgImageUrl, setBgImageUrl] = useState('')
   const [bgImageFile, setBgImageFile] = useState<File | null>(null)
 
-  // 🎴 LOYALTY CARD STATE DISIMPAN KASIR
+  // LOYALTY CARD STATE DISIMPAN KASIR
   const [loyaltyActive, setLoyaltyActive] = useState<boolean>(false)
   const [loyaltyCode, setLoyaltyCode] = useState<string>('')
   const [loyaltyMaxStamps, setLoyaltyMaxStamps] = useState<number>(10)
@@ -73,7 +73,7 @@ export default function KasirDashboardPage() {
     emoji: '☕'
   })
 
-  // 🎟️ KODE PROMO STATE
+  // KODE PROMO STATE
   const [promos, setPromos] = useState<any[]>([])
   const [showPromoModal, setShowPromoModal] = useState(false)
   const [newPromoCode, setNewPromoCode] = useState('')
@@ -81,7 +81,7 @@ export default function KasirDashboardPage() {
   const [newPromoVal, setNewPromoVal] = useState<number>(0)
   const [newPromoMin, setNewPromoMin] = useState<number>(0)
 
-  // 📊 REKAP & LAPORAN STATE
+  // REKAP & LAPORAN STATE
   const [rekapPeriode, setRekapPeriode] = useState<'hari' | 'minggu' | 'bulan'>('hari')
   const [showRekapModal, setShowRekapModal] = useState(false)
 
@@ -197,7 +197,6 @@ export default function KasirDashboardPage() {
           if (storeData.banner_url) setBannerUrl(storeData.banner_url)
           if (storeData.is_open !== undefined) setIsOpen(storeData.is_open)
 
-          // Load Info Tambahan
           if (storeData.maps_url) setMapsUrl(storeData.maps_url)
           if (storeData.wa_complaint) setWaComplaint(storeData.wa_complaint)
           if (storeData.social_links) setSocialLinks(storeData.social_links || [])
@@ -210,12 +209,10 @@ export default function KasirDashboardPage() {
           if (storeData.bg_image_url) setBgImageUrl(storeData.bg_image_url)
           if (storeData.theme_config) setThemeConfig(storeData.theme_config)
 
-          // Load Loyalty Settings
           if (storeData.loyalty_active !== undefined) setLoyaltyActive(storeData.loyalty_active)
           if (storeData.loyalty_code) setLoyaltyCode(storeData.loyalty_code)
           if (storeData.loyalty_max_stamps) setLoyaltyMaxStamps(storeData.loyalty_max_stamps)
 
-          // Hitung Sisa Langganan
           if (storeData.expired_at) {
             setExpiredAt(storeData.expired_at)
             const diff = new Date(storeData.expired_at).getTime() - new Date().getTime()
@@ -448,21 +445,42 @@ export default function KasirDashboardPage() {
   const rekapOrders = getFilteredOrdersByPeriode()
   const totalRekapOmzet = rekapOrders.reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
 
+  // 🌟 FUNGSI DOWNLOAD CSV REVISI
   const downloadRekapCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,ID Pesanan,Tanggal,Waktu,Meja,Pemesan,Total Harga,Status\n"
+    if (rekapOrders.length === 0) {
+      alert('Tidak ada data pesanan selesai pada periode ini.')
+      return
+    }
+
+    let csvContent = '\uFEFF'
+    csvContent += 'ID Pesanan,Tanggal,Waktu,Nomor Meja,Nama Pemesan,Total Harga (Rp),Status\n'
+
     rekapOrders.forEach((o) => {
       const d = new Date(o.created_at)
       const dateStr = d.toLocaleDateString('id-ID')
-      const timeStr = d.toLocaleTimeString('id-ID')
-      csvContent += `${o.id},${dateStr},${timeStr},Meja #${o.tables?.nomor || '-'},${o.nama_pemesan},${o.total_harga},${o.status}\n`
+      const timeStr = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+      
+      const orderId = `"${o.id || ''}"`
+      const meja = `"Meja #${o.tables?.nomor ?? '-'}"`
+      const nama = `"${(o.nama_pemesan || 'Tanpa Nama').replace(/"/g, '""')}"`
+      const totalHarga = o.total_harga || 0
+      const status = `"${(o.status || '').toUpperCase()}"`
+
+      csvContent += `${orderId},${dateStr},${timeStr},${meja},${nama},${totalHarga},${status}\n`
     })
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
     
-    const encodedUri = encodeURI(csvContent)
-    const link = document.createElement("a")
-    link.setAttribute("href", encodedUri)
-    link.setAttribute("download", `Rekap_${storeName}_${rekapPeriode}_${Date.now()}.csv`)
+    const fileName = `Rekap_${(storeName || 'Toko').replace(/\s+/g, '_')}_${rekapPeriode}_${Date.now()}.csv`
+    
+    link.setAttribute('href', url)
+    link.setAttribute('download', fileName)
     document.body.appendChild(link)
     link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   const customerStoreUrl = typeof window !== 'undefined' && storeSlug ? `${window.location.origin}/st/${storeSlug}` : ''
@@ -838,7 +856,7 @@ export default function KasirDashboardPage() {
                 />
               </div>
 
-              {/* 🎴 FORM PENGATURAN LOYALTY CARD TOKO */}
+              {/* FORM PENGATURAN LOYALTY CARD TOKO */}
               <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-amber-400">🎴 Aktifkan Loyalty Card Toko</span>
