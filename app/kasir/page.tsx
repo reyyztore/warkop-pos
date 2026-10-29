@@ -60,6 +60,11 @@ export default function KasirDashboardPage() {
   const [bgImageUrl, setBgImageUrl] = useState('')
   const [bgImageFile, setBgImageFile] = useState<File | null>(null)
 
+  // 🎴 LOYALTY CARD STATE DISIMPAN KASIR
+  const [loyaltyActive, setLoyaltyActive] = useState<boolean>(false)
+  const [loyaltyCode, setLoyaltyCode] = useState<string>('')
+  const [loyaltyMaxStamps, setLoyaltyMaxStamps] = useState<number>(10)
+
   const [selectedPreset, setSelectedPreset] = useState('Slate Dark')
   const [themeConfig, setThemeConfig] = useState({
     bgColor: '#0f172a',
@@ -180,7 +185,7 @@ export default function KasirDashboardPage() {
           if (storeData.banner_url) setBannerUrl(storeData.banner_url)
           if (storeData.is_open !== undefined) setIsOpen(storeData.is_open)
 
-          // Load Fitur Baru
+          // Load Info Tambahan
           if (storeData.maps_url) setMapsUrl(storeData.maps_url)
           if (storeData.wa_complaint) setWaComplaint(storeData.wa_complaint)
           if (storeData.social_links) setSocialLinks(storeData.social_links || [])
@@ -192,6 +197,11 @@ export default function KasirDashboardPage() {
           if (storeData.theme_style) setThemeStyle(storeData.theme_style)
           if (storeData.bg_image_url) setBgImageUrl(storeData.bg_image_url)
           if (storeData.theme_config) setThemeConfig(storeData.theme_config)
+
+          // Load Loyalty Settings
+          if (storeData.loyalty_active !== undefined) setLoyaltyActive(storeData.loyalty_active)
+          if (storeData.loyalty_code) setLoyaltyCode(storeData.loyalty_code)
+          if (storeData.loyalty_max_stamps) setLoyaltyMaxStamps(storeData.loyalty_max_stamps)
 
           // Hitung Sisa Langganan
           if (storeData.expired_at) {
@@ -358,6 +368,9 @@ export default function KasirDashboardPage() {
         wifi_password: wifiPassword,
         jam_operasional: jamOperasional,
         fasilitas: meFasilitas,
+        loyalty_active: loyaltyActive,
+        loyalty_code: loyaltyCode,
+        loyalty_max_stamps: loyaltyMaxStamps,
       }).eq('id', storeId)
 
       setBannerUrl(newBannerUrl)
@@ -514,7 +527,6 @@ export default function KasirDashboardPage() {
               </div>
             </div>
 
-            {/* RINCIAN ITEM PESANAN: PANAS/DINGIN + CATATAN */}
             <ul className="space-y-2 text-xs text-slate-300">
               {ord.order_items?.map((item: any) => (
                 <li key={item.id} className="bg-slate-950/60 p-2 rounded-xl border border-slate-800/60 space-y-1">
@@ -568,7 +580,6 @@ export default function KasirDashboardPage() {
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-base font-bold text-emerald-400">👤 Pengaturan Profil & QRIS</h2>
             
-            {/* KOTAK SISA HARI LANGGANAN */}
             <div className="bg-slate-950 border border-amber-500/40 p-3.5 rounded-2xl space-y-2">
               <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider">⏳ Masa Aktif Langganan Toko</span>
               <p className="text-xs font-bold text-white">
@@ -613,14 +624,14 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* MODAL EDIT TEMA VISUAL, BACKGROUND GAMBAR, WIFI, MAPS, SOSMED & FASILITAS TOKO */}
+      {/* MODAL EDIT TEMA VISUAL, BACKGROUND GAMBAR, WIFI, MAPS, SOSMED & LOYALTY CARD */}
       {showTampilanModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-lg rounded-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-base font-bold text-amber-400">🎨 Edit Tema & Info Toko</h2>
             
             <div className="space-y-4">
-              {/* PILIHAN TEMA VISUAL PELANGGAN */}
+              {/* PILIHAN TEMA VISUAL */}
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Pilih Gaya Tema Visual Toko</label>
                 <select
@@ -647,7 +658,47 @@ export default function KasirDashboardPage() {
                 />
               </div>
 
-              {/* Pilihan 10 Preset Tema Warna */}
+              {/* 🎴 FORM PENGATURAN LOYALTY CARD TOKO */}
+              <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-amber-400">🎴 Aktifkan Loyalty Card Toko</span>
+                  <input
+                    type="checkbox"
+                    checked={loyaltyActive}
+                    onChange={(e) => setLoyaltyActive(e.target.checked)}
+                    className="w-4 h-4 accent-amber-500 cursor-pointer"
+                  />
+                </div>
+
+                {loyaltyActive && (
+                  <div className="space-y-2 pt-1 border-t border-slate-800">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Kode Loyalty Hari Ini</label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: WARKOPPING01"
+                        value={loyaltyCode}
+                        onChange={(e) => setLoyaltyCode(e.target.value.toUpperCase())}
+                        className="w-full mt-1 p-2 bg-slate-900 border border-slate-800 text-xs font-mono font-bold text-amber-300 rounded-xl uppercase"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Jumlah Target Kotak Stamp</label>
+                      <input
+                        type="number"
+                        min={3}
+                        max={20}
+                        value={loyaltyMaxStamps}
+                        onChange={(e) => setLoyaltyMaxStamps(Number(e.target.value))}
+                        className="w-full mt-1 p-2 bg-slate-900 border border-slate-800 text-xs text-white rounded-xl"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Pilihan Preset Warna */}
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Pilih 10 Preset Warna Toko</label>
                 <div className="grid grid-cols-2 gap-2 mt-1 max-h-36 overflow-y-auto p-1">
