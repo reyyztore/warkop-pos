@@ -65,7 +65,7 @@ function DynamicStoreContent() {
   const nameRef = useRef<HTMLInputElement | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
 
-  // 🔔 CUSTOMER SOUND BELL OPTION (DEFAULT OPSI 2)
+  // 🔔 CUSTOMER SOUND BELL OPTION
   const [customerSoundOption, setCustomerSoundOption] = useState<number>(2)
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'info' | 'game' | 'profile'>('menu')
   const [selectedGame, setSelectedGame] = useState<number>(1)
@@ -80,7 +80,7 @@ function DynamicStoreContent() {
   const [bannerUrl, setBannerUrl] = useState('')
   const [isOpen, setIsOpen] = useState(true)
 
-  // 🌟 FITUR TEMA VISUAL, BACKGROUND WALLPAPER & INFO TOKO
+  // 🌟 FITUR TEMA VISUAL, BACKGROUND WALLPAPER, INFO TOKO & CROSS SELLING
   const [mapsUrl, setMapsUrl] = useState('')
   const [waComplaint, setWaComplaint] = useState('')
   const [socialLinks, setSocialLinks] = useState<{ platform: string; url: string }[]>([])
@@ -91,6 +91,7 @@ function DynamicStoreContent() {
   const [fasilitas, setFasilitas] = useState<string[]>([])
   const [bgImageUrl, setBgImageUrl] = useState('')
   const [themeStyle, setThemeStyle] = useState('glassmorphic')
+  const [recommendationActive, setRecommendationActive] = useState<boolean>(true)
   const [themeConfig, setThemeConfig] = useState({
     bgColor: '#0f172a',
     textColor: '#ffffff',
@@ -129,7 +130,7 @@ function DynamicStoreContent() {
   const [strukMode, setStrukMode] = useState<'biasa' | 'original' | 'custom'>('original')
   const [customStrukBg, setCustomStrukBg] = useState<string | null>(null)
 
-  // 🆕 STATE MODAL ULASAN PELANGGAN
+  // ULASAN PELANGGAN
   const [reviewActive, setReviewActive] = useState<boolean>(false)
   const [showReviewModal, setShowReviewModal] = useState<boolean>(false)
   const [reviewOrderTarget, setReviewOrderTarget] = useState<any>(null)
@@ -491,6 +492,7 @@ function DynamicStoreContent() {
     if (store.theme_style) setThemeStyle(store.theme_style)
     if (store.theme_config) setThemeConfig(store.theme_config)
     if (store.review_active !== undefined) setReviewActive(store.review_active)
+    if (store.recommendation_active !== undefined) setRecommendationActive(store.recommendation_active)
   }
 
   const fetchMyOrders = async (targetStoreId: string, nameFilter: string) => {
@@ -568,7 +570,6 @@ function DynamicStoreContent() {
   const updateCartItem = (menuId: string, varian: 'panas' | 'dingin', delta: number) => {
     if (!isOpen) return
     const menu = menuItems.find((m) => m.id === menuId)
-    // 🛑 Kunci jika stok habis / sold out
     if (menu && (menu.stok <= 0 || menu.is_sold_out || !menu.tersedia)) {
       alert('Maaf, menu ini sedang SOLD OUT / HABIS!')
       return
@@ -631,7 +632,7 @@ function DynamicStoreContent() {
     alert(`🎉 Kode promo ${found.kode} berhasil dipasang!`)
   }
 
-  // 📲 BAGIKAN DETAIL TAGIHAN KE WHATSAPP (PATUNGAN / MINTA DIJAJARIN)
+  // 📲 BAGIKAN DETAIL TAGIHAN KE WHATSAPP (PATUNGAN)
   const handleShareCartToWA = () => {
     if (Object.keys(cart).length === 0) {
       alert('Keranjang masih kosong!')
@@ -732,7 +733,6 @@ function DynamicStoreContent() {
     }
   }
 
-  // 💬 KIRIM ULASAN PELANGGAN KE OWNER
   const handleSubmitReview = async () => {
     if (!reviewOrderTarget || !storeId) return
     try {
@@ -900,6 +900,14 @@ function DynamicStoreContent() {
     ? menuItems 
     : menuItems.filter(m => m.category_id === activeCategory)
 
+  // 💡 MENCARI REKOMENDASI MENU PENDAMPING (CROSS-SELLING)
+  const getRecommendedItems = () => {
+    if (Object.keys(cart).length === 0) return []
+    const cartMenuIds = Object.values(cart).map((i) => i.menuId)
+    return menuItems.filter((m) => !cartMenuIds.includes(m.id) && m.stok > 0 && !m.is_sold_out).slice(0, 3)
+  }
+
+  const recommendedItems = getRecommendedItems()
   const winner = calculateWinner(tttBoard)
   const isCovering = isPasswordFocused && !isPasswordVisible
   const isShocked = isPasswordVisible && isPasswordFocused
@@ -1338,12 +1346,10 @@ function DynamicStoreContent() {
                 const qtyPanas = cart[keyPanas]?.qty || 0
                 const qtyDingin = cart[keyDingin]?.qty || 0
 
-                // 🛑 CEK STATUS AUTO-SOLD OUT BERDASARKAN STOK / STATUS
                 const isSoldOut = item.stok <= 0 || item.is_sold_out || !item.tersedia
 
                 return (
                   <div key={item.id} className={`${themeClasses.card} p-3.5 space-y-3 relative ${isSoldOut ? 'opacity-60 grayscale-[0.3]' : ''}`}>
-                    {/* 🆕 LABEL BADGE TERMASUK BADGE SOLD OUT */}
                     {isSoldOut ? (
                       <span className="absolute top-0 right-0 bg-rose-600 text-white font-black text-[9px] px-2.5 py-1 rounded-bl-xl shadow-sm z-10 uppercase tracking-wider">
                         🚫 SOLD OUT
@@ -1463,7 +1469,6 @@ function DynamicStoreContent() {
                     </button>
                   )}
 
-                  {/* 🆕 TOMBOL ULASAN JIKA PESANAN SELESAI */}
                   {ord.status === 'selesai' && reviewActive && (
                     <button
                       onClick={() => { setReviewOrderTarget(ord); setShowReviewModal(true); }}
@@ -1839,10 +1844,34 @@ function DynamicStoreContent() {
         )}
       </div>
 
-      {/* Floating Bottom Cart & Kode Promo */}
+      {/* Floating Bottom Cart, Kode Promo & Rekomendasi Menu Pendamping */}
       {activeNav === 'menu' && Object.keys(cart).length > 0 && (
         <div className="fixed bottom-20 left-4 right-4 max-w-md mx-auto z-30">
           <div className={`${themeClasses.card} p-3.5 space-y-3 shadow-2xl backdrop-blur-xl border border-white/80`}>
+            
+            {/* 💡 WIDGET REKOMENDASI MENU PENDAMPING (CROSS-SELLING) */}
+            {recommendationActive && recommendedItems.length > 0 && (
+              <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-1.5">
+                <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider">💡 Pas banget dikombinasikan dengan:</p>
+                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                  {recommendedItems.map((rec) => (
+                    <div key={rec.id} className="bg-white/90 p-2 rounded-xl border border-slate-200 shrink-0 flex items-center gap-2 text-xs">
+                      <div>
+                        <p className="font-bold text-slate-800 text-[11px] line-clamp-1">{rec.nama}</p>
+                        <p className="text-[10px] text-emerald-600 font-bold">Rp {(rec.harga_panas || rec.harga)?.toLocaleString('id-ID')}</p>
+                      </div>
+                      <button
+                        onClick={() => updateCartItem(rec.id, 'panas', 1)}
+                        className="px-2 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] rounded-lg shadow"
+                      >
+                        + Tambah
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <input
                 type="text"
@@ -1874,7 +1903,6 @@ function DynamicStoreContent() {
               </div>
             </div>
 
-            {/* 🆕 TOMBOL BAGIKAN TAGIHAN WA (PATUNGAN) */}
             <div className="flex gap-2">
               <button
                 onClick={handleShareCartToWA}
@@ -1890,14 +1918,13 @@ function DynamicStoreContent() {
         </div>
       )}
 
-      {/* 🆕 MODAL ULASAN & FEEDBACK PELANGGAN */}
+      {/* MODAL ULASAN & FEEDBACK PELANGGAN */}
       {showReviewModal && reviewOrderTarget && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white text-slate-900 border border-slate-200 w-full max-w-sm rounded-3xl p-6 text-center space-y-4 shadow-2xl">
             <h3 className="text-base font-bold text-amber-600">⭐ Beri Ulasan Toko</h3>
             <p className="text-xs text-slate-500">Bagaimana kualitas makanan & pelayanan toko kami?</p>
 
-            {/* Rating Bintang 1-5 */}
             <div className="flex justify-center gap-2 text-2xl cursor-pointer">
               {[1, 2, 3, 4, 5].map((star) => (
                 <span
