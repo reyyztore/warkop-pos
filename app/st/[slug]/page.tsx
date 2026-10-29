@@ -80,7 +80,7 @@ function DynamicStoreContent() {
   const [bannerUrl, setBannerUrl] = useState('')
   const [isOpen, setIsOpen] = useState(true)
 
-  // 🌟 FITUR BARU TEMA VISUAL, BACKGROUND WALLPAPER & INFO TOKO
+  // 🌟 FITUR TEMA VISUAL, BACKGROUND WALLPAPER & INFO TOKO
   const [mapsUrl, setMapsUrl] = useState('')
   const [waComplaint, setWaComplaint] = useState('')
   const [socialLinks, setSocialLinks] = useState<{ platform: string; url: string }[]>([])
@@ -97,6 +97,11 @@ function DynamicStoreContent() {
     accentColor: '#10b981',
     emoji: '☕'
   })
+
+  // 🎴 FITUR LOYALTY CARD STATE
+  const [userStamps, setUserStamps] = useState<number>(0)
+  const [inputLoyaltyCode, setInputLoyaltyCode] = useState<string>('')
+  const [claimingStamp, setClaimingStamp] = useState<boolean>(false)
 
   // Data Menu & Cart Baru (Varian Panas/Dingin & Catatan)
   const [menuItems, setMenuItems] = useState<any[]>([])
@@ -351,7 +356,10 @@ function DynamicStoreContent() {
       const avatarUrl = activeSession.user.user_metadata?.avatar_url || ''
       setUserData({ name, phone, email, avatarUrl })
       setEditingName(name)
-      if (storeId) fetchMyOrders(storeId, name)
+      if (storeId) {
+        fetchMyOrders(storeId, name)
+        fetchUserLoyalty(storeId, activeSession.user.id)
+      }
     }
   }
 
@@ -383,7 +391,10 @@ function DynamicStoreContent() {
         const avatarUrl = data.session.user.user_metadata?.avatar_url || ''
         setUserData({ name, phone: userPhone, email: userEmail, avatarUrl })
         setEditingName(name)
-        if (storeId) fetchMyOrders(storeId, name)
+        if (storeId) {
+          fetchMyOrders(storeId, name)
+          fetchUserLoyalty(storeId, data.session.user.id)
+        }
       }
     } catch (err: any) {
       alert(err.message || 'Gagal autentikasi.')
@@ -409,7 +420,10 @@ function DynamicStoreContent() {
       if (menuData) setMenuItems(menuData)
       if (tblData) setTables(tblData)
 
-      if (userData.name) fetchMyOrders(store.id, userData.name)
+      if (session?.user) {
+        fetchMyOrders(store.id, userData.name)
+        fetchUserLoyalty(store.id, session.user.id)
+      }
     }
     setLoading(false)
   }
@@ -422,7 +436,7 @@ function DynamicStoreContent() {
     if (store.banner_url) setBannerUrl(store.banner_url)
     if (store.is_open !== undefined) setIsOpen(store.is_open)
 
-    // Fitur Baru Tema Visual & Background Wallpaper Toko
+    // Fitur Tema Visual & Background Wallpaper Toko
     if (store.maps_url) setMapsUrl(store.maps_url)
     if (store.wa_complaint) setWaComplaint(store.wa_complaint)
     if (store.social_links) setSocialLinks(store.social_links || [])
@@ -449,7 +463,67 @@ function DynamicStoreContent() {
     if (data) setMyOrders(data)
   }
 
-  // 🌟 KERANJANG: VARIAN PANAS/DINGIN + CATATAN
+  // 🎴 FETCH & CLAIM LOYALTY STAMPS
+  const fetchUserLoyalty = async (targetStoreId: string, userId: string) => {
+    if (!targetStoreId || !userId) return
+    const { data } = await supabase
+      .from('customer_loyalty')
+      .select('stamps_count')
+      .eq('store_id', targetStoreId)
+      .eq('user_id', userId)
+      .single()
+
+    if (data) setUserStamps(data.stamps_count || 0)
+  }
+
+  const handleClaimStamp = async () => {
+    if (!session?.user || !storeData) return
+    if (!inputLoyaltyCode.trim()) {
+      alert('Masukkan kode loyalty hari ini!')
+      return
+    }
+
+    if (inputLoyaltyCode.trim().toUpperCase() !== storeData.loyalty_code?.toUpperCase()) {
+      alert('❌ Kode loyalty salah! Tanya ke kasir untuk kode hari ini.')
+      return
+    }
+
+    setClaimingStamp(true)
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const { data: existing } = await supabase
+        .from('customer_loyalty')
+        .select('*')
+        .eq('store_id', storeId)
+        .eq('user_id', session.user.id)
+        .single()
+
+      if (existing && existing.last_claim_date === today) {
+        alert('⚠️ Kamu sudah mengklaim stamp loyalty untuk hari ini! Coba lagi besok.')
+        return
+      }
+
+      const nextStamps = Math.min((existing?.stamps_count || 0) + 1, storeData.loyalty_max_stamps || 10)
+
+      await supabase.from('customer_loyalty').upsert({
+        store_id: storeId,
+        user_id: session.user.id,
+        stamps_count: nextStamps,
+        last_claim_date: today,
+        updated_at: new Date().toISOString(),
+      })
+
+      setUserStamps(nextStamps)
+      setInputLoyaltyCode('')
+      alert(`🎉 BERHASIL! Stamp kamu bertambah menjadi ${nextStamps}/${storeData.loyalty_max_stamps || 10}!`)
+    } catch (err: any) {
+      alert(err.message || 'Gagal klaim stamp.')
+    } finally {
+      setClaimingStamp(false)
+    }
+  }
+
+  // KERANJANG: VARIAN PANAS/DINGIN + CATATAN
   const updateCartItem = (menuId: string, varian: 'panas' | 'dingin', delta: number) => {
     if (!isOpen) return
     const key = `${menuId}_${varian}`
@@ -550,7 +624,7 @@ function DynamicStoreContent() {
     }
   }
 
-  // 🌟 PEMBATALAN PESANAN OLEH PELANGGAN
+  // PEMBATALAN PESANAN OLEH PELANGGAN
   const handleCancelOrder = async (orderId: string) => {
     const confirmCancel = confirm('Apakah kamu yakin ingin membatalkan pesanan ini?')
     if (!confirmCancel) return
@@ -648,7 +722,7 @@ function DynamicStoreContent() {
   const isCovering = isPasswordFocused && !isPasswordVisible
   const isShocked = isPasswordVisible && isPasswordFocused
 
-  // 🌟 FUNGSI GENERATOR TEMA VISUAL CERAH
+  // FUNGSI GENERATOR TEMA VISUAL CERAH
   const getThemeClasses = (style: string) => {
     switch (style) {
       case 'bubble': // Merah Muda Ceria
@@ -1042,9 +1116,11 @@ function DynamicStoreContent() {
           </div>
         )}
 
+        {/* 🌟 REVISI PENGUMUMAN: CERAH, KONTRAS & TIDAK TENGGELAM */}
         {announcement && (
-          <div className="p-3 bg-amber-500/20 border border-amber-500/40 text-amber-900 text-xs font-bold rounded-2xl text-center shadow-sm">
-            📢 {announcement}
+          <div className={`${themeClasses.card} p-3.5 text-center shadow-md border-2 border-pink-300/80 bg-white/95 text-slate-800 font-bold text-xs flex items-center justify-center gap-2`}>
+            <span className="text-base">📢</span>
+            <span className="tracking-wide">{announcement}</span>
           </div>
         )}
 
@@ -1095,7 +1171,6 @@ function DynamicStoreContent() {
                       </div>
                     </div>
 
-                    {/* Pilihan 2 Harga Varian (Panas / Dingin) */}
                     <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60">
                       <div className={`${themeClasses.subCard} p-2.5 flex items-center justify-between`}>
                         <div>
@@ -1124,7 +1199,6 @@ function DynamicStoreContent() {
                       )}
                     </div>
 
-                    {/* Catatan Pemesanan Khusus */}
                     {(qtyPanas > 0 || qtyDingin > 0) && (
                       <div className="space-y-1.5 pt-1">
                         {qtyPanas > 0 && (
@@ -1154,7 +1228,7 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 2: STATUS PESANAN & BATALKAN PESANAN */}
+        {/* TAB 2: STATUS PESANAN */}
         {activeNav === 'status' && (
           <div className="space-y-4">
             <div className={`${themeClasses.card} p-3.5 text-center space-y-1`}>
@@ -1174,7 +1248,6 @@ function DynamicStoreContent() {
                   <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-700' : ord.status === 'batal' ? 'bg-red-500/20 text-red-700' : 'bg-emerald-500/20 text-emerald-700'}`}>{ord.status}</span>
                 </div>
 
-                {/* TOMBOL BATALKAN PESANAN PELANGGAN */}
                 {ord.status === 'pending' && (
                   <button
                     onClick={() => handleCancelOrder(ord.id)}
@@ -1193,10 +1266,9 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* 🌟 TAB 3: INFO TOKO LENGKAP (JAM OPERASIONAL, FASILITAS, WIFI, MAPS, SOSMED, WA) */}
+        {/* TAB 3: INFO TOKO */}
         {activeNav === 'info' && (
           <div className="space-y-4">
-            {/* Jam Operasional */}
             {jamOperasional && (
               <div className={`${themeClasses.card} p-4 space-y-1`}>
                 <h3 className="text-xs font-black uppercase tracking-wider text-amber-600">🕒 Jam Operasional Toko</h3>
@@ -1204,7 +1276,6 @@ function DynamicStoreContent() {
               </div>
             )}
 
-            {/* Fasilitas Toko */}
             {fasilitas && fasilitas.length > 0 && (
               <div className={`${themeClasses.card} p-4 space-y-2`}>
                 <h3 className="text-xs font-black uppercase tracking-wider text-emerald-600">✨ Fasilitas Toko</h3>
@@ -1218,7 +1289,6 @@ function DynamicStoreContent() {
               </div>
             )}
 
-            {/* Fasilitas Wifi */}
             {wifiActive && (
               <div className={`${themeClasses.card} p-4 space-y-2`}>
                 <h3 className="text-xs font-black uppercase tracking-wider text-blue-600">📶 Wi-Fi Toko Gratis</h3>
@@ -1229,21 +1299,18 @@ function DynamicStoreContent() {
               </div>
             )}
 
-            {/* Google Maps Link */}
             {mapsUrl && (
               <a href={mapsUrl} target="_blank" rel="noreferrer" className={`${themeClasses.card} block p-4 text-xs font-bold text-center text-sky-600 hover:underline`}>
                 📍 Buka Lokasi Toko di Google Maps ➔
               </a>
             )}
 
-            {/* WA Komplain */}
             {waComplaint && (
               <a href={`https://wa.me/${waComplaint.replace(/[^0-9]/g, '')}`} target="_blank" rel="noreferrer" className={`${themeClasses.card} block p-4 text-xs font-bold text-center text-emerald-600 hover:underline`}>
                 💬 WhatsApp Layanan / Komplain Toko ➔
               </a>
             )}
 
-            {/* Social Media Links */}
             {socialLinks && socialLinks.length > 0 && (
               <div className={`${themeClasses.card} p-4 space-y-2`}>
                 <h4 className="text-xs font-bold opacity-75 uppercase">Media Sosial Toko</h4>
@@ -1259,7 +1326,7 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 4: 10 MINI GAMES */}
+        {/* TAB 4: GAMES */}
         {activeNav === 'game' && (
           <div className="space-y-4 text-center">
             <h2 className="text-base font-bold">🎮 Arena 10 Games Anti-Bosan</h2>
@@ -1289,7 +1356,6 @@ function DynamicStoreContent() {
               ))}
             </div>
 
-            {/* Game 1: TicTacToe */}
             {selectedGame === 1 && (
               <div className={`${themeClasses.card} p-5 inline-block max-w-xs w-full space-y-3`}>
                 <p className="text-xs font-bold text-emerald-600">
@@ -1312,7 +1378,6 @@ function DynamicStoreContent() {
               </div>
             )}
 
-            {/* Game 2: Tebak Angka */}
             {selectedGame === 2 && (
               <div className={`${themeClasses.card} p-5 space-y-3`}>
                 <p className="text-xs font-bold text-emerald-600">{guessMsg}</p>
@@ -1329,7 +1394,6 @@ function DynamicStoreContent() {
               </div>
             )}
 
-            {/* Game 3: Suwit */}
             {selectedGame === 3 && (
               <div className={`${themeClasses.card} p-5 space-y-3`}>
                 <p className="text-xs font-bold text-emerald-600">{rpsResult}</p>
@@ -1345,7 +1409,6 @@ function DynamicStoreContent() {
               </div>
             )}
 
-            {/* Game 4: Memory */}
             {selectedGame === 4 && (
               <div className={`${themeClasses.card} p-5 space-y-3`}>
                 <div className="grid grid-cols-4 gap-2">
@@ -1368,7 +1431,6 @@ function DynamicStoreContent() {
               </div>
             )}
 
-            {/* Game 5: Clicker */}
             {selectedGame === 5 && (
               <div className={`${themeClasses.card} p-5 space-y-3`}>
                 <p className="text-xs font-bold text-emerald-600">Total Klik: {clicks}</p>
@@ -1377,7 +1439,6 @@ function DynamicStoreContent() {
               </div>
             )}
 
-            {/* Game 6: Kuis Math */}
             {selectedGame === 6 && (
               <div className={`${themeClasses.card} p-5 space-y-3`}>
                 <p className="text-xs font-bold text-emerald-600">{mathMsg}</p>
@@ -1393,7 +1454,6 @@ function DynamicStoreContent() {
               </div>
             )}
 
-            {/* Game 7: Color Guess */}
             {selectedGame === 7 && (
               <div className={`${themeClasses.card} p-5 space-y-3`}>
                 <p className="text-xs font-bold text-emerald-600">{colorMsg}</p>
@@ -1414,7 +1474,6 @@ function DynamicStoreContent() {
               </div>
             )}
 
-            {/* Game 8: Lempar Koin */}
             {selectedGame === 8 && (
               <div className={`${themeClasses.card} p-5 space-y-3`}>
                 <p className="text-xs font-bold text-emerald-600">{coinResult}</p>
@@ -1423,7 +1482,6 @@ function DynamicStoreContent() {
               </div>
             )}
 
-            {/* Game 9: Acak Kata */}
             {selectedGame === 9 && (
               <div className={`${themeClasses.card} p-5 space-y-3`}>
                 <p className="text-xs font-bold text-emerald-600">{scrambleMsg}</p>
@@ -1438,7 +1496,6 @@ function DynamicStoreContent() {
               </div>
             )}
 
-            {/* Game 10: Tes Reaksi */}
             {selectedGame === 10 && (
               <div className={`${themeClasses.card} p-5 space-y-3`}>
                 {reactState === 'idle' && (
@@ -1464,9 +1521,66 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 5: PROFIL PELANGGAN */}
+        {/* TAB 5: PROFIL PELANGGAN & LOYALTY CARD */}
         {activeNav === 'profile' && (
           <div className="space-y-4">
+
+            {/* 🎴 FITUR LOYALTY CARD PELANGGAN */}
+            {storeData?.loyalty_active && (
+              <div className={`${themeClasses.card} p-5 space-y-4 text-center border-2 border-amber-300 bg-amber-50/90`}>
+                <div className="flex justify-between items-center border-b border-amber-200 pb-2">
+                  <h3 className="text-xs font-black text-amber-900 uppercase tracking-wider">🎴 Loyalty Card Toko</h3>
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900">
+                    {userStamps} / {storeData.loyalty_max_stamps || 10} Stamp
+                  </span>
+                </div>
+
+                {/* Grid Kotak Stamp */}
+                <div className="grid grid-cols-5 gap-2 my-3">
+                  {Array.from({ length: storeData.loyalty_max_stamps || 10 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-12 rounded-xl border-2 flex items-center justify-center text-lg font-black transition-all ${
+                        i < userStamps
+                          ? 'bg-emerald-500 border-emerald-600 text-white shadow-md scale-105'
+                          : 'bg-white/80 border-amber-200 text-amber-300'
+                      }`}
+                    >
+                      {i < userStamps ? '✓' : i + 1}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Form Input Kode Harian */}
+                {userStamps < (storeData.loyalty_max_stamps || 10) ? (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Masukkan Kode Loyalty Hari Ini..."
+                        value={inputLoyaltyCode}
+                        onChange={(e) => setInputLoyaltyCode(e.target.value.toUpperCase())}
+                        className="flex-1 px-3 py-2 text-xs font-bold bg-white border border-amber-300 rounded-xl focus:outline-none text-slate-800 uppercase"
+                      />
+                      <button
+                        onClick={handleClaimStamp}
+                        disabled={claimingStamp}
+                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 disabled:opacity-50"
+                      >
+                        {claimingStamp ? '...' : 'Klaim'}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-amber-700 italic">*Kode diperbarui oleh kasir setiap hari & hanya bisa diklaim 1x per hari.</p>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-emerald-100 border border-emerald-300 rounded-2xl space-y-1">
+                    <p className="text-xs font-black text-emerald-800">🎉 Selamat! Stamp Kamu Sudah Penuh!</p>
+                    <p className="text-[11px] text-emerald-700">Tunjukkan tampilan ini ke kasir untuk mendapatkan <strong>1 Menu Gratis Bebas Pilih</strong>!</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className={`${themeClasses.card} p-6 space-y-4 text-center`}>
               <div className="w-24 h-24 mx-auto rounded-full overflow-hidden bg-slate-200 border-2 border-emerald-500 flex items-center justify-center text-3xl shadow-md">
                 {userData.avatarUrl ? <img src={userData.avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : '👤'}
