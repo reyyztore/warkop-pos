@@ -25,7 +25,7 @@ export default function OwnerDashboardPage() {
   const [showTargetModal, setShowTargetModal] = useState<boolean>(false)
   const [inputTarget, setInputTarget] = useState<string>('')
 
-  // State Modal Tambah Cabang Toko Baru
+  // State Modal Tautan Cabang Toko Baru
   const [showAddStoreModal, setShowAddStoreModal] = useState<boolean>(false)
   const [newStoreName, setNewStoreName] = useState<string>('')
   const [newStoreSlug, setNewStoreSlug] = useState<string>('')
@@ -203,10 +203,10 @@ export default function OwnerDashboardPage() {
     }
   }
 
-  // 🏪 Tambah Cabang Toko Baru
-  const handleAddNewStore = async () => {
+  // 🔗 Tautkan Cabang Toko Baru Secara Otomatis
+  const handleLinkNewStore = async () => {
     if (!newStoreName || !newStoreSlug) {
-      alert('Mohon isi nama cabang dan slug URL toko!')
+      alert('Mohon isi nama cabang dan slug URL toko terlebih dahulu!')
       return
     }
 
@@ -220,13 +220,13 @@ export default function OwnerDashboardPage() {
       store_name: newStoreName,
       slug: cleanSlug,
       is_open: true,
-      expired_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // Default 30 hari
+      expired_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     }).select().single()
 
     if (error) {
-      alert('Gagal membuat cabang baru: ' + error.message)
+      alert('Gagal menautkan cabang baru: ' + error.message)
     } else {
-      alert('✅ Cabang toko baru berhasil dibuat!')
+      alert('✅ Cabang toko baru berhasil ditautkan ke akun owner!')
       setShowAddStoreModal(false)
       setNewStoreName('')
       setNewStoreSlug('')
@@ -250,14 +250,14 @@ export default function OwnerDashboardPage() {
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
           <h1 className="text-2xl font-black text-amber-400">🚪 Panel Eksekutif Owner</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Pantau laporan keuangan, multi-cabang, pengeluaran, dan rekap shift kasir secara real-time.</p>
+          <p className="text-xs text-slate-400 mt-0.5">Pantau laporan keuangan, multi-cabang tertaut, pengeluaran, dan rekap shift kasir secara real-time.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setShowAddStoreModal(true)}
             className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black rounded-xl shadow transition"
           >
-            ➕ Tambah Cabang Toko
+            🔗 Tautkan Cabang Baru
           </button>
           <Link href="/kasir" className="px-4 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-slate-200 rounded-xl hover:bg-slate-800 transition">
             🔙 Kembali ke Kasir
@@ -268,7 +268,7 @@ export default function OwnerDashboardPage() {
       {/* Selector Multi-Cabang Toko */}
       <div className="max-w-6xl mx-auto mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 p-4 border border-slate-800 rounded-2xl">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">🏪 Pilih Cabang Toko:</span>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">🏪 Pilih Cabang Tertaut:</span>
           <select
             value={selectedStoreId}
             onChange={(e) => setSelectedStoreId(e.target.value)}
@@ -297,7 +297,7 @@ export default function OwnerDashboardPage() {
           <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">🎯 Target Omzet Bulanan Toko Ini</h3>
+                <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">🎯 Target Omzet Bulanan Cabang Ini</h3>
                 <p className="text-sm font-bold text-white mt-0.5">
                   Rp {totalOmzet.toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-normal">dari target Rp {monthlyTarget.toLocaleString('id-ID')}</span>
                 </p>
@@ -332,7 +332,7 @@ export default function OwnerDashboardPage() {
             </div>
 
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-1">
-              <p className="text-[10px] font-black text-slate-400 uppercase">Total Pengeluaran Toko</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase">Total Pengeluaran Cabang</p>
               <p className="text-2xl font-black text-rose-400">Rp {totalPengeluaran.toLocaleString('id-ID')}</p>
               <p className="text-[10px] text-slate-500">Dari {expenses.length} catatan pengeluaran</p>
             </div>
@@ -352,7 +352,7 @@ export default function OwnerDashboardPage() {
             {/* Form & List Pengeluaran */}
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-4">
               <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider">
-                {editingExpenseId ? '✏️ Edit Pengeluaran Toko' : '💸 Tambah Pengeluaran Toko'}
+                {editingExpenseId ? '✏️ Edit Pengeluaran Cabang' : '💸 Tambah Pengeluaran Cabang'}
               </h3>
 
               <form onSubmit={handleSaveExpense} className="space-y-3">
@@ -428,7 +428,7 @@ export default function OwnerDashboardPage() {
               
               <div className="max-h-96 overflow-y-auto space-y-3 pr-1">
                 {shifts.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic text-center py-6">Belum ada data shift kasir untuk toko ini.</p>
+                  <p className="text-xs text-slate-500 italic text-center py-6">Belum ada data shift kasir untuk cabang ini.</p>
                 ) : (
                   shifts.map((shift) => (
                     <div key={shift.id} className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl space-y-2 text-xs">
@@ -485,11 +485,12 @@ export default function OwnerDashboardPage() {
         </div>
       )}
 
-      {/* MODAL TAMBAH CABANG TOKO BARU */}
+      {/* MODAL TAUTKAN CABANG BARU SECARA OTOMATIS */}
       {showAddStoreModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-6 space-y-3.5">
-            <h3 className="text-sm font-bold text-amber-400">🏪 Tambah Cabang Toko Baru</h3>
+            <h3 className="text-sm font-bold text-amber-400">🔗 Tautkan Cabang Toko Baru</h3>
+            <p className="text-[10px] text-slate-400">Masukkan nama dan slug cabang baru agar otomatis tertaut ke akun owner kamu.</p>
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase">Nama Cabang Toko</label>
               <input
@@ -511,7 +512,7 @@ export default function OwnerDashboardPage() {
               />
             </div>
             <div className="flex gap-2 pt-2">
-              <button onClick={handleAddNewStore} className="flex-1 py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Buat Cabang</button>
+              <button onClick={handleLinkNewStore} className="flex-1 py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Tautkan Cabang</button>
               <button onClick={() => setShowAddStoreModal(false)} className="px-4 py-2.5 bg-slate-800 text-xs font-bold rounded-xl text-slate-400">Batal</button>
             </div>
           </div>
