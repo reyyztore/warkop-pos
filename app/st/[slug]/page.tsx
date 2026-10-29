@@ -358,12 +358,19 @@ function DynamicStoreContent() {
   const checkSession = async () => {
     const { data: { session: activeSession } } = await supabase.auth.getSession()
     if (activeSession) {
+      // 🔒 Cek apakah user yang terautentikasi terdaftar khusus di toko ini
+      const sessionStoreSlug = activeSession.user.user_metadata?.store_slug
+      if (sessionStoreSlug && sessionStoreSlug !== slug) {
+        setSession(null)
+        return
+      }
+
       setSession(activeSession)
       const name = activeSession.user.user_metadata?.full_name || activeSession.user.email?.split('@')[0] || 'Pelanggan'
       const phone = activeSession.user.user_metadata?.phone || '-'
-      const email = activeSession.user.email || ''
+      const realEmail = activeSession.user.user_metadata?.real_email || activeSession.user.email || ''
       const avatarUrl = activeSession.user.user_metadata?.avatar_url || ''
-      setUserData({ name, phone, email, avatarUrl })
+      setUserData({ name, phone, email: realEmail, avatarUrl })
       setEditingName(name)
       if (storeId) {
         fetchMyOrders(storeId, name)
@@ -372,33 +379,54 @@ function DynamicStoreContent() {
     }
   }
 
+  // 🔒 AUTH HANDLER TERISOLASI PER-TOKO
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setAuthLoading(true)
     try {
+      // Format Email Terisolasi Khusus Toko Ini
+      const tenantEmail = `${slug.toLowerCase()}_${email.trim().toLowerCase()}`
+
       if (isRegister) {
-        const { error } = await supabase.auth.signUp({
-          email,
+        const { data: authData, error } = await supabase.auth.signUp({
+          email: tenantEmail,
           password,
           options: {
-            data: { full_name: nama.trim(), phone: phone.trim() },
+            data: { 
+              full_name: nama.trim(), 
+              phone: phone.trim(),
+              real_email: email.trim(),
+              store_id: storeId,
+              store_slug: slug,
+            },
           },
         })
         if (error) throw error
-        alert('🎉 Pendaftaran berhasil! Silakan login.')
+
+        if (authData.user && storeId) {
+          await supabase.from('profiles').insert({
+            id: authData.user.id,
+            full_name: nama.trim(),
+            phone: phone.trim(),
+            store_id: storeId,
+          })
+        }
+
+        alert('🎉 Pendaftaran akun toko berhasil! Silakan login.')
         setIsRegister(false)
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email,
+          email: tenantEmail,
           password,
         })
-        if (error) throw error
+        if (error) throw new Error('Email atau kata sandi salah untuk toko ini!')
+
         setSession(data.session)
         const name = data.session.user.user_metadata?.full_name || data.session.user.email?.split('@')[0] || 'Pelanggan'
         const userPhone = data.session.user.user_metadata?.phone || '-'
-        const userEmail = data.session.user.email || ''
+        const realEmail = data.session.user.user_metadata?.real_email || data.session.user.email || ''
         const avatarUrl = data.session.user.user_metadata?.avatar_url || ''
-        setUserData({ name, phone: userPhone, email: userEmail, avatarUrl })
+        setUserData({ name, phone: userPhone, email: realEmail, avatarUrl })
         setEditingName(name)
         if (storeId) {
           fetchMyOrders(storeId, name)
@@ -999,7 +1027,7 @@ function DynamicStoreContent() {
               <div>
                 <h1 className="text-xl font-black text-white tracking-tight">{storeName}</h1>
                 <p className="text-slate-400 text-xs mt-0.5 font-medium">
-                  {isRegister ? 'Lengkapi data untuk membuat akun baru' : 'Silakan masuk ke akun pelanggan kamu'}
+                  {isRegister ? 'Lengkapi data untuk membuat akun khusus toko ini' : 'Silakan masuk ke akun pelanggan toko ini'}
                 </p>
               </div>
             </div>
