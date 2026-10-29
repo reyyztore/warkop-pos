@@ -62,11 +62,16 @@ export default function KasirMejaPage() {
       return
     }
 
-    await supabase.from('tables').insert({
+    const { error } = await supabase.from('tables').insert({
       store_id: storeId,
       nomor: num,
       aktif: true,
     })
+
+    if (error) {
+      alert(`Gagal menambah meja: ${error.message}`)
+      return
+    }
 
     setNomorMejaBaru('')
     fetchTables(storeId)
@@ -134,7 +139,7 @@ export default function KasirMejaPage() {
                   </div>
 
                   <a href={qrUrl} target="_blank" download={`QR_Toko_${storeSlug}_Meja_${t.nomor}.png`} className="block text-[10px] font-bold text-blue-400 hover:underline">
-                    📥 Cetak 1 Barcode Meja #{t.nomor}
+                    📥 Cetak Barcode Meja #{t.nomor}
                   </a>
 
                   <button onClick={() => handleDeleteTable(t.id, t.nomor)} className="w-full py-1.5 bg-rose-950/60 text-rose-400 text-[10px] font-bold rounded-lg">
