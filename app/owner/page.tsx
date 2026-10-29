@@ -74,7 +74,6 @@ export default function OwnerDashboardPage() {
     
     if (storesList && storesList.length > 0) {
       setStores(storesList)
-      // Jika selectedStoreId belum ada atau tidak ada dalam list baru, set ke toko pertama
       if (!selectedStoreId || !storesList.some(s => s.id === selectedStoreId)) {
         setSelectedStoreId(storesList[0].id)
       }
@@ -246,14 +245,13 @@ export default function OwnerDashboardPage() {
     }
   }
 
-  // 🔓 Lepas Tautan (Unlink) Cabang (Kecuali Cabang Utama/Pertama)
+  // 🔓 Lepas Tautan (Unlink) Cabang
   const handleUnlinkStore = async () => {
     if (stores.length <= 1) {
       alert('⚠️ Tidak dapat melepas tautan karena ini adalah satu-satunya cabang toko yang kamu miliki.')
       return
     }
 
-    // Cabang pertama (utama) di-indeks ke-0 berdasarkan created_at ascending
     if (stores[0].id === selectedStoreId) {
       alert('🔒 Cabang utama (pertama) tidak dapat dilepas tautannya demi keamanan kepemilikan toko!')
       return
@@ -265,7 +263,6 @@ export default function OwnerDashboardPage() {
     if (!confirmUnlink) return
 
     try {
-      // Set owner_id menjadi null atau kosongkan kepemilikannya
       const { error } = await supabase
         .from('stores')
         .update({ owner_id: null })
@@ -289,7 +286,7 @@ export default function OwnerDashboardPage() {
   const targetPercentage = monthlyTarget > 0 ? Math.min(100, Math.round((totalOmzet / monthlyTarget) * 100)) : 0
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 font-sans pb-20 relative">
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 font-sans pb-20 overflow-x-hidden w-full box-border">
       
       {/* Top Header */}
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
@@ -312,12 +309,12 @@ export default function OwnerDashboardPage() {
 
       {/* Selector Multi-Cabang Toko & Tombol Unlink */}
       <div className="max-w-6xl mx-auto mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 p-4 border border-slate-800 rounded-2xl">
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap w-full">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">🏪 Pilih Cabang Tertaut:</span>
           <select
             value={selectedStoreId}
             onChange={(e) => setSelectedStoreId(e.target.value)}
-            className="bg-slate-950 border border-slate-800 text-xs font-bold text-amber-300 px-3 py-2 rounded-xl focus:outline-none"
+            className="bg-slate-950 border border-slate-800 text-xs font-bold text-amber-300 px-3 py-2 rounded-xl focus:outline-none max-w-full truncate"
           >
             {stores.map((s, idx) => (
               <option key={s.id} value={s.id}>
@@ -326,7 +323,6 @@ export default function OwnerDashboardPage() {
             ))}
           </select>
 
-          {/* Tombol Lepas Tautan (Unlink) - Sembunyikan untuk cabang utama */}
           {stores.length > 1 && stores[0]?.id !== selectedStoreId && (
             <button
               onClick={handleUnlinkStore}
@@ -338,7 +334,7 @@ export default function OwnerDashboardPage() {
         </div>
 
         {storeData && (
-          <div className="text-xs text-slate-300">
+          <div className="text-xs text-slate-300 shrink-0">
             Status Toko: <strong className={storeData.is_open ? 'text-emerald-400' : 'text-rose-400'}>{storeData.is_open ? '● BUKA' : '○ TUTUP'}</strong>
           </div>
         )}
@@ -462,7 +458,7 @@ export default function OwnerDashboardPage() {
                             {new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </p>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 shrink-0">
                           <span className="font-mono font-bold text-rose-400">-Rp {item.amount?.toLocaleString('id-ID')}</span>
                           <button onClick={() => handleEditExpense(item)} className="text-[10px] text-amber-300 px-2 py-1 bg-amber-950/40 rounded-lg font-bold">
                             Edit
