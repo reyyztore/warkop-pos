@@ -65,8 +65,8 @@ function DynamicStoreContent() {
   const nameRef = useRef<HTMLInputElement | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
 
-  // Customer Sound Bell Option
-  const [customerSoundOption, setCustomerSoundOption] = useState<number>(1)
+  // 🔔 CUSTOMER SOUND BELL OPTION (DEFAULT DIUBAH KE OPSI 2)
+  const [customerSoundOption, setCustomerSoundOption] = useState<number>(2)
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'info' | 'game' | 'profile'>('menu')
   const [selectedGame, setSelectedGame] = useState<number>(1)
 
@@ -1116,7 +1116,7 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* 🌟 REVISI PENGUMUMAN: CERAH, KONTRAS & TIDAK TENGGELAM */}
+        {/* PENGUMUMAN */}
         {announcement && (
           <div className={`${themeClasses.card} p-3.5 text-center shadow-md border-2 border-pink-300/80 bg-white/95 text-slate-800 font-bold text-xs flex items-center justify-center gap-2`}>
             <span className="text-base">📢</span>
@@ -1124,7 +1124,7 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 1: MENU UTAMA (PANAS / DINGIN & CATATAN) */}
+        {/* TAB 1: MENU UTAMA */}
         {activeNav === 'menu' && (
           <div className="space-y-4">
             <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
