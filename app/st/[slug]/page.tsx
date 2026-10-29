@@ -65,7 +65,7 @@ function DynamicStoreContent() {
   const nameRef = useRef<HTMLInputElement | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
 
-  // 🔔 CUSTOMER SOUND BELL OPTION (DEFAULT DIUBAH KE OPSI 2)
+  // 🔔 CUSTOMER SOUND BELL OPTION (DEFAULT OPSI 2)
   const [customerSoundOption, setCustomerSoundOption] = useState<number>(2)
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'info' | 'game' | 'profile'>('menu')
   const [selectedGame, setSelectedGame] = useState<number>(1)
@@ -103,6 +103,11 @@ function DynamicStoreContent() {
   const [inputLoyaltyCode, setInputLoyaltyCode] = useState<string>('')
   const [claimingStamp, setClaimingStamp] = useState<boolean>(false)
 
+  // 🎟️ PROMO CODE STATES
+  const [promos, setPromos] = useState<any[]>([])
+  const [inputPromoCode, setInputPromoCode] = useState('')
+  const [appliedPromo, setAppliedPromo] = useState<any>(null)
+
   // Data Menu & Cart Baru (Varian Panas/Dingin & Catatan)
   const [menuItems, setMenuItems] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
@@ -114,11 +119,15 @@ function DynamicStoreContent() {
   const [submitting, setSubmitting] = useState(false)
   const [selectedPayment, setSelectedPayment] = useState<'qris' | 'kasir'>('kasir')
 
-  // Modal State QRIS & Bukti
+  // Modal State QRIS, Bukti & Struk
   const [showQrisModal, setShowQrisModal] = useState(false)
   const [activeOrderForQris, setActiveOrderForQris] = useState<any>(null)
   const [uploadingBukti, setUploadingBukti] = useState(false)
   const [buktiFile, setBuktiFile] = useState<File | null>(null)
+
+  const [selectedStrukOrder, setSelectedStrukOrder] = useState<any>(null)
+  const [strukMode, setStrukMode] = useState<'biasa' | 'original' | 'custom'>('original')
+  const [customStrukBg, setCustomStrukBg] = useState<string | null>(null)
 
   // Data Pelanggan & Status Pesanan
   const [myOrders, setMyOrders] = useState<any[]>([])
@@ -415,10 +424,12 @@ function DynamicStoreContent() {
       const { data: catData } = await supabase.from('categories').select('*').eq('store_id', store.id).order('urutan')
       const { data: menuData } = await supabase.from('menu_items').select('*').eq('store_id', store.id).eq('tersedia', true)
       const { data: tblData } = await supabase.from('tables').select('*').eq('store_id', store.id).eq('aktif', true).order('nomor')
+      const { data: promoData } = await supabase.from('store_promos').select('*').eq('store_id', store.id).eq('aktif', true)
 
       if (catData) setCategories(catData)
       if (menuData) setMenuItems(menuData)
       if (tblData) setTables(tblData)
+      if (promoData) setPromos(promoData)
 
       if (session?.user) {
         fetchMyOrders(store.id, userData.name)
@@ -436,7 +447,6 @@ function DynamicStoreContent() {
     if (store.banner_url) setBannerUrl(store.banner_url)
     if (store.is_open !== undefined) setIsOpen(store.is_open)
 
-    // Fitur Tema Visual & Background Wallpaper Toko
     if (store.maps_url) setMapsUrl(store.maps_url)
     if (store.wa_complaint) setWaComplaint(store.wa_complaint)
     if (store.social_links) setSocialLinks(store.social_links || [])
@@ -546,14 +556,42 @@ function DynamicStoreContent() {
     })
   }
 
-  const getTotalHarga = () => Object.entries(cart).reduce((total, [key, item]) => {
+  const getSubtotalHarga = () => Object.entries(cart).reduce((total, [key, item]) => {
     const menu = menuItems.find((m) => m.id === item.menuId)
     if (!menu) return total
     const hargaSatuan = item.varian === 'dingin' && menu.harga_dingin ? menu.harga_dingin : (menu.harga_panas || menu.harga)
     return total + hargaSatuan * item.qty
   }, 0)
 
+  const getDiskonNominal = () => {
+    if (!appliedPromo) return 0
+    const subtotal = getSubtotalHarga()
+    if (subtotal < (appliedPromo.minimal_transaksi || 0)) return 0
+
+    if (appliedPromo.tipe_diskon === 'persen') {
+      return (subtotal * appliedPromo.nilai_diskon) / 100
+    }
+    return Math.min(appliedPromo.nilai_diskon, subtotal)
+  }
+
+  const getTotalHarga = () => Math.max(0, getSubtotalHarga() - getDiskonNominal())
+
   const getTotalItem = () => Object.values(cart).reduce((a, b) => a + b.qty, 0)
+
+  const handleApplyPromo = () => {
+    if (!inputPromoCode.trim()) return
+    const found = promos.find((p) => p.kode.toUpperCase() === inputPromoCode.trim().toUpperCase())
+    if (!found) {
+      alert('❌ Kode promo tidak ditemukan atau sudah tidak berlaku.')
+      return
+    }
+    if (getSubtotalHarga() < (found.minimal_transaksi || 0)) {
+      alert(`⚠️ Minimal transaksi untuk promo ini adalah Rp ${found.minimal_transaksi?.toLocaleString('id-ID')}`)
+      return
+    }
+    setAppliedPromo(found)
+    alert(`🎉 Kode promo ${found.kode} berhasil dipasang!`)
+  }
 
   const handleCheckout = async () => {
     if (!isOpen) {
@@ -574,6 +612,8 @@ function DynamicStoreContent() {
       const targetTable = tables.find((t) => t.nomor.toString() === selectedTable.toString())
       if (!targetTable) throw new Error('Meja tidak valid.')
 
+      const diskonVal = getDiskonNominal()
+
       const { data: orderData, error: orderErr } = await supabase
         .from('orders')
         .insert({
@@ -586,6 +626,8 @@ function DynamicStoreContent() {
           status: 'pending',
           metode_pembayaran: selectedPayment,
           is_paid: false,
+          kode_promo: appliedPromo ? appliedPromo.kode : null,
+          diskon_nominal: diskonVal,
         })
         .select()
         .single()
@@ -615,6 +657,8 @@ function DynamicStoreContent() {
       }
 
       setCart({})
+      setAppliedPromo(null)
+      setInputPromoCode('')
       setActiveNav('status')
       fetchMyOrders(storeId, userData.name)
     } catch (err: any) {
@@ -622,6 +666,63 @@ function DynamicStoreContent() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // PESAN LAGI (RE-ORDER)
+  const handleReorder = (ord: any) => {
+    if (!ord.order_items || ord.order_items.length === 0) return
+    const newCart: any = { ...cart }
+
+    ord.order_items.forEach((item: any) => {
+      const key = `${item.menu_id}_${item.varian || 'panas'}`
+      newCart[key] = {
+        qty: (newCart[key]?.qty || 0) + item.qty,
+        varian: item.varian || 'panas',
+        catatan: item.catatan || '',
+        menuId: item.menu_id
+      }
+    })
+
+    setCart(newCart)
+    setActiveNav('menu')
+    alert('🔄 Menu dari pesanan lama berhasil dimasukkan kembali ke keranjang!')
+  }
+
+  // BAGIKAN STRUK KE WHATSAPP
+  const handleShareToWhatsApp = (ord: any) => {
+    const formattedDate = new Date(ord.created_at).toLocaleString('id-ID', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+
+    let text = `*STRUK PEMBAYARAN - ${storeName.toUpperCase()}*\n`
+    text += `-----------------------------------\n`
+    text += `🗓️ Waktu: ${formattedDate} WIB\n`
+    text += `🪑 Meja: #${ord.tables?.nomor || '-'}\n`
+    text += `👤 Pemesan: ${ord.nama_pemesan}\n`
+    text += `-----------------------------------\n`
+    text += `*DETAIL MENU:*\n`
+
+    ord.order_items?.forEach((i: any) => {
+      text += `• ${i.qty}x ${i.menu_items?.nama} (${i.varian || 'Panas'}) = Rp ${(i.harga_satuan * i.qty).toLocaleString('id-ID')}\n`
+      if (i.catatan) text += `  _Catatan: ${i.catatan}_\n`
+    })
+
+    text += `-----------------------------------\n`
+    if (ord.diskon_nominal > 0) {
+      text += `🎟️ Diskon Promo: -Rp ${ord.diskon_nominal.toLocaleString('id-ID')}\n`
+    }
+    text += `💰 *TOTAL HARI INI: Rp ${ord.total_harga?.toLocaleString('id-ID')}*\n`
+    text += `-----------------------------------\n`
+    text += `Terima kasih atas kunjungannya!\n`
+    text += `_Powered by Reyyztore_`
+
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`
+    window.open(waUrl, '_blank')
   }
 
   // PEMBATALAN PESANAN OLEH PELANGGAN
@@ -725,46 +826,46 @@ function DynamicStoreContent() {
   // FUNGSI GENERATOR TEMA VISUAL CERAH
   const getThemeClasses = (style: string) => {
     switch (style) {
-      case 'bubble': // Merah Muda Ceria
+      case 'bubble':
         return {
           wrapper: 'bg-gradient-to-br from-pink-100 via-rose-50 to-pink-200 text-slate-800',
-          card: 'bg-white/90 border-2 border-pink-300 rounded-[2rem] shadow-lg shadow-pink-200/50 hover:scale-[1.01] transition-all',
+          card: 'bg-white/90 border-2 border-pink-300 rounded-[2rem] shadow-lg shadow-pink-200/50 hover:scale-[1.01] transition-all relative overflow-hidden',
           header: 'bg-white/80 backdrop-blur-md border-b-2 border-pink-200 text-pink-900',
           button: 'bg-pink-500 hover:bg-pink-600 text-white rounded-full font-black shadow-md shadow-pink-300',
           badge: 'bg-pink-100 text-pink-700 border border-pink-300 rounded-full',
           subCard: 'bg-pink-50/80 border border-pink-200 rounded-2xl',
         }
-      case 'fresh_mint': // Hijau Muda
+      case 'fresh_mint':
         return {
           wrapper: 'bg-gradient-to-br from-emerald-100 via-teal-50 to-emerald-200 text-slate-800',
-          card: 'bg-white/90 border border-emerald-300 rounded-3xl shadow-md shadow-emerald-100 hover:scale-[1.01] transition-all',
+          card: 'bg-white/90 border border-emerald-300 rounded-3xl shadow-md shadow-emerald-100 hover:scale-[1.01] transition-all relative overflow-hidden',
           header: 'bg-white/80 backdrop-blur-md border-b border-emerald-200 text-emerald-900',
           button: 'bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black shadow-md shadow-emerald-200',
           badge: 'bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl',
           subCard: 'bg-emerald-50/80 border border-emerald-200 rounded-xl',
         }
-      case 'sky_blue': // Biru Muda
+      case 'sky_blue':
         return {
           wrapper: 'bg-gradient-to-br from-sky-100 via-blue-50 to-sky-200 text-slate-800',
-          card: 'bg-white/95 border border-sky-200 rounded-3xl shadow-md shadow-sky-100 hover:scale-[1.01] transition-all',
+          card: 'bg-white/95 border border-sky-200 rounded-3xl shadow-md shadow-sky-100 hover:scale-[1.01] transition-all relative overflow-hidden',
           header: 'bg-white/85 backdrop-blur-md border-b border-sky-200 text-sky-900',
           button: 'bg-sky-500 hover:bg-sky-600 text-white rounded-2xl font-black shadow-md shadow-sky-200',
           badge: 'bg-sky-100 text-sky-800 border border-sky-300 rounded-xl',
           subCard: 'bg-sky-50/80 border border-sky-200 rounded-xl',
         }
-      case 'warm_latte': // Cokelat Muda Aesthetic
+      case 'warm_latte':
         return {
           wrapper: 'bg-gradient-to-br from-amber-100 via-orange-50 to-amber-200 text-amber-950',
-          card: 'bg-white/90 border border-amber-300 rounded-3xl shadow-md shadow-amber-200/50 hover:scale-[1.01] transition-all',
+          card: 'bg-white/90 border border-amber-300 rounded-3xl shadow-md shadow-amber-200/50 hover:scale-[1.01] transition-all relative overflow-hidden',
           header: 'bg-white/80 backdrop-blur-md border-b border-amber-200 text-amber-900',
           button: 'bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black shadow-md shadow-amber-300',
           badge: 'bg-amber-100 text-amber-900 border border-amber-300 rounded-xl',
           subCard: 'bg-amber-50/80 border border-amber-200 rounded-xl',
         }
-      case 'glassmorphic': default: // Gelas Kaca / Frosted Glass Cerah
+      case 'glassmorphic': default:
         return {
           wrapper: 'bg-gradient-to-br from-slate-100 via-sky-50 to-indigo-100 text-slate-900',
-          card: 'bg-white/60 backdrop-blur-md border border-white/80 rounded-3xl shadow-xl shadow-sky-950/5 hover:scale-[1.01] transition-all',
+          card: 'bg-white/60 backdrop-blur-md border border-white/80 rounded-3xl shadow-xl shadow-sky-950/5 hover:scale-[1.01] transition-all relative overflow-hidden',
           header: 'bg-white/40 backdrop-blur-xl border-b border-white/60 text-slate-900',
           button: 'bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-md shadow-indigo-200',
           badge: 'bg-white/70 backdrop-blur-sm text-indigo-900 border border-white/80 rounded-xl',
@@ -1159,13 +1260,20 @@ function DynamicStoreContent() {
                 const qtyDingin = cart[keyDingin]?.qty || 0
 
                 return (
-                  <div key={item.id} className={`${themeClasses.card} p-3.5 space-y-3`}>
+                  <div key={item.id} className={`${themeClasses.card} p-3.5 space-y-3 relative`}>
+                    {/* LABEL BADGE MENU DARI TOKO */}
+                    {item.label && (
+                      <span className="absolute top-0 right-0 bg-amber-500 text-slate-950 font-black text-[9px] px-2.5 py-1 rounded-bl-xl shadow-sm z-10 uppercase tracking-wider">
+                        {item.label}
+                      </span>
+                    )}
+
                     <div className="flex items-center gap-3.5">
                       <div className="w-16 h-16 rounded-2xl overflow-hidden bg-slate-200 shrink-0 flex items-center justify-center text-2xl shadow-inner">
                         {item.foto_url ? <img src={item.foto_url} alt={item.nama} className="w-full h-full object-cover" /> : themeConfig.emoji}
                       </div>
 
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 pr-12">
                         <h3 className="font-bold text-sm line-clamp-1">{item.nama}</h3>
                         <p className="text-[11px] opacity-75 line-clamp-2 mt-0.5">{item.deskripsi || 'Racikan khas toko kami.'}</p>
                       </div>
@@ -1228,41 +1336,68 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 2: STATUS PESANAN */}
+        {/* TAB 2: STATUS PESANAN & STRUK PELANGGAN */}
         {activeNav === 'status' && (
           <div className="space-y-4">
             <div className={`${themeClasses.card} p-3.5 text-center space-y-1`}>
               <p className="text-xs font-bold text-amber-600">🔔 Panggil Kasir Ke Meja Kamu</p>
-              <button onClick={handleNudgeKasir} className="px-4 py-2 bg-amber-500 text-white text-xs font-black rounded-xl shadow-md">🔔 Pencet Bel Panggil Kasir Toko</button>
+              <button onClick={handleNudgeKasir} className="px-4 py-2 bg-amber-500 text-white text-xs font-black rounded-xl shadow-md">
+                🔔 Pencet Bel Panggil Kasir Toko
+              </button>
             </div>
 
             {myOrders.length === 0 ? (
-              <div className={`p-8 text-center text-xs opacity-75 ${themeClasses.card}`}>Belum ada pesanan aktif di toko ini saat ini.</div>
-            ) : myOrders.map((ord) => (
-              <div key={ord.id} className={`${themeClasses.card} p-4 space-y-3`}>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-xs font-bold text-emerald-600">Meja #{ord.tables?.nomor || '-'}</span>
-                    <p className="text-[10px] opacity-60">{new Date(ord.created_at).toLocaleString('id-ID')}</p>
+              <div className={`p-8 text-center text-xs opacity-75 ${themeClasses.card}`}>Belum ada pesanan aktif.</div>
+            ) : myOrders.map((ord) => {
+              const formattedTime = new Date(ord.created_at).toLocaleString('id-ID', {
+                weekday: 'short',
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })
+
+              return (
+                <div key={ord.id} className={`${themeClasses.card} p-4 space-y-3`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-xs font-bold text-emerald-600">Meja #{ord.tables?.nomor || '-'}</span>
+                      {/* WAKTU PEMESANAN DETAIL */}
+                      <p className="text-[10px] font-semibold text-slate-500 mt-0.5">🗓️ {formattedTime} WIB</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-700' : ord.status === 'batal' ? 'bg-red-500/20 text-red-700' : 'bg-emerald-500/20 text-emerald-700'}`}>{ord.status}</span>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-700' : ord.status === 'batal' ? 'bg-red-500/20 text-red-700' : 'bg-emerald-500/20 text-emerald-700'}`}>{ord.status}</span>
-                </div>
 
-                {ord.status === 'pending' && (
-                  <button
-                    onClick={() => handleCancelOrder(ord.id)}
-                    className="w-full py-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl transition active:scale-95 shadow-sm"
-                  >
-                    🚫 Batalkan Pesanan Ini
-                  </button>
-                )}
+                  {ord.status === 'pending' && (
+                    <button
+                      onClick={() => handleCancelOrder(ord.id)}
+                      className="w-full py-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl transition active:scale-95 shadow-sm"
+                    >
+                      🚫 Batalkan Pesanan Ini
+                    </button>
+                  )}
 
-                <div className="flex gap-2 pt-1 border-t border-b border-slate-200/60 py-2">
-                  <button onClick={() => { setActiveOrderForQris(ord); setShowQrisModal(true); }} className="flex-1 py-1.5 bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-xl">📲 Lihat QRIS Toko</button>
-                  <button onClick={() => { setActiveOrderForQris(ord); setShowQrisModal(true); }} className="flex-1 py-1.5 bg-blue-100 text-blue-800 border border-blue-300 text-xs font-bold rounded-xl">📤 Kirim Bukti Bayar</button>
+                  {/* TOMBOL AKSI LENGKAP: STRUK, REORDER & WA */}
+                  <div className="grid grid-cols-3 gap-2 pt-1 border-t border-b border-slate-200/60 py-2">
+                    <button onClick={() => setSelectedStrukOrder(ord)} className="py-1.5 bg-slate-800 text-white text-[11px] font-bold rounded-xl">
+                      🧾 Lihat Struk
+                    </button>
+                    <button onClick={() => handleReorder(ord)} className="py-1.5 bg-emerald-500 text-slate-950 text-[11px] font-black rounded-xl">
+                      🔄 Pesan Lagi
+                    </button>
+                    <button onClick={() => handleShareToWhatsApp(ord)} className="py-1.5 bg-green-600 text-white text-[11px] font-bold rounded-xl">
+                      💬 Bagikan WA
+                    </button>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button onClick={() => { setActiveOrderForQris(ord); setShowQrisModal(true); }} className="flex-1 py-1.5 bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold rounded-xl">📲 Lihat QRIS Toko</button>
+                    <button onClick={() => { setActiveOrderForQris(ord); setShowQrisModal(true); }} className="flex-1 py-1.5 bg-blue-100 text-blue-800 border border-blue-300 text-xs font-bold rounded-xl">📤 Kirim Bukti Bayar</button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -1614,11 +1749,32 @@ function DynamicStoreContent() {
         )}
       </div>
 
-      {/* Floating Bottom Cart */}
+      {/* Floating Bottom Cart & Kode Promo */}
       {activeNav === 'menu' && Object.keys(cart).length > 0 && (
         <div className="fixed bottom-20 left-4 right-4 max-w-md mx-auto z-30">
           <div className={`${themeClasses.card} p-3.5 space-y-3 shadow-2xl backdrop-blur-xl border border-white/80`}>
-            <div className="flex justify-between items-center">
+            {/* Input Promo Code */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Punya Kode Promo Toko?"
+                value={inputPromoCode}
+                onChange={(e) => setInputPromoCode(e.target.value.toUpperCase())}
+                className="flex-1 px-3 py-1.5 text-xs font-bold bg-white border border-slate-300 rounded-xl uppercase focus:outline-none"
+              />
+              <button onClick={handleApplyPromo} className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl transition active:scale-95 shrink-0">
+                Pasang Promo
+              </button>
+            </div>
+
+            {appliedPromo && (
+              <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl text-[10px] font-bold flex justify-between items-center border border-emerald-300">
+                <span>🎟️ Promo {appliedPromo.kode} Terpasang</span>
+                <button onClick={() => setAppliedPromo(null)} className="text-rose-600 font-bold hover:underline">Hapus</button>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center pt-1">
               <div>
                 <p className="text-[10px] font-bold opacity-75 uppercase">{getTotalItem()} Menu Dipilih</p>
                 <p className="text-base font-black text-emerald-600">Rp {getTotalHarga().toLocaleString('id-ID')}</p>
@@ -1656,6 +1812,105 @@ function DynamicStoreContent() {
           </div>
         </div>
       )}
+
+      {/* MODAL STRUK INTERAKTIF & CUSTOM BACKGROUND */}
+      {selectedStrukOrder && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-sm font-black text-center text-emerald-400">🧾 Struk Pembayaran {storeName}</h3>
+
+            {/* Pilihan Mode Struk */}
+            <div className="flex gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[10px] font-bold">
+              <button onClick={() => setStrukMode('biasa')} className={`flex-1 py-1.5 rounded-lg transition ${strukMode === 'biasa' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400'}`}>Biasa</button>
+              <button onClick={() => setStrukMode('original')} className={`flex-1 py-1.5 rounded-lg transition ${strukMode === 'original' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400'}`}>Original</button>
+              <button onClick={() => setStrukMode('custom')} className={`flex-1 py-1.5 rounded-lg transition ${strukMode === 'custom' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400'}`}>Custom</button>
+            </div>
+
+            {strukMode === 'custom' && (
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Upload Foto Background Struk</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) setCustomStrukBg(URL.createObjectURL(file))
+                  }}
+                  className="w-full text-xs text-slate-400 file:py-1 file:px-2 file:rounded-xl file:bg-emerald-950 file:text-emerald-300 mt-1"
+                />
+              </div>
+            )}
+
+            {/* AREA TAMPILAN STRUK */}
+            <div
+              id="struk-printable"
+              className={`p-4 rounded-2xl text-slate-900 space-y-3 font-mono text-xs relative shadow-xl ${
+                strukMode === 'biasa' ? 'bg-slate-100' : 'bg-white'
+              }`}
+              style={{
+                backgroundImage: strukMode === 'custom' && customStrukBg ? `linear-gradient(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.85)), url('${customStrukBg}')` : undefined,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+            >
+              {strukMode === 'original' && storeAvatar && (
+                <div className="w-12 h-12 mx-auto rounded-full overflow-hidden mb-1 border border-slate-300 shadow-sm">
+                  <img src={storeAvatar} alt="Logo Toko" className="w-full h-full object-cover" />
+                </div>
+              )}
+
+              <div className="text-center border-b border-dashed border-slate-400 pb-2">
+                <h4 className="font-black text-sm uppercase text-slate-900">{storeName}</h4>
+                <p className="text-[10px] text-slate-600 font-sans">
+                  {new Date(selectedStrukOrder.created_at).toLocaleString('id-ID', {
+                    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                  })} WIB
+                </p>
+                <p className="text-[10px] text-slate-600 font-sans">Meja: #{selectedStrukOrder.tables?.nomor} | Pemesan: {selectedStrukOrder.nama_pemesan}</p>
+              </div>
+
+              <div className="space-y-1.5">
+                {selectedStrukOrder.order_items?.map((item: any) => (
+                  <div key={item.id} className="flex justify-between text-[11px]">
+                    <span>{item.qty}x {item.menu_items?.nama} ({item.varian || 'Panas'})</span>
+                    <span>Rp {(item.harga_satuan * item.qty).toLocaleString('id-ID')}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-dashed border-slate-400 pt-2 space-y-1 text-right font-bold text-xs">
+                {selectedStrukOrder.diskon_nominal > 0 && (
+                  <p className="text-emerald-700">Diskon Promo: -Rp {selectedStrukOrder.diskon_nominal.toLocaleString('id-ID')}</p>
+                )}
+                <p className="text-sm font-black text-slate-900">TOTAL: Rp {selectedStrukOrder.total_harga?.toLocaleString('id-ID')}</p>
+              </div>
+
+              {/* BRANDING REYYZTORE DI BAWAH STRUK */}
+              <div className="text-center pt-2 border-t border-slate-300 text-[9px] text-slate-500 font-sans">
+                <p>Terima Kasih Atas Kunjungan Anda!</p>
+                <p className="font-bold text-slate-700 mt-0.5">Powered by Reyyztore</p>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => window.print()} className="flex-1 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow transition">
+                🖨️ Cetak / Simpan
+              </button>
+              <button onClick={() => handleShareToWhatsApp(selectedStrukOrder)} className="flex-1 py-2 bg-green-600 hover:bg-green-500 text-white font-bold text-xs rounded-xl shadow transition">
+                💬 Kirim WA
+              </button>
+            </div>
+            <button onClick={() => setSelectedStrukOrder(null)} className="w-full py-2 bg-slate-800 text-xs font-bold rounded-xl text-slate-400 hover:text-white">
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* FOOTER BRANDING REYYZTORE */}
+      <footer className="text-center py-4 text-[10px] text-slate-400 font-medium">
+        Powered by <strong className="text-emerald-400">Reyyztore</strong> • Digital POS System
+      </footer>
 
       {/* Bottom Nav Bar Pelanggan */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200 p-2 z-40 shadow-lg">
