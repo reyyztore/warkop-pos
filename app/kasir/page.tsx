@@ -372,49 +372,86 @@ export default function KasirDashboardPage() {
     }
   }
 
-  // ⏱️ FUNGSI SHIFT KASIR
+  // ⏱️ FUNGSI BUKA SHIFT KASIR (PERBAIKAN LENGKAP)
   const handleOpenShift = async () => {
-    if (!modalAwalInput || !storeId) return
-    const modalVal = parseFloat(modalAwalInput)
+    if (!modalAwalInput || !storeId) {
+      alert('⚠️ Masukkan nominal modal awal kasir terlebih dahulu!')
+      return
+    }
 
-    const { data, error } = await supabase.from('cashier_shifts').insert({
-      store_id: storeId,
-      starting_cash: modalVal,
-      status: 'open',
-      start_time: new Date().toISOString()
-    }).select().single()
+    try {
+      const modalVal = parseFloat(modalAwalInput)
+      if (isNaN(modalVal)) {
+        alert('⚠️ Nominal modal awal harus berupa angka!')
+        return
+      }
 
-    if (!error) {
+      const { data, error } = await supabase
+        .from('cashier_shifts')
+        .insert({
+          store_id: storeId,
+          starting_cash: modalVal,
+          status: 'open',
+          start_time: new Date().toISOString()
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Database Error:', error)
+        throw error
+      }
+
       setActiveShift(data)
       setShowShiftModal(false)
       setModalAwalInput('')
       alert('⏱️ Shift Kasir Resmi DIBUKA!')
+    } catch (err: any) {
+      alert(`❌ Gagal Membuka Shift: ${err.message || 'Terjadi kesalahan sistem'}`)
     }
   }
 
+  // ⏱️ FUNGSI TUTUP SHIFT KASIR (PERBAIKAN LENGKAP)
   const handleCloseShift = async () => {
-    if (!kasFisikInput || !activeShift) return
-    const fisikVal = parseFloat(kasFisikInput)
+    if (!kasFisikInput || !activeShift) {
+      alert('⚠️ Masukkan nominal total kas fisik terlebih dahulu!')
+      return
+    }
 
-    const totalCashSales = orders
-      .filter((o) => o.status === 'selesai' && o.metode_pembayaran === 'kasir')
-      .reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
+    try {
+      const fisikVal = parseFloat(kasFisikInput)
+      if (isNaN(fisikVal)) {
+        alert('⚠️ Nominal kas fisik harus berupa angka!')
+        return
+      }
 
-    const expectedCash = (activeShift.starting_cash || 0) + totalCashSales
-    const difference = fisikVal - expectedCash
+      const totalCashSales = orders
+        .filter((o) => o.status === 'selesai' && o.metode_pembayaran === 'kasir')
+        .reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
 
-    await supabase.from('cashier_shifts').update({
-      ending_cash: fisikVal,
-      expected_cash: expectedCash,
-      difference: difference,
-      status: 'closed',
-      end_time: new Date().toISOString()
-    }).eq('id', activeShift.id)
+      const expectedCash = (activeShift.starting_cash || 0) + totalCashSales
+      const difference = fisikVal - expectedCash
 
-    setActiveShift(null)
-    setShowShiftModal(false)
-    setKasFisikInput('')
-    alert(`⏱️ Shift Kasir DITUTUP!\nSelisih Kas: Rp ${difference.toLocaleString('id-ID')}`)
+      const { error } = await supabase
+        .from('cashier_shifts')
+        .update({
+          ending_cash: fisikVal,
+          expected_cash: expectedCash,
+          difference: difference,
+          status: 'closed',
+          end_time: new Date().toISOString()
+        })
+        .eq('id', activeShift.id)
+
+      if (error) throw error
+
+      setActiveShift(null)
+      setShowShiftModal(false)
+      setKasFisikInput('')
+      alert(`⏱️ Shift Kasir DITUTUP!\nSelisih Kas: Rp ${difference.toLocaleString('id-ID')}`)
+    } catch (err: any) {
+      alert(`❌ Gagal Menutup Shift: ${err.message || 'Terjadi kesalahan sistem'}`)
+    }
   }
 
   // 🪑 FUNGSI PINDAH MEJA
