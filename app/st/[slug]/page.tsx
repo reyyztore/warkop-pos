@@ -108,7 +108,7 @@ function DynamicStoreContent() {
   const [inputPromoCode, setInputPromoCode] = useState('')
   const [appliedPromo, setAppliedPromo] = useState<any>(null)
 
-  // Data Menu & Cart Baru (Varian Panas/Dingin & Catatan)
+  // Data Menu & Cart Baru
   const [menuItems, setMenuItems] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [cart, setCart] = useState<{ [key: string]: { qty: number; varian: 'panas' | 'dingin'; catatan: string; menuId: string } }>({})
@@ -128,6 +128,13 @@ function DynamicStoreContent() {
   const [selectedStrukOrder, setSelectedStrukOrder] = useState<any>(null)
   const [strukMode, setStrukMode] = useState<'biasa' | 'original' | 'custom'>('original')
   const [customStrukBg, setCustomStrukBg] = useState<string | null>(null)
+
+  // 🆕 STATE MODAL ULASAN PELANGGAN
+  const [reviewActive, setReviewActive] = useState<boolean>(false)
+  const [showReviewModal, setShowReviewModal] = useState<boolean>(false)
+  const [reviewOrderTarget, setReviewOrderTarget] = useState<any>(null)
+  const [reviewRating, setReviewRating] = useState<number>(5)
+  const [reviewComment, setReviewComment] = useState<string>('')
 
   // Data Pelanggan & Status Pesanan
   const [myOrders, setMyOrders] = useState<any[]>([])
@@ -358,7 +365,6 @@ function DynamicStoreContent() {
   const checkSession = async () => {
     const { data: { session: activeSession } } = await supabase.auth.getSession()
     if (activeSession) {
-      // 🔒 Cek apakah user yang terautentikasi terdaftar khusus di toko ini
       const sessionStoreSlug = activeSession.user.user_metadata?.store_slug
       if (sessionStoreSlug && sessionStoreSlug !== slug) {
         setSession(null)
@@ -379,12 +385,10 @@ function DynamicStoreContent() {
     }
   }
 
-  // 🔒 AUTH HANDLER TERISOLASI PER-TOKO
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setAuthLoading(true)
     try {
-      // Format Email Terisolasi Khusus Toko Ini
       const tenantEmail = `${slug.toLowerCase()}_${email.trim().toLowerCase()}`
 
       if (isRegister) {
@@ -450,7 +454,7 @@ function DynamicStoreContent() {
       updateStoreConfig(store)
 
       const { data: catData } = await supabase.from('categories').select('*').eq('store_id', store.id).order('urutan')
-      const { data: menuData } = await supabase.from('menu_items').select('*').eq('store_id', store.id).eq('tersedia', true)
+      const { data: menuData } = await supabase.from('menu_items').select('*').eq('store_id', store.id)
       const { data: tblData } = await supabase.from('tables').select('*').eq('store_id', store.id).eq('aktif', true).order('nomor')
       const { data: promoData } = await supabase.from('store_promos').select('*').eq('store_id', store.id).eq('aktif', true)
 
@@ -486,6 +490,7 @@ function DynamicStoreContent() {
     if (store.bg_image_url) setBgImageUrl(store.bg_image_url)
     if (store.theme_style) setThemeStyle(store.theme_style)
     if (store.theme_config) setThemeConfig(store.theme_config)
+    if (store.review_active !== undefined) setReviewActive(store.review_active)
   }
 
   const fetchMyOrders = async (targetStoreId: string, nameFilter: string) => {
@@ -501,7 +506,6 @@ function DynamicStoreContent() {
     if (data) setMyOrders(data)
   }
 
-  // 🎴 FETCH & CLAIM LOYALTY STAMPS
   const fetchUserLoyalty = async (targetStoreId: string, userId: string) => {
     if (!targetStoreId || !userId) return
     const { data } = await supabase
@@ -561,9 +565,15 @@ function DynamicStoreContent() {
     }
   }
 
-  // KERANJANG: VARIAN PANAS/DINGIN + CATATAN
   const updateCartItem = (menuId: string, varian: 'panas' | 'dingin', delta: number) => {
     if (!isOpen) return
+    const menu = menuItems.find((m) => m.id === menuId)
+    // 🛑 Kunci jika stok habis / sold out
+    if (menu && (menu.stok <= 0 || menu.is_sold_out || !menu.tersedia)) {
+      alert('Maaf, menu ini sedang SOLD OUT / HABIS!')
+      return
+    }
+
     const key = `${menuId}_${varian}`
     setCart((prev) => {
       const current = prev[key] || { qty: 0, varian, catatan: '', menuId }
@@ -621,6 +631,31 @@ function DynamicStoreContent() {
     alert(`🎉 Kode promo ${found.kode} berhasil dipasang!`)
   }
 
+  // 📲 BAGIKAN DETAIL TAGIHAN KE WHATSAPP (PATUNGAN / MINTA DIJAJARIN)
+  const handleShareCartToWA = () => {
+    if (Object.keys(cart).length === 0) {
+      alert('Keranjang masih kosong!')
+      return
+    }
+
+    let text = `*RINGKASAN PESANAN MEJA #${selectedTable || '-'} - ${storeName.toUpperCase()}*\n`
+    text += `-----------------------------------\n`
+
+    Object.values(cart).forEach((item) => {
+      const menu = menuItems.find((m) => m.id === item.menuId)
+      const hargaSatuan = item.varian === 'dingin' && menu?.harga_dingin ? menu.harga_dingin : (menu?.harga_panas || menu?.harga || 0)
+      text += `• ${item.qty}x ${menu?.nama} (${item.varian}) = Rp ${(hargaSatuan * item.qty).toLocaleString('id-ID')}\n`
+      if (item.catatan) text += `  _Catatan: ${item.catatan}_\n`
+    })
+
+    text += `-----------------------------------\n`
+    text += `💰 *TOTAL TAGIHAN MEJA: Rp ${getTotalHarga().toLocaleString('id-ID')}*\n`
+    text += `\nYuk patungan / bayarin pesanan ini! ☕🔥`
+
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`
+    window.open(waUrl, '_blank')
+  }
+
   const handleCheckout = async () => {
     if (!isOpen) {
       alert('Maaf, Toko sedang TUTUP. Pemesanan tidak dapat diproses.')
@@ -672,6 +707,7 @@ function DynamicStoreContent() {
           harga_satuan: hargaSatuan,
           varian: item.varian,
           catatan: item.catatan || null,
+          hpp_satuan: menu?.hpp || 0,
         }
       })
 
@@ -696,7 +732,26 @@ function DynamicStoreContent() {
     }
   }
 
-  // PESAN LAGI (RE-ORDER)
+  // 💬 KIRIM ULASAN PELANGGAN KE OWNER
+  const handleSubmitReview = async () => {
+    if (!reviewOrderTarget || !storeId) return
+    try {
+      await supabase.from('store_reviews').insert({
+        store_id: storeId,
+        order_id: reviewOrderTarget.id,
+        customer_name: userData.name,
+        rating: reviewRating,
+        comment: reviewComment,
+      })
+
+      alert('🎉 Terima kasih atas ulasan & masukan kamu untuk toko ini!')
+      setShowReviewModal(false)
+      setReviewComment('')
+    } catch (err: any) {
+      alert('Gagal mengirim ulasan: ' + err.message)
+    }
+  }
+
   const handleReorder = (ord: any) => {
     if (!ord.order_items || ord.order_items.length === 0) return
     const newCart: any = { ...cart }
@@ -716,7 +771,6 @@ function DynamicStoreContent() {
     alert('🔄 Menu dari pesanan lama berhasil dimasukkan kembali ke keranjang!')
   }
 
-  // BAGIKAN STRUK KE WHATSAPP
   const handleShareToWhatsApp = (ord: any) => {
     const formattedDate = new Date(ord.created_at).toLocaleString('id-ID', {
       weekday: 'long',
@@ -753,7 +807,6 @@ function DynamicStoreContent() {
     window.open(waUrl, '_blank')
   }
 
-  // PEMBATALAN PESANAN OLEH PELANGGAN
   const handleCancelOrder = async (orderId: string) => {
     const confirmCancel = confirm('Apakah kamu yakin ingin membatalkan pesanan ini?')
     if (!confirmCancel) return
@@ -851,7 +904,6 @@ function DynamicStoreContent() {
   const isCovering = isPasswordFocused && !isPasswordVisible
   const isShocked = isPasswordVisible && isPasswordFocused
 
-  // FUNGSI GENERATOR TEMA VISUAL CERAH
   const getThemeClasses = (style: string) => {
     switch (style) {
       case 'bubble':
@@ -912,7 +964,6 @@ function DynamicStoreContent() {
     return <div className="min-h-screen bg-slate-950 text-rose-400 flex items-center justify-center text-xs">Toko tidak ditemukan.</div>
   }
 
-  // TAMPILAN LOGIN MASKOT KARTUN INTERAKTIF
   if (!session) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-3 sm:p-6 font-sans">
@@ -1287,14 +1338,21 @@ function DynamicStoreContent() {
                 const qtyPanas = cart[keyPanas]?.qty || 0
                 const qtyDingin = cart[keyDingin]?.qty || 0
 
+                // 🛑 CEK STATUS AUTO-SOLD OUT BERDASARKAN STOK / STATUS
+                const isSoldOut = item.stok <= 0 || item.is_sold_out || !item.tersedia
+
                 return (
-                  <div key={item.id} className={`${themeClasses.card} p-3.5 space-y-3 relative`}>
-                    {/* LABEL BADGE MENU DARI TOKO */}
-                    {item.label && (
+                  <div key={item.id} className={`${themeClasses.card} p-3.5 space-y-3 relative ${isSoldOut ? 'opacity-60 grayscale-[0.3]' : ''}`}>
+                    {/* 🆕 LABEL BADGE TERMASUK BADGE SOLD OUT */}
+                    {isSoldOut ? (
+                      <span className="absolute top-0 right-0 bg-rose-600 text-white font-black text-[9px] px-2.5 py-1 rounded-bl-xl shadow-sm z-10 uppercase tracking-wider">
+                        🚫 SOLD OUT
+                      </span>
+                    ) : item.label ? (
                       <span className="absolute top-0 right-0 bg-amber-500 text-slate-950 font-black text-[9px] px-2.5 py-1 rounded-bl-xl shadow-sm z-10 uppercase tracking-wider">
                         {item.label}
                       </span>
-                    )}
+                    ) : null}
 
                     <div className="flex items-center gap-3.5">
                       <div className="w-16 h-16 rounded-2xl overflow-hidden bg-slate-200 shrink-0 flex items-center justify-center text-2xl shadow-inner">
@@ -1316,7 +1374,7 @@ function DynamicStoreContent() {
                         <div className="flex items-center gap-1">
                           {qtyPanas > 0 && <button onClick={() => updateCartItem(item.id, 'panas', -1)} className="w-6 h-6 bg-slate-200 text-slate-800 text-xs font-bold rounded-md">-</button>}
                           {qtyPanas > 0 && <span className="text-xs font-bold px-1 text-emerald-600">{qtyPanas}</span>}
-                          <button onClick={() => updateCartItem(item.id, 'panas', 1)} disabled={!isOpen} className="w-6 h-6 bg-emerald-500 text-white text-xs font-bold rounded-md disabled:opacity-50">+</button>
+                          <button onClick={() => updateCartItem(item.id, 'panas', 1)} disabled={!isOpen || isSoldOut} className="w-6 h-6 bg-emerald-500 text-white text-xs font-bold rounded-md disabled:opacity-40">+</button>
                         </div>
                       </div>
 
@@ -1329,7 +1387,7 @@ function DynamicStoreContent() {
                           <div className="flex items-center gap-1">
                             {qtyDingin > 0 && <button onClick={() => updateCartItem(item.id, 'dingin', -1)} className="w-6 h-6 bg-slate-200 text-slate-800 text-xs font-bold rounded-md">-</button>}
                             {qtyDingin > 0 && <span className="text-xs font-bold px-1 text-emerald-600">{qtyDingin}</span>}
-                            <button onClick={() => updateCartItem(item.id, 'dingin', 1)} disabled={!isOpen} className="w-6 h-6 bg-emerald-500 text-white text-xs font-bold rounded-md disabled:opacity-50">+</button>
+                            <button onClick={() => updateCartItem(item.id, 'dingin', 1)} disabled={!isOpen || isSoldOut} className="w-6 h-6 bg-emerald-500 text-white text-xs font-bold rounded-md disabled:opacity-40">+</button>
                           </div>
                         </div>
                       )}
@@ -1391,7 +1449,6 @@ function DynamicStoreContent() {
                   <div className="flex justify-between items-start">
                     <div>
                       <span className="text-xs font-bold text-emerald-600">Meja #{ord.tables?.nomor || '-'}</span>
-                      {/* WAKTU PEMESANAN DETAIL */}
                       <p className="text-[10px] font-semibold text-slate-500 mt-0.5">🗓️ {formattedTime} WIB</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-700' : ord.status === 'batal' ? 'bg-red-500/20 text-red-700' : 'bg-emerald-500/20 text-emerald-700'}`}>{ord.status}</span>
@@ -1406,7 +1463,16 @@ function DynamicStoreContent() {
                     </button>
                   )}
 
-                  {/* TOMBOL AKSI LENGKAP: STRUK, REORDER & WA */}
+                  {/* 🆕 TOMBOL ULASAN JIKA PESANAN SELESAI */}
+                  {ord.status === 'selesai' && reviewActive && (
+                    <button
+                      onClick={() => { setReviewOrderTarget(ord); setShowReviewModal(true); }}
+                      className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black rounded-xl transition shadow-sm"
+                    >
+                      ⭐ Beri Ulasan / Feedback Pesanan Ini
+                    </button>
+                  )}
+
                   <div className="grid grid-cols-3 gap-2 pt-1 border-t border-b border-slate-200/60 py-2">
                     <button onClick={() => setSelectedStrukOrder(ord)} className="py-1.5 bg-slate-800 text-white text-[11px] font-bold rounded-xl">
                       🧾 Lihat Struk
@@ -1687,8 +1753,6 @@ function DynamicStoreContent() {
         {/* TAB 5: PROFIL PELANGGAN & LOYALTY CARD */}
         {activeNav === 'profile' && (
           <div className="space-y-4">
-
-            {/* 🎴 FITUR LOYALTY CARD PELANGGAN */}
             {storeData?.loyalty_active && (
               <div className={`${themeClasses.card} p-5 space-y-4 text-center border-2 border-amber-300 bg-amber-50/90`}>
                 <div className="flex justify-between items-center border-b border-amber-200 pb-2">
@@ -1698,7 +1762,6 @@ function DynamicStoreContent() {
                   </span>
                 </div>
 
-                {/* Grid Kotak Stamp */}
                 <div className="grid grid-cols-5 gap-2 my-3">
                   {Array.from({ length: storeData.loyalty_max_stamps || 10 }).map((_, i) => (
                     <div
@@ -1714,7 +1777,6 @@ function DynamicStoreContent() {
                   ))}
                 </div>
 
-                {/* Form Input Kode Harian */}
                 {userStamps < (storeData.loyalty_max_stamps || 10) ? (
                   <div className="space-y-2">
                     <div className="flex gap-2">
@@ -1781,7 +1843,6 @@ function DynamicStoreContent() {
       {activeNav === 'menu' && Object.keys(cart).length > 0 && (
         <div className="fixed bottom-20 left-4 right-4 max-w-md mx-auto z-30">
           <div className={`${themeClasses.card} p-3.5 space-y-3 shadow-2xl backdrop-blur-xl border border-white/80`}>
-            {/* Input Promo Code */}
             <div className="flex gap-2">
               <input
                 type="text"
@@ -1813,9 +1874,58 @@ function DynamicStoreContent() {
               </div>
             </div>
 
-            <button onClick={handleCheckout} disabled={submitting || !isOpen} className={`w-full py-2.5 ${themeClasses.button} text-xs disabled:opacity-50`}>
-              {submitting ? 'Mengirim...' : !isOpen ? 'Toko Sedang Tutup' : 'Pesan Sekarang →'}
-            </button>
+            {/* 🆕 TOMBOL BAGIKAN TAGIHAN WA (PATUNGAN) */}
+            <div className="flex gap-2">
+              <button
+                onClick={handleShareCartToWA}
+                className="py-2.5 px-3 bg-green-600 hover:bg-green-500 text-white font-black text-xs rounded-2xl shadow transition"
+              >
+                📲 Patungan WA
+              </button>
+              <button onClick={handleCheckout} disabled={submitting || !isOpen} className={`flex-1 py-2.5 ${themeClasses.button} text-xs disabled:opacity-50`}>
+                {submitting ? 'Mengirim...' : !isOpen ? 'Toko Sedang Tutup' : 'Pesan Sekarang →'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 MODAL ULASAN & FEEDBACK PELANGGAN */}
+      {showReviewModal && reviewOrderTarget && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white text-slate-900 border border-slate-200 w-full max-w-sm rounded-3xl p-6 text-center space-y-4 shadow-2xl">
+            <h3 className="text-base font-bold text-amber-600">⭐ Beri Ulasan Toko</h3>
+            <p className="text-xs text-slate-500">Bagaimana kualitas makanan & pelayanan toko kami?</p>
+
+            {/* Rating Bintang 1-5 */}
+            <div className="flex justify-center gap-2 text-2xl cursor-pointer">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <span
+                  key={star}
+                  onClick={() => setReviewRating(star)}
+                  className={star <= reviewRating ? 'text-amber-400' : 'text-slate-300'}
+                >
+                  ★
+                </span>
+              ))}
+            </div>
+
+            <textarea
+              rows={3}
+              placeholder="Tulis ulasan/saran kamu untuk toko..."
+              value={reviewComment}
+              onChange={(e) => setReviewComment(e.target.value)}
+              className="w-full p-2.5 bg-slate-50 border border-slate-300 text-xs rounded-xl focus:outline-none text-slate-800 font-medium"
+            />
+
+            <div className="flex gap-2">
+              <button onClick={handleSubmitReview} className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow">
+                Kirim Ulasan
+              </button>
+              <button onClick={() => setShowReviewModal(false)} className="px-4 py-2.5 bg-slate-100 text-slate-600 font-bold text-xs rounded-xl">
+                Batal
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1847,7 +1957,6 @@ function DynamicStoreContent() {
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-sm font-black text-center text-emerald-400">🧾 Struk Pembayaran {storeName}</h3>
 
-            {/* Pilihan Mode Struk */}
             <div className="flex gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-[10px] font-bold">
               <button onClick={() => setStrukMode('biasa')} className={`flex-1 py-1.5 rounded-lg transition ${strukMode === 'biasa' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400'}`}>Biasa</button>
               <button onClick={() => setStrukMode('original')} className={`flex-1 py-1.5 rounded-lg transition ${strukMode === 'original' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-400'}`}>Original</button>
@@ -1869,7 +1978,6 @@ function DynamicStoreContent() {
               </div>
             )}
 
-            {/* AREA TAMPILAN STRUK */}
             <div
               id="struk-printable"
               className={`p-4 rounded-2xl text-slate-900 space-y-3 font-mono text-xs relative shadow-xl ${
@@ -1913,7 +2021,6 @@ function DynamicStoreContent() {
                 <p className="text-sm font-black text-slate-900">TOTAL: Rp {selectedStrukOrder.total_harga?.toLocaleString('id-ID')}</p>
               </div>
 
-              {/* BRANDING REYYZTORE DI BAWAH STRUK */}
               <div className="text-center pt-2 border-t border-slate-300 text-[9px] text-slate-500 font-sans">
                 <p>Terima Kasih Atas Kunjungan Anda!</p>
                 <p className="font-bold text-slate-700 mt-0.5">Powered by Reyyztore</p>
