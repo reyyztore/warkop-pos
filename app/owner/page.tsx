@@ -27,7 +27,6 @@ export default function OwnerDashboardPage() {
 
   // State Modal Tautan Cabang Toko Baru
   const [showAddStoreModal, setShowAddStoreModal] = useState<boolean>(false)
-  const [newStoreName, setNewStoreName] = useState<string>('')
   const [newStoreSlug, setNewStoreSlug] = useState<string>('')
 
   const supabase = createClient()
@@ -203,35 +202,44 @@ export default function OwnerDashboardPage() {
     }
   }
 
-  // 🔗 Tautkan Cabang Toko Baru Secara Otomatis
+  // 🔗 Tautkan Cabang Toko Berdasarkan Slug yang Sudah Ada
   const handleLinkNewStore = async () => {
-    if (!newStoreName || !newStoreSlug) {
-      alert('Mohon isi nama cabang dan slug URL toko terlebih dahulu!')
+    if (!newStoreSlug) {
+      alert('⚠️ Mohon masukkan Slug URL cabang toko!')
       return
     }
 
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
 
-    const cleanSlug = newStoreSlug.toLowerCase().replace(/\s+/g, '-')
+    const cleanSlug = newStoreSlug.toLowerCase().trim().replace(/\s+/g, '-')
 
-    const { data, error } = await supabase.from('stores').insert({
-      owner_id: session.user.id,
-      store_name: newStoreName,
-      slug: cleanSlug,
-      is_open: true,
-      expired_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-    }).select().single()
+    // 1. Cari toko berdasarkan slug
+    const { data: existingStore, error: fetchError } = await supabase
+      .from('stores')
+      .select('*')
+      .eq('slug', cleanSlug)
+      .single()
 
-    if (error) {
-      alert('Gagal menautkan cabang baru: ' + error.message)
+    if (fetchError || !existingStore) {
+      alert('❌ Cabang dengan Slug tersebut tidak ditemukan di database!')
+      return
+    }
+
+    // 2. Update owner_id toko tersebut ke user yang sedang login
+    const { error: updateError } = await supabase
+      .from('stores')
+      .update({ owner_id: session.user.id })
+      .eq('id', existingStore.id)
+
+    if (updateError) {
+      alert('❌ Gagal menautkan cabang: ' + updateError.message)
     } else {
-      alert('✅ Cabang toko baru berhasil ditautkan ke akun owner!')
+      alert(`✅ Cabang "${existingStore.store_name}" berhasil ditautkan ke akun owner kamu!`)
       setShowAddStoreModal(false)
-      setNewStoreName('')
       setNewStoreSlug('')
       checkOwnerAuthAndFetchStores()
-      if (data) setSelectedStoreId(data.id)
+      setSelectedStoreId(existingStore.id)
     }
   }
 
@@ -485,24 +493,14 @@ export default function OwnerDashboardPage() {
         </div>
       )}
 
-      {/* MODAL TAUTKAN CABANG BARU SECARA OTOMATIS */}
+      {/* MODAL TAUTKAN CABANG BERDASARKAN SLUG */}
       {showAddStoreModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-6 space-y-3.5">
-            <h3 className="text-sm font-bold text-amber-400">🔗 Tautkan Cabang Toko Baru</h3>
-            <p className="text-[10px] text-slate-400">Masukkan nama dan slug cabang baru agar otomatis tertaut ke akun owner kamu.</p>
+            <h3 className="text-sm font-bold text-amber-400">🔗 Tautkan Cabang Toko</h3>
+            <p className="text-[10px] text-slate-400">Masukkan slug URL cabang toko yang sudah ada agar otomatis tertaut ke akun owner kamu.</p>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Nama Cabang Toko</label>
-              <input
-                type="text"
-                placeholder="Contoh: Warkop Kita Cabang 2"
-                value={newStoreName}
-                onChange={(e) => setNewStoreName(e.target.value)}
-                className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Slug URL Toko (Tanpa Spasi)</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase">Slug URL Toko</label>
               <input
                 type="text"
                 placeholder="Contoh: warkop-cabang-2"
