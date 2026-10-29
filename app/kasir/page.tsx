@@ -89,6 +89,15 @@ export default function KasirDashboardPage() {
   const [kasirSoundOption, setKasirSoundOption] = useState<number>(2)
   const [customerBellAlert, setCustomerBellAlert] = useState<string | null>(null)
 
+  // 🆕 STATE MODUL BARU: TOGGLE FITUR & OWNER MODE PROTECTED PIN
+  const [kdsActive, setKdsActive] = useState<boolean>(false)
+  const [stockActive, setStockActive] = useState<boolean>(false)
+  const [ownerModeActive, setOwnerModeActive] = useState<boolean>(false)
+  const [masterPin, setMasterPin] = useState<string>('123456')
+  const [showPinModal, setShowPinModal] = useState<boolean>(false)
+  const [inputPin, setInputPin] = useState<string>('')
+  const [pinTargetAction, setPinTargetAction] = useState<'disable_owner' | 'access_owner' | null>(null)
+
   const supabase = createClient()
 
   const speakText = (text: string, loop: boolean = false) => {
@@ -98,6 +107,11 @@ export default function KasirDashboardPage() {
     utterance.lang = 'id-ID'
     if (loop) utterance.onend = () => window.speechSynthesis.speak(utterance)
     window.speechSynthesis.speak(utterance)
+  }
+
+  // 🔊 REVISI AI VOICE: Menyebutkan "Panggilan! Meja X menekan panggilan"
+  const speakTableBell = (tableNo: string) => {
+    speakText(`Panggilan! Meja ${tableNo} menekan panggilan.`, false)
   }
 
   const playBellSound = () => {
@@ -135,9 +149,10 @@ export default function KasirDashboardPage() {
     const channel = supabase
       .channel(`kasir-dashboard-${storeId}`)
       .on('broadcast', { event: 'customer-ring-bell' }, (payload: any) => {
-        playBellSound()
         const table = payload.payload?.tableNo || '??'
-        setCustomerBellAlert(`🔔 Meja #${table} memanggil kasir!`)
+        // 🔊 Panggil notifikasi suara revisi
+        speakTableBell(table)
+        setCustomerBellAlert(`🔔 Meja #${table} menekan panggilan!`)
         setTimeout(() => setCustomerBellAlert(null), 8000)
       })
       .on('broadcast', { event: 'order-cancelled-by-customer' }, (payload: any) => {
@@ -213,6 +228,12 @@ export default function KasirDashboardPage() {
           if (storeData.loyalty_code) setLoyaltyCode(storeData.loyalty_code)
           if (storeData.loyalty_max_stamps) setLoyaltyMaxStamps(storeData.loyalty_max_stamps)
 
+          // 🆕 AMBIL CONFIG MODUL SAKLAR STORE
+          if (storeData.kds_active !== undefined) setKdsActive(storeData.kds_active)
+          if (storeData.stock_active !== undefined) setStockActive(storeData.stock_active)
+          if (storeData.owner_mode_active !== undefined) setOwnerModeActive(storeData.owner_mode_active)
+          if (storeData.master_pin) setMasterPin(storeData.master_pin)
+
           if (storeData.expired_at) {
             setExpiredAt(storeData.expired_at)
             const diff = new Date(storeData.expired_at).getTime() - new Date().getTime()
@@ -244,6 +265,57 @@ export default function KasirDashboardPage() {
   const fetchPromos = async (targetStoreId: string) => {
     const { data } = await supabase.from('store_promos').select('*').eq('store_id', targetStoreId)
     if (data) setPromos(data)
+  }
+
+  // 🆕 FUNGSIONALITAS TOGGLE KDS & STOK
+  const handleToggleKds = async (newVal: boolean) => {
+    if (!storeId) return
+    setKdsActive(newVal)
+    await supabase.from('stores').update({ kds_active: newVal }).eq('id', storeId)
+  }
+
+  const handleToggleStock = async (newVal: boolean) => {
+    if (!storeId) return
+    setStockActive(newVal)
+    await supabase.from('stores').update({ stock_active: newVal }).eq('id', storeId)
+  }
+
+  const handleToggleOwnerMode = async (newVal: boolean) => {
+    if (!storeId) return
+    if (!newVal) {
+      // Jika ingin menonaktifkan Mode Owner, MINTA PIN
+      setPinTargetAction('disable_owner')
+      setInputPin('')
+      setShowPinModal(true)
+    } else {
+      setOwnerModeActive(true)
+      await supabase.from('stores').update({ owner_mode_active: true }).eq('id', storeId)
+    }
+  }
+
+  const handleVerifyMasterPin = async () => {
+    if (inputPin !== masterPin) {
+      alert('❌ Master PIN 6-Digit Salah!')
+      return
+    }
+
+    if (pinTargetAction === 'disable_owner') {
+      setOwnerModeActive(false)
+      if (storeId) {
+        await supabase.from('stores').update({ owner_mode_active: false }).eq('id', storeId)
+      }
+      setShowPinModal(false)
+      alert('✅ Mode Owner berhasil dinonaktifkan.')
+    } else if (pinTargetAction === 'access_owner') {
+      setShowPinModal(false)
+      window.location.href = '/owner'
+    }
+  }
+
+  const handleOpenOwnerPanel = () => {
+    setPinTargetAction('access_owner')
+    setInputPin('')
+    setShowPinModal(true)
   }
 
   const handleAddPromo = async () => {
@@ -570,6 +642,89 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
+      {/* 🆕 PANEL PENGATURAN SAKLAR FITUR TOKO & LINK KDS KONDISIONAL */}
+      <div className="max-w-5xl mx-auto mt-4 p-4 bg-slate-900 border border-slate-800 rounded-3xl space-y-3">
+        <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">⚙️ Pengaturan Saklar Fitur Toko</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Saklar Layar Dapur / KDS */}
+          <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center">
+            <div>
+              <p className="text-xs font-bold text-white">Mode Layar Dapur (KDS)</p>
+              <p className="text-[10px] text-slate-400">Layar khusus barista/koki</p>
+            </div>
+            <button
+              onClick={() => handleToggleKds(!kdsActive)}
+              className={`px-3 py-1.5 text-xs font-black rounded-xl border transition ${
+                kdsActive ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-900 text-slate-400 border-slate-800'
+              }`}
+            >
+              {kdsActive ? 'ON' : 'OFF'}
+            </button>
+          </div>
+
+          {/* Saklar Stok Menu */}
+          <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center">
+            <div>
+              <p className="text-xs font-bold text-white">Manajemen Stok Menu</p>
+              <p className="text-[10px] text-slate-400">Status Sold Out otomatis</p>
+            </div>
+            <button
+              onClick={() => handleToggleStock(!stockActive)}
+              className={`px-3 py-1.5 text-xs font-black rounded-xl border transition ${
+                stockActive ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-900 text-slate-400 border-slate-800'
+              }`}
+            >
+              {stockActive ? 'ON' : 'OFF'}
+            </button>
+          </div>
+
+          {/* Saklar Mode Owner Access */}
+          <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center">
+            <div>
+              <p className="text-xs font-bold text-white">Mode Akses Owner</p>
+              <p className="text-[10px] text-slate-400">Proteksi PIN 6-Digit</p>
+            </div>
+            <button
+              onClick={() => handleToggleOwnerMode(!ownerModeActive)}
+              className={`px-3 py-1.5 text-xs font-black rounded-xl border transition ${
+                ownerModeActive ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-900 text-slate-400 border-slate-800'
+              }`}
+            >
+              {ownerModeActive ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        </div>
+
+        {/* 🔗 LINK KDS HANYA MUNCUL JIKA MODE DAPUR (KDS) DIAKTIFKAN */}
+        {kdsActive && storeSlug && (
+          <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row justify-between items-center gap-2">
+            <span className="text-xs text-amber-300 font-bold">👨‍🍳 Mode Layar Dapur Aktif! Akses link dapur untuk barista:</span>
+            <a
+              href={`/st/${storeSlug}/dapur`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl shadow-lg transition"
+            >
+              👨‍🍳 Buka Layar Dapur (/st/{storeSlug}/dapur) ➔
+            </a>
+          </div>
+        )}
+
+        {/* 👑 TOMBOL MASUK OWNER PANEL JIKA MODE OWNER ON */}
+        {ownerModeActive && (
+          <div className="pt-2 border-t border-slate-800/80 flex justify-between items-center">
+            <span className="text-xs text-slate-400">Ingin melihat laporan keuangan & analitik lengkap?</span>
+            <button
+              onClick={handleOpenOwnerPanel}
+              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-lg transition"
+            >
+              🚪 Masuk Panel Owner (PIN Protected) ➔
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Alert Bell & Notifikasi Pembatalan Pelanggan */}
       {customerBellAlert && (
         <div className="max-w-5xl mx-auto mt-4 p-3.5 bg-amber-500 text-slate-950 text-xs font-black rounded-2xl shadow-xl flex justify-between items-center animate-bounce">
@@ -693,6 +848,35 @@ export default function KasirDashboardPage() {
           )
         })}
       </div>
+
+      {/* 🆕 MODAL VERIFIKASI MASTER PIN OWNER */}
+      {showPinModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-xs rounded-3xl p-6 space-y-4 text-center">
+            <div className="text-3xl">🔑</div>
+            <h3 className="text-sm font-bold text-amber-400">Masukkan Master PIN 6-Digit Owner</h3>
+            <p className="text-[10px] text-slate-400">Aksi ini memerlukan konfirmasi PIN pemilik toko.</p>
+            
+            <input
+              type="password"
+              maxLength={6}
+              placeholder="••••••"
+              value={inputPin}
+              onChange={(e) => setInputPin(e.target.value)}
+              className="w-full text-center text-lg font-mono tracking-widest p-2 bg-slate-950 border border-slate-800 rounded-xl text-amber-300 focus:outline-none"
+            />
+
+            <div className="flex gap-2 pt-2">
+              <button onClick={handleVerifyMasterPin} className="flex-1 py-2 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">
+                Verifikasi PIN
+              </button>
+              <button onClick={() => setShowPinModal(false)} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL REKAP LAPORAN PENJUALAN */}
       {showRekapModal && (
