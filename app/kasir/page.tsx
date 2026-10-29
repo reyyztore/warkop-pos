@@ -73,6 +73,18 @@ export default function KasirDashboardPage() {
     emoji: '☕'
   })
 
+  // 🎟️ KODE PROMO STATE
+  const [promos, setPromos] = useState<any[]>([])
+  const [showPromoModal, setShowPromoModal] = useState(false)
+  const [newPromoCode, setNewPromoCode] = useState('')
+  const [newPromoType, setNewPromoType] = useState<'flat' | 'persen'>('flat')
+  const [newPromoVal, setNewPromoVal] = useState<number>(0)
+  const [newPromoMin, setNewPromoMin] = useState<number>(0)
+
+  // 📊 REKAP & LAPORAN STATE
+  const [rekapPeriode, setRekapPeriode] = useState<'hari' | 'minggu' | 'bulan'>('hari')
+  const [showRekapModal, setShowRekapModal] = useState(false)
+
   // Sound Options & Notifications
   const [kasirSoundOption, setKasirSoundOption] = useState<number>(2)
   const [customerBellAlert, setCustomerBellAlert] = useState<string | null>(null)
@@ -212,6 +224,7 @@ export default function KasirDashboardPage() {
         }
 
         fetchOrders(currentStoreId)
+        fetchPromos(currentStoreId)
       } else {
         setLoading(false)
         alert('Akun kamu belum terhubung dengan toko mana pun. Silakan mendaftar toko terlebih dahulu.')
@@ -229,6 +242,36 @@ export default function KasirDashboardPage() {
 
     if (data) setOrders(data)
     setLoading(false)
+  }
+
+  const fetchPromos = async (targetStoreId: string) => {
+    const { data } = await supabase.from('store_promos').select('*').eq('store_id', targetStoreId)
+    if (data) setPromos(data)
+  }
+
+  const handleAddPromo = async () => {
+    if (!storeId || !newPromoCode) return
+    const { error } = await supabase.from('store_promos').insert({
+      store_id: storeId,
+      kode: newPromoCode.toUpperCase(),
+      tipe_diskon: newPromoType,
+      nilai_diskon: newPromoVal,
+      minimal_transaksi: newPromoMin,
+      aktif: true,
+    })
+
+    if (error) alert(error.message)
+    else {
+      alert('✅ Kode Promo Berhasil Ditambahkan!')
+      setNewPromoCode('')
+      fetchPromos(storeId)
+    }
+  }
+
+  const handleDeletePromo = async (id: string) => {
+    if (!confirm('Hapus kode promo ini?')) return
+    await supabase.from('store_promos').delete().eq('id', id)
+    if (storeId) fetchPromos(storeId)
   }
 
   const updateStatus = async (orderId: string, status: string) => {
@@ -382,6 +425,46 @@ export default function KasirDashboardPage() {
     }
   }
 
+  // Rekap Laporan Penjualan (Hari Ini, 1 Minggu, 1 Bulan)
+  const getFilteredOrdersByPeriode = () => {
+    const now = new Date()
+    return orders.filter((o) => {
+      if (o.status !== 'selesai') return false
+      const orderDate = new Date(o.created_at)
+      
+      if (rekapPeriode === 'hari') {
+        return orderDate.toDateString() === now.toDateString()
+      } else if (rekapPeriode === 'minggu') {
+        const diffDays = (now.getTime() - orderDate.getTime()) / (1000 * 3600 * 24)
+        return diffDays <= 7
+      } else if (rekapPeriode === 'bulan') {
+        const diffDays = (now.getTime() - orderDate.getTime()) / (1000 * 3600 * 24)
+        return diffDays <= 30
+      }
+      return true
+    })
+  }
+
+  const rekapOrders = getFilteredOrdersByPeriode()
+  const totalRekapOmzet = rekapOrders.reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
+
+  const downloadRekapCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,ID Pesanan,Tanggal,Waktu,Meja,Pemesan,Total Harga,Status\n"
+    rekapOrders.forEach((o) => {
+      const d = new Date(o.created_at)
+      const dateStr = d.toLocaleDateString('id-ID')
+      const timeStr = d.toLocaleTimeString('id-ID')
+      csvContent += `${o.id},${dateStr},${timeStr},Meja #${o.tables?.nomor || '-'},${o.nama_pemesan},${o.total_harga},${o.status}\n`
+    })
+    
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", `Rekap_${storeName}_${rekapPeriode}_${Date.now()}.csv`)
+    document.body.appendChild(link)
+    link.click()
+  }
+
   const customerStoreUrl = typeof window !== 'undefined' && storeSlug ? `${window.location.origin}/st/${storeSlug}` : ''
 
   const isToday = (dateStr: string) => new Date(dateStr).toDateString() === new Date().toDateString()
@@ -419,17 +502,23 @@ export default function KasirDashboardPage() {
 
         {/* Menu Navigasi Kasir */}
         <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => setShowRekapModal(true)} className="px-3.5 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-amber-300 rounded-2xl">
+            📊 Rekap Laporan
+          </button>
+          <button onClick={() => setShowPromoModal(true)} className="px-3.5 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-cyan-300 rounded-2xl">
+            🎟️ Kode Promo
+          </button>
           <button onClick={() => setShowProfileModal(true)} className="px-3.5 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-emerald-300 rounded-2xl">
             👤 Profil & QRIS
           </button>
           <button onClick={() => setShowTampilanModal(true)} className="px-3.5 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-amber-300 rounded-2xl">
-            🎨 Edit Tema & Info Toko
+            🎨 Edit Tema
           </button>
           <Link href="/kasir/menu" className="px-3.5 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-slate-200 rounded-2xl">
-            🌸 Kelola Menu
+            🌸 Menu
           </Link>
           <Link href="/kasir/meja" className="px-3.5 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-slate-200 rounded-2xl">
-            🪑 Kelola Meja
+            🪑 Meja
           </Link>
         </div>
       </div>
@@ -506,73 +595,164 @@ export default function KasirDashboardPage() {
       <div className="max-w-5xl mx-auto mt-4 space-y-3">
         {loading ? (
           <div className="h-44 bg-slate-900/50 rounded-3xl animate-pulse border border-slate-800" />
-        ) : filteredOrders.map((ord) => (
-          <div key={ord.id} className="bg-slate-900 border border-slate-800 p-4 rounded-3xl space-y-3">
-            <div className="flex justify-between items-start pb-3 border-b border-slate-800">
-              <div>
-                <span className="text-sm font-black text-emerald-400">Meja #{ord.tables?.nomor || '-'}</span>
-                
-                <div className="bg-slate-950 p-2 rounded-xl border border-slate-800 text-[11px] space-y-0.5 mt-1">
-                  <p className="font-bold text-white">👤 Pemesan: {ord.nama_pemesan}</p>
-                  <p className="text-slate-400">📧 Email: {ord.email_pemesan || 'Tamu / Tanpa Email'}</p>
-                  <p className="text-slate-400">📱 No. HP/WA: {ord.phone_pemesan || '-'}</p>
+        ) : filteredOrders.map((ord) => {
+          const formattedDate = new Date(ord.created_at).toLocaleString('id-ID', {
+            weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+          })
+
+          return (
+            <div key={ord.id} className="bg-slate-900 border border-slate-800 p-4 rounded-3xl space-y-3">
+              <div className="flex justify-between items-start pb-3 border-b border-slate-800">
+                <div>
+                  <span className="text-sm font-black text-emerald-400">Meja #{ord.tables?.nomor || '-'}</span>
+                  <p className="text-[10px] text-slate-400 font-medium">🗓️ {formattedDate} WIB</p>
+                  
+                  <div className="bg-slate-950 p-2 rounded-xl border border-slate-800 text-[11px] space-y-0.5 mt-1.5">
+                    <p className="font-bold text-white">👤 Pemesan: {ord.nama_pemesan}</p>
+                    <p className="text-slate-400">📧 Email: {ord.email_pemesan || 'Tamu / Tanpa Email'}</p>
+                    <p className="text-slate-400">📱 No. HP/WA: {ord.phone_pemesan || '-'}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-end gap-1.5">
+                  <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-300' : ord.status === 'batal' ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-300'}`}>{ord.status}</span>
+                  <button onClick={() => ringSpecificTableBell(ord.tables?.nomor)} className="text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 px-2 py-1 rounded-lg font-bold">
+                    🔔 Ring Meja #{ord.tables?.nomor}
+                  </button>
                 </div>
               </div>
 
-              <div className="flex flex-col items-end gap-1.5">
-                <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${ord.status === 'pending' ? 'bg-amber-500/20 text-amber-300' : ord.status === 'batal' ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-300'}`}>{ord.status}</span>
-                <button onClick={() => ringSpecificTableBell(ord.tables?.nomor)} className="text-[10px] bg-amber-500/10 border border-amber-500/30 text-amber-300 px-2 py-1 rounded-lg font-bold">
-                  🔔 Ring Meja #{ord.tables?.nomor}
+              {ord.kode_promo && (
+                <div className="text-[10px] bg-emerald-950 text-emerald-300 px-2.5 py-1 rounded-lg font-bold border border-emerald-800/60 inline-block">
+                  🎟️ Promo Terpakai: {ord.kode_promo} (-Rp {ord.diskon_nominal?.toLocaleString('id-ID')})
+                </div>
+              )}
+
+              <ul className="space-y-2 text-xs text-slate-300">
+                {ord.order_items?.map((item: any) => (
+                  <li key={item.id} className="bg-slate-950/60 p-2 rounded-xl border border-slate-800/60 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="font-bold text-white"><strong className="text-emerald-400">{item.qty}x</strong> {item.menu_items?.nama}</span>
+                        {item.varian && (
+                          <span className={`ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${item.varian === 'dingin' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'bg-amber-950 text-amber-300 border border-amber-800'}`}>
+                            {item.varian === 'dingin' ? '🧊 Dingin' : '🔥 Panas'}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-slate-400 font-mono">Rp {(item.harga_satuan * item.qty).toLocaleString('id-ID')}</span>
+                    </div>
+                    {item.catatan && (
+                      <p className="text-[10px] text-amber-300/90 italic bg-amber-950/20 px-2 py-0.5 rounded border border-amber-900/30">
+                        📝 Catatan: "{item.catatan}"
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+
+              {ord.bukti_pembayaran_url && (
+                <div className="p-2 bg-blue-950/40 border border-blue-800/60 rounded-xl flex justify-between items-center text-xs">
+                  <span className="text-blue-300 font-bold">📷 Bukti Transfer Pelanggan</span>
+                  <button onClick={() => setSelectedBuktiUrl(ord.bukti_pembayaran_url)} className="px-2.5 py-1 bg-blue-500 text-slate-950 font-black rounded-lg text-[10px]">
+                    Lihat Bukti
+                  </button>
+                </div>
+              )}
+
+              <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs font-black">
+                <span>Total: <strong className="text-emerald-400">Rp {ord.total_harga?.toLocaleString('id-ID')}</strong></span>
+                <button onClick={() => togglePaidStatus(ord.id, ord.is_paid)} className={`px-3 py-1 rounded-xl text-[10px] font-bold ${ord.is_paid ? 'bg-emerald-500 text-slate-950' : 'bg-rose-950 text-rose-400 border border-rose-800'}`}>
+                  {ord.is_paid ? '✅ Lunas' : '❌ Belum Bayar'}
                 </button>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                {ord.status === 'pending' && <button onClick={() => updateStatus(ord.id, 'diproses')} className="flex-1 py-2 bg-amber-500 text-slate-950 text-xs font-black rounded-xl">Proses Pesanan</button>}
+                {ord.status === 'diproses' && <button onClick={() => updateStatus(ord.id, 'selesai')} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl">Selesaikan Pesanan</button>}
               </div>
             </div>
+          )
+        })}
+      </div>
 
-            <ul className="space-y-2 text-xs text-slate-300">
-              {ord.order_items?.map((item: any) => (
-                <li key={item.id} className="bg-slate-950/60 p-2 rounded-xl border border-slate-800/60 space-y-1">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <span className="font-bold text-white"><strong className="text-emerald-400">{item.qty}x</strong> {item.menu_items?.nama}</span>
-                      {item.varian && (
-                        <span className={`ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${item.varian === 'dingin' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'bg-amber-950 text-amber-300 border border-amber-800'}`}>
-                          {item.varian === 'dingin' ? '🧊 Dingin' : '🔥 Panas'}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-slate-400 font-mono">Rp {(item.harga_satuan * item.qty).toLocaleString('id-ID')}</span>
-                  </div>
-                  {item.catatan && (
-                    <p className="text-[10px] text-amber-300/90 italic bg-amber-950/20 px-2 py-0.5 rounded border border-amber-900/30">
-                      📝 Catatan: "{item.catatan}"
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
+      {/* MODAL REKAP LAPORAN PENJUALAN */}
+      {showRekapModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-4">
+            <h3 className="text-base font-bold text-amber-400">📊 Rekap & Download Laporan</h3>
 
-            {ord.bukti_pembayaran_url && (
-              <div className="p-2 bg-blue-950/40 border border-blue-800/60 rounded-xl flex justify-between items-center text-xs">
-                <span className="text-blue-300 font-bold">📷 Bukti Transfer Pelanggan</span>
-                <button onClick={() => setSelectedBuktiUrl(ord.bukti_pembayaran_url)} className="px-2.5 py-1 bg-blue-500 text-slate-950 font-black rounded-lg text-[10px]">
-                  Lihat Bukti
-                </button>
-              </div>
-            )}
-
-            <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-xs font-black">
-              <span>Total: <strong className="text-emerald-400">Rp {ord.total_harga?.toLocaleString('id-ID')}</strong></span>
-              <button onClick={() => togglePaidStatus(ord.id, ord.is_paid)} className={`px-3 py-1 rounded-xl text-[10px] font-bold ${ord.is_paid ? 'bg-emerald-500 text-slate-950' : 'bg-rose-950 text-rose-400 border border-rose-800'}`}>
-                {ord.is_paid ? '✅ Lunas' : '❌ Belum Bayar'}
+            <div className="flex gap-2">
+              <button onClick={() => setRekapPeriode('hari')} className={`flex-1 py-2 text-xs font-bold rounded-xl ${rekapPeriode === 'hari' ? 'bg-amber-500 text-slate-950' : 'bg-slate-950 border border-slate-800'}`}>
+                Hari Ini
+              </button>
+              <button onClick={() => setRekapPeriode('minggu')} className={`flex-1 py-2 text-xs font-bold rounded-xl ${rekapPeriode === 'minggu' ? 'bg-amber-500 text-slate-950' : 'bg-slate-950 border border-slate-800'}`}>
+                7 Hari Terakhir
+              </button>
+              <button onClick={() => setRekapPeriode('bulan')} className={`flex-1 py-2 text-xs font-bold rounded-xl ${rekapPeriode === 'bulan' ? 'bg-amber-500 text-slate-950' : 'bg-slate-950 border border-slate-800'}`}>
+                30 Hari Terakhir
               </button>
             </div>
 
-            <div className="flex gap-2 pt-1">
-              {ord.status === 'pending' && <button onClick={() => updateStatus(ord.id, 'diproses')} className="flex-1 py-2 bg-amber-500 text-slate-950 text-xs font-black rounded-xl">Proses Pesanan</button>}
-              {ord.status === 'diproses' && <button onClick={() => updateStatus(ord.id, 'selesai')} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl">Selesaikan Pesanan</button>}
+            <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl text-center space-y-1">
+              <p className="text-[10px] text-slate-400 uppercase font-bold">Total Omzet ({rekapPeriode.toUpperCase()})</p>
+              <p className="text-2xl font-black text-emerald-400">Rp {totalRekapOmzet.toLocaleString('id-ID')}</p>
+              <p className="text-xs text-slate-400">{rekapOrders.length} Pesanan Selesai</p>
             </div>
+
+            <button onClick={downloadRekapCSV} className="w-full py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl shadow-md">
+              📥 Download Laporan (CSV / Excel)
+            </button>
+            <button onClick={() => setShowRekapModal(false)} className="w-full py-2 bg-slate-800 text-xs font-bold rounded-xl">
+              Tutup
+            </button>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
+
+      {/* MODAL KELOLA KODE PROMO */}
+      {showPromoModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+            <h3 className="text-base font-bold text-emerald-400">🎟️ Kelola Kode Promo Toko</h3>
+
+            <div className="space-y-2">
+              <input type="text" placeholder="Kode Promo (misal: PROMO20K)" value={newPromoCode} onChange={(e) => setNewPromoCode(e.target.value.toUpperCase())} className="w-full p-2 bg-slate-950 border border-slate-800 text-xs font-bold rounded-xl text-white uppercase" />
+              <div className="grid grid-cols-2 gap-2">
+                <select value={newPromoType} onChange={(e) => setNewPromoType(e.target.value as any)} className="p-2 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white font-bold">
+                  <option value="flat">Nominal (Rp)</option>
+                  <option value="persen">Persentase (%)</option>
+                </select>
+                <input type="number" placeholder="Nilai Diskon" value={newPromoVal} onChange={(e) => setNewPromoVal(Number(e.target.value))} className="p-2 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white" />
+              </div>
+              <input type="number" placeholder="Minimal Transaksi (Rp)" value={newPromoMin} onChange={(e) => setNewPromoMin(Number(e.target.value))} className="w-full p-2 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white" />
+              <button onClick={handleAddPromo} className="w-full py-2 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl">
+                + Tambah Promo Baru
+              </button>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-slate-800">
+              {promos.map((p) => (
+                <div key={p.id} className="p-2.5 bg-slate-950 border border-slate-800 rounded-xl flex justify-between items-center text-xs">
+                  <div>
+                    <span className="font-black text-amber-400">{p.kode}</span>
+                    <p className="text-[10px] text-slate-400">
+                      Diskon: {p.tipe_diskon === 'persen' ? `${p.nilai_diskon}%` : `Rp ${p.nilai_diskon?.toLocaleString('id-ID')}`} (Min: Rp {p.minimal_transaksi?.toLocaleString('id-ID')})
+                    </p>
+                  </div>
+                  <button onClick={() => handleDeletePromo(p.id)} className="text-rose-400 font-bold px-2 py-1 bg-rose-950/40 rounded-lg text-[10px]">
+                    Hapus
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button onClick={() => setShowPromoModal(false)} className="w-full py-2 bg-slate-800 text-xs font-bold rounded-xl">
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* MODAL PROFIL & LANGGANAN KASIR */}
       {showProfileModal && (
@@ -834,6 +1014,11 @@ export default function KasirDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* FOOTER BRANDING REYYZTORE */}
+      <footer className="text-center py-6 text-[10px] text-slate-400 font-medium border-t border-slate-800 mt-8">
+        Powered by <strong className="text-emerald-400">Reyyztore</strong> • Digital POS System
+      </footer>
     </div>
   )
 }
