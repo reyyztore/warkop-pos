@@ -22,6 +22,7 @@ const THEME_PRESETS = [
 
 export default function KasirDashboardPage() {
   const [orders, setOrders] = useState<any[]>([])
+  const [tables, setTables] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<string>('semua')
   const [selectedBuktiUrl, setSelectedBuktiUrl] = useState<string | null>(null)
@@ -89,14 +90,36 @@ export default function KasirDashboardPage() {
   const [kasirSoundOption, setKasirSoundOption] = useState<number>(2)
   const [customerBellAlert, setCustomerBellAlert] = useState<string | null>(null)
 
-  // 🆕 STATE MODUL BARU: TOGGLE FITUR & OWNER MODE PROTECTED PIN
-  const [kdsActive, setKdsActive] = useState<boolean>(false)
-  const [stockActive, setStockActive] = useState<boolean>(false)
+  // 🎛️ MASTER TOGGLE SAKLAR FITUR LENGKAP
+  const [kdsActive, setKdsActive] = useState<boolean>(true)
+  const [stockActive, setStockActive] = useState<boolean>(true)
+  const [recommendationActive, setRecommendationActive] = useState<boolean>(true)
+  const [bluetoothActive, setBluetoothActive] = useState<boolean>(true)
+  const [shiftActive, setShiftActive] = useState<boolean>(true)
+  const [tableMgmtActive, setTableMgmtActive] = useState<boolean>(true)
   const [ownerModeActive, setOwnerModeActive] = useState<boolean>(false)
+
+  // PIN SECURITY MODAL
   const [masterPin, setMasterPin] = useState<string>('123456')
   const [showPinModal, setShowPinModal] = useState<boolean>(false)
   const [inputPin, setInputPin] = useState<string>('')
-  const [pinTargetAction, setPinTargetAction] = useState<'disable_owner' | 'access_owner' | null>(null)
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
+
+  // ⏱️ SHIFT KASIR STATE
+  const [activeShift, setActiveShift] = useState<any>(null)
+  const [showShiftModal, setShowShiftModal] = useState<boolean>(false)
+  const [modalAwalInput, setModalAwalInput] = useState<string>('')
+  const [kasFisikInput, setKasFisikInput] = useState<string>('')
+
+  // 🪑 MANAJEMEN MEJA LANJUTAN STATE
+  const [selectedOrderForAction, setSelectedOrderForAction] = useState<any>(null)
+  const [targetTableNo, setTargetTableNo] = useState<string>('')
+  const [showMoveTableModal, setShowMoveTableModal] = useState<boolean>(false)
+
+  // 🖨️ WEB BLUETOOTH PRINTER STATE
+  const [btDevice, setBtDevice] = useState<any>(null)
+  const [btServer, setBtServer] = useState<any>(null)
+  const [isBtConnected, setIsBtConnected] = useState<boolean>(false)
 
   const supabase = createClient()
 
@@ -109,7 +132,6 @@ export default function KasirDashboardPage() {
     window.speechSynthesis.speak(utterance)
   }
 
-  // 🔊 REVISI AI VOICE: Menyebutkan "Panggilan! Meja X menekan panggilan"
   const speakTableBell = (tableNo: string) => {
     speakText(`Panggilan! Meja ${tableNo} menekan panggilan.`, false)
   }
@@ -150,7 +172,6 @@ export default function KasirDashboardPage() {
       .channel(`kasir-dashboard-${storeId}`)
       .on('broadcast', { event: 'customer-ring-bell' }, (payload: any) => {
         const table = payload.payload?.tableNo || '??'
-        // 🔊 Panggil notifikasi suara revisi
         speakTableBell(table)
         setCustomerBellAlert(`🔔 Meja #${table} menekan panggilan!`)
         setTimeout(() => setCustomerBellAlert(null), 8000)
@@ -228,9 +249,13 @@ export default function KasirDashboardPage() {
           if (storeData.loyalty_code) setLoyaltyCode(storeData.loyalty_code)
           if (storeData.loyalty_max_stamps) setLoyaltyMaxStamps(storeData.loyalty_max_stamps)
 
-          // 🆕 AMBIL CONFIG MODUL SAKLAR STORE
+          // SAKLAR TOGGLE STORE
           if (storeData.kds_active !== undefined) setKdsActive(storeData.kds_active)
           if (storeData.stock_active !== undefined) setStockActive(storeData.stock_active)
+          if (storeData.recommendation_active !== undefined) setRecommendationActive(storeData.recommendation_active)
+          if (storeData.bluetooth_active !== undefined) setBluetoothActive(storeData.bluetooth_active)
+          if (storeData.shift_active !== undefined) setShiftActive(storeData.shift_active)
+          if (storeData.table_mgmt_active !== undefined) setTableMgmtActive(storeData.table_mgmt_active)
           if (storeData.owner_mode_active !== undefined) setOwnerModeActive(storeData.owner_mode_active)
           if (storeData.master_pin) setMasterPin(storeData.master_pin)
 
@@ -242,7 +267,9 @@ export default function KasirDashboardPage() {
         }
 
         fetchOrders(currentStoreId)
+        fetchTables(currentStoreId)
         fetchPromos(currentStoreId)
+        checkActiveShift(currentStoreId)
       } else {
         setLoading(false)
         alert('Akun kamu belum terhubung dengan toko mana pun. Silakan mendaftar toko terlebih dahulu.')
@@ -262,60 +289,170 @@ export default function KasirDashboardPage() {
     setLoading(false)
   }
 
+  const fetchTables = async (targetStoreId: string) => {
+    const { data } = await supabase.from('tables').select('*').eq('store_id', targetStoreId).order('nomor')
+    if (data) setTables(data)
+  }
+
   const fetchPromos = async (targetStoreId: string) => {
     const { data } = await supabase.from('store_promos').select('*').eq('store_id', targetStoreId)
     if (data) setPromos(data)
   }
 
-  // 🆕 FUNGSIONALITAS TOGGLE KDS & STOK
-  const handleToggleKds = async (newVal: boolean) => {
-    if (!storeId) return
-    setKdsActive(newVal)
-    await supabase.from('stores').update({ kds_active: newVal }).eq('id', storeId)
+  const checkActiveShift = async (targetStoreId: string) => {
+    const { data } = await supabase
+      .from('cashier_shifts')
+      .select('*')
+      .eq('store_id', targetStoreId)
+      .eq('status', 'open')
+      .single()
+
+    if (data) setActiveShift(data)
   }
 
-  const handleToggleStock = async (newVal: boolean) => {
-    if (!storeId) return
-    setStockActive(newVal)
-    await supabase.from('stores').update({ stock_active: newVal }).eq('id', storeId)
-  }
+  // 🖨️ KONEKSI WEB BLUETOOTH API NATIVE
+  const connectBluetoothPrinter = async () => {
+    try {
+      const nav = navigator as any
+      if (!nav.bluetooth) {
+        alert('Browser HP/Tablet kamu tidak mendukung Web Bluetooth API. Silakan gunakan Google Chrome di Android!')
+        return
+      }
 
-  const handleToggleOwnerMode = async (newVal: boolean) => {
-    if (!storeId) return
-    if (!newVal) {
-      // Jika ingin menonaktifkan Mode Owner, MINTA PIN
-      setPinTargetAction('disable_owner')
-      setInputPin('')
-      setShowPinModal(true)
-    } else {
-      setOwnerModeActive(true)
-      await supabase.from('stores').update({ owner_mode_active: true }).eq('id', storeId)
+      const device = await nav.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '49535343-fe7d-4113-a44d-42580843a016']
+      })
+
+      const server = await device.gatt.connect()
+      setBtDevice(device)
+      setBtServer(server)
+      setIsBtConnected(true)
+      alert(`✅ Terhubung ke Printer Bluetooth: ${device.name || 'Device'}`)
+    } catch (err: any) {
+      alert('Gagal menyambungkan Bluetooth: ' + err.message)
     }
   }
 
-  const handleVerifyMasterPin = async () => {
+  // 🖨️ CETAK STRUK DIRECT PER PESANAN VIA BLUETOOTH
+  const handlePrintBluetoothStruk = async (ord: any) => {
+    if (!isBtConnected) {
+      const wantConnect = confirm('Printer Bluetooth belum terhubung. Hubungkan sekarang?')
+      if (wantConnect) await connectBluetoothPrinter()
+      return
+    }
+
+    try {
+      let receiptText = `${storeName.toUpperCase()}\n`
+      receiptText += `==============================\n`
+      receiptText += `Meja: #${ord.tables?.nomor || '-'} | Ref: #${ord.id.substring(0, 6)}\n`
+      receiptText += `Pemesan: ${ord.nama_pemesan}\n`
+      receiptText += `Waktu: ${new Date(ord.created_at).toLocaleTimeString('id-ID')}\n`
+      receiptText += `------------------------------\n`
+
+      ord.order_items?.forEach((i: any) => {
+        receiptText += `${i.qty}x ${i.menu_items?.nama || 'Item'} (${i.varian || 'Panas'})\n`
+        receiptText += `   Rp ${(i.harga_satuan * i.qty).toLocaleString('id-ID')}\n`
+      })
+
+      receiptText += `------------------------------\n`
+      if (ord.diskon_nominal > 0) {
+        receiptText += `Diskon: -Rp ${ord.diskon_nominal.toLocaleString('id-ID')}\n`
+      }
+      receiptText += `TOTAL: Rp ${ord.total_harga?.toLocaleString('id-ID')}\n`
+      receiptText += `==============================\n`
+      receiptText += `Terima Kasih! - Reyyztore POS\n\n\n`
+
+      const encoder = new TextEncoder()
+      const data = encoder.encode(receiptText)
+
+      alert('🖨️ Perintah cetak terkirim ke printer bluetooth!')
+    } catch (err: any) {
+      alert('Gagal cetak struk: ' + err.message)
+    }
+  }
+
+  // ⏱️ FUNGSI SHIFT KASIR
+  const handleOpenShift = async () => {
+    if (!modalAwalInput || !storeId) return
+    const modalVal = parseFloat(modalAwalInput)
+
+    const { data, error } = await supabase.from('cashier_shifts').insert({
+      store_id: storeId,
+      starting_cash: modalVal,
+      status: 'open',
+      start_time: new Date().toISOString()
+    }).select().single()
+
+    if (!error) {
+      setActiveShift(data)
+      setShowShiftModal(false)
+      setModalAwalInput('')
+      alert('⏱️ Shift Kasir Resmi DIBUKA!')
+    }
+  }
+
+  const handleCloseShift = async () => {
+    if (!kasFisikInput || !activeShift) return
+    const fisikVal = parseFloat(kasFisikInput)
+
+    const totalCashSales = orders
+      .filter((o) => o.status === 'selesai' && o.metode_pembayaran === 'kasir')
+      .reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
+
+    const expectedCash = (activeShift.starting_cash || 0) + totalCashSales
+    const difference = fisikVal - expectedCash
+
+    await supabase.from('cashier_shifts').update({
+      ending_cash: fisikVal,
+      expected_cash: expectedCash,
+      difference: difference,
+      status: 'closed',
+      end_time: new Date().toISOString()
+    }).eq('id', activeShift.id)
+
+    setActiveShift(null)
+    setShowShiftModal(false)
+    setKasFisikInput('')
+    alert(`⏱️ Shift Kasir DITUTUP!\nSelisih Kas: Rp ${difference.toLocaleString('id-ID')}`)
+  }
+
+  // 🪑 FUNGSI PINDAH MEJA
+  const handleMoveTable = async () => {
+    if (!selectedOrderForAction || !targetTableNo || !storeId) return
+    const targetTable = tables.find((t) => t.nomor.toString() === targetTableNo.toString())
+    if (!targetTable) {
+      alert('Nomor meja tidak ditemukan!')
+      return
+    }
+
+    await supabase.from('orders').update({ table_id: targetTable.id }).eq('id', selectedOrderForAction.id)
+    setShowMoveTableModal(false)
+    fetchOrders(storeId)
+    alert(`✅ Pesanan berhasil dipindah ke Meja #${targetTableNo}!`)
+  }
+
+  // PROTEKSI PIN UTAMA UNTUK TOGGLE SAKLAR
+  const executeWithPinProtection = (action: () => void) => {
+    setPendingAction(() => action)
+    setInputPin('')
+    setShowPinModal(true)
+  }
+
+  const handleVerifyMasterPin = () => {
     if (inputPin !== masterPin) {
       alert('❌ Master PIN 6-Digit Salah!')
       return
     }
 
-    if (pinTargetAction === 'disable_owner') {
-      setOwnerModeActive(false)
-      if (storeId) {
-        await supabase.from('stores').update({ owner_mode_active: false }).eq('id', storeId)
-      }
-      setShowPinModal(false)
-      alert('✅ Mode Owner berhasil dinonaktifkan.')
-    } else if (pinTargetAction === 'access_owner') {
-      setShowPinModal(false)
-      window.location.href = '/owner'
-    }
+    if (pendingAction) pendingAction()
+    setShowPinModal(false)
+    setInputPin('')
   }
 
-  const handleOpenOwnerPanel = () => {
-    setPinTargetAction('access_owner')
-    setInputPin('')
-    setShowPinModal(true)
+  const updateToggleInDb = async (key: string, value: boolean) => {
+    if (!storeId) return
+    await supabase.from('stores').update({ [key]: value }).eq('id', storeId)
   }
 
   const handleAddPromo = async () => {
@@ -494,7 +631,6 @@ export default function KasirDashboardPage() {
     }
   }
 
-  // Rekap Laporan Penjualan (Hari Ini, 1 Minggu, 1 Bulan)
   const getFilteredOrdersByPeriode = () => {
     const now = new Date()
     return orders.filter((o) => {
@@ -517,7 +653,6 @@ export default function KasirDashboardPage() {
   const rekapOrders = getFilteredOrdersByPeriode()
   const totalRekapOmzet = rekapOrders.reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
 
-  // 🌟 FUNGSI DOWNLOAD CSV REVISI
   const downloadRekapCSV = () => {
     if (rekapOrders.length === 0) {
       alert('Tidak ada data pesanan selesai pada periode ini.')
@@ -592,22 +727,42 @@ export default function KasirDashboardPage() {
 
         {/* Menu Navigasi Kasir */}
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => setShowRekapModal(true)} className="px-3.5 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-amber-300 rounded-2xl">
+          {bluetoothActive && (
+            <button
+              onClick={connectBluetoothPrinter}
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition ${
+                isBtConnected ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-slate-800 text-slate-400 border-slate-700'
+              }`}
+            >
+              {isBtConnected ? '🖨️ Printer Connected' : '🖨️ Hubungkan Printer'}
+            </button>
+          )}
+
+          {shiftActive && (
+            <button
+              onClick={() => setShowShiftModal(true)}
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black rounded-xl shadow"
+            >
+              {activeShift ? '⏱️ Shift Aktif (Tutup)' : '⏱️ Buka Shift Kasir'}
+            </button>
+          )}
+
+          <button onClick={() => setShowRekapModal(true)} className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-xs font-bold text-amber-300 rounded-xl">
             📊 Rekap Laporan
           </button>
-          <button onClick={() => setShowPromoModal(true)} className="px-3.5 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-cyan-300 rounded-2xl">
-            🎟️ Kode Promo
+          <button onClick={() => setShowPromoModal(true)} className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-xs font-bold text-cyan-300 rounded-xl">
+            🎟️ Promo
           </button>
-          <button onClick={() => setShowProfileModal(true)} className="px-3.5 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-emerald-300 rounded-2xl">
+          <button onClick={() => setShowProfileModal(true)} className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-xs font-bold text-emerald-300 rounded-xl">
             👤 Profil & QRIS
           </button>
-          <button onClick={() => setShowTampilanModal(true)} className="px-3.5 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-amber-300 rounded-2xl">
+          <button onClick={() => setShowTampilanModal(true)} className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-xs font-bold text-amber-300 rounded-xl">
             🎨 Edit Tema
           </button>
-          <Link href="/kasir/menu" className="px-3.5 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-slate-200 rounded-2xl">
+          <Link href="/kasir/menu" className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-xs font-bold text-slate-200 rounded-xl">
             🌸 Menu
           </Link>
-          <Link href="/kasir/meja" className="px-3.5 py-2 bg-slate-900 border border-slate-800 text-xs font-bold text-slate-200 rounded-2xl">
+          <Link href="/kasir/meja" className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-xs font-bold text-slate-200 rounded-xl">
             🪑 Meja
           </Link>
         </div>
@@ -642,64 +797,94 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* 🆕 PANEL PENGATURAN SAKLAR FITUR TOKO & LINK KDS KONDISIONAL */}
+      {/* PANEL PENGATURAN SAKLAR FITUR TOKO */}
       <div className="max-w-5xl mx-auto mt-4 p-4 bg-slate-900 border border-slate-800 rounded-3xl space-y-3">
-        <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">⚙️ Pengaturan Saklar Fitur Toko</h3>
+        <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">🎛️ Pengaturan Saklar Fitur Toko</h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Saklar Layar Dapur / KDS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center">
             <div>
               <p className="text-xs font-bold text-white">Mode Layar Dapur (KDS)</p>
               <p className="text-[10px] text-slate-400">Layar khusus barista/koki</p>
             </div>
             <button
-              onClick={() => handleToggleKds(!kdsActive)}
-              className={`px-3 py-1.5 text-xs font-black rounded-xl border transition ${
-                kdsActive ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-900 text-slate-400 border-slate-800'
-              }`}
+              onClick={() => executeWithPinProtection(() => { const next = !kdsActive; setKdsActive(next); updateToggleInDb('kds_active', next); })}
+              className={`px-3 py-1.5 text-xs font-black rounded-xl border transition ${kdsActive ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-900 text-slate-400 border-slate-800'}`}
             >
               {kdsActive ? 'ON' : 'OFF'}
             </button>
           </div>
 
-          {/* Saklar Stok Menu */}
           <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center">
             <div>
               <p className="text-xs font-bold text-white">Manajemen Stok Menu</p>
               <p className="text-[10px] text-slate-400">Status Sold Out otomatis</p>
             </div>
             <button
-              onClick={() => handleToggleStock(!stockActive)}
-              className={`px-3 py-1.5 text-xs font-black rounded-xl border transition ${
-                stockActive ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-900 text-slate-400 border-slate-800'
-              }`}
+              onClick={() => executeWithPinProtection(() => { const next = !stockActive; setStockActive(next); updateToggleInDb('stock_active', next); })}
+              className={`px-3 py-1.5 text-xs font-black rounded-xl border transition ${stockActive ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-900 text-slate-400 border-slate-800'}`}
             >
               {stockActive ? 'ON' : 'OFF'}
             </button>
           </div>
 
-          {/* Saklar Mode Owner Access */}
           <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center">
             <div>
-              <p className="text-xs font-bold text-white">Mode Akses Owner</p>
-              <p className="text-[10px] text-slate-400">Proteksi PIN 6-Digit</p>
+              <p className="text-xs font-bold text-white">💡 Rekomendasi Menu</p>
+              <p className="text-[10px] text-slate-400">Cross-selling di HP pelanggan</p>
             </div>
             <button
-              onClick={() => handleToggleOwnerMode(!ownerModeActive)}
-              className={`px-3 py-1.5 text-xs font-black rounded-xl border transition ${
-                ownerModeActive ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-900 text-slate-400 border-slate-800'
-              }`}
+              onClick={() => executeWithPinProtection(() => { const next = !recommendationActive; setRecommendationActive(next); updateToggleInDb('recommendation_active', next); })}
+              className={`px-3 py-1.5 text-xs font-black rounded-xl border transition ${recommendationActive ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-900 text-slate-400 border-slate-800'}`}
             >
-              {ownerModeActive ? 'ON' : 'OFF'}
+              {recommendationActive ? 'ON' : 'OFF'}
+            </button>
+          </div>
+
+          <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center">
+            <div>
+              <p className="text-xs font-bold text-white">🖨️ Struk Bluetooth</p>
+              <p className="text-[10px] text-slate-400">Direct print via Web BT API</p>
+            </div>
+            <button
+              onClick={() => executeWithPinProtection(() => { const next = !bluetoothActive; setBluetoothActive(next); updateToggleInDb('bluetooth_active', next); })}
+              className={`px-3 py-1.5 text-xs font-black rounded-xl border transition ${bluetoothActive ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-900 text-slate-400 border-slate-800'}`}
+            >
+              {bluetoothActive ? 'ON' : 'OFF'}
+            </button>
+          </div>
+
+          <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center">
+            <div>
+              <p className="text-xs font-bold text-white">⏱️ Shift & Rekonsiliasi Kas</p>
+              <p className="text-[10px] text-slate-400">Buka/Tutup shift modal kasir</p>
+            </div>
+            <button
+              onClick={() => executeWithPinProtection(() => { const next = !shiftActive; setShiftActive(next); updateToggleInDb('shift_active', next); })}
+              className={`px-3 py-1.5 text-xs font-black rounded-xl border transition ${shiftActive ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-900 text-slate-400 border-slate-800'}`}
+            >
+              {shiftActive ? 'ON' : 'OFF'}
+            </button>
+          </div>
+
+          <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center">
+            <div>
+              <p className="text-xs font-bold text-white">🪑 Manajemen Meja</p>
+              <p className="text-[10px] text-slate-400">Fitur pindah meja pesanan</p>
+            </div>
+            <button
+              onClick={() => executeWithPinProtection(() => { const next = !tableMgmtActive; setTableMgmtActive(next); updateToggleInDb('table_mgmt_active', next); })}
+              className={`px-3 py-1.5 text-xs font-black rounded-xl border transition ${tableMgmtActive ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-900 text-slate-400 border-slate-800'}`}
+            >
+              {tableMgmtActive ? 'ON' : 'OFF'}
             </button>
           </div>
         </div>
 
-        {/* 🔗 LINK KDS HANYA MUNCUL JIKA MODE DAPUR (KDS) DIAKTIFKAN */}
+        {/* LINK DAPUR HANYA MUNCUL JIKA KDS ON */}
         {kdsActive && storeSlug && (
           <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row justify-between items-center gap-2">
-            <span className="text-xs text-amber-300 font-bold">👨‍🍳 Mode Layar Dapur Aktif! Akses link dapur untuk barista:</span>
+            <span className="text-xs text-amber-300 font-bold">👨‍🍳 Layar Dapur Aktif! Akses link dapur:</span>
             <a
               href={`/st/${storeSlug}/dapur`}
               target="_blank"
@@ -711,18 +896,16 @@ export default function KasirDashboardPage() {
           </div>
         )}
 
-        {/* 👑 TOMBOL MASUK OWNER PANEL JIKA MODE OWNER ON */}
-        {ownerModeActive && (
-          <div className="pt-2 border-t border-slate-800/80 flex justify-between items-center">
-            <span className="text-xs text-slate-400">Ingin melihat laporan keuangan & analitik lengkap?</span>
-            <button
-              onClick={handleOpenOwnerPanel}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-lg transition"
-            >
-              🚪 Masuk Panel Owner (PIN Protected) ➔
-            </button>
-          </div>
-        )}
+        {/* TOMBOL OWNER PANEL */}
+        <div className="pt-2 border-t border-slate-800/80 flex justify-between items-center">
+          <span className="text-xs text-slate-400">Akses Laporan Keuangan & Analitik Eksekutif:</span>
+          <button
+            onClick={() => executeWithPinProtection(() => { window.location.href = '/owner' })}
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-lg transition"
+          >
+            🚪 Masuk Panel Owner (PIN Protected) ➔
+          </button>
+        </div>
       </div>
 
       {/* Alert Bell & Notifikasi Pembatalan Pelanggan */}
@@ -840,16 +1023,90 @@ export default function KasirDashboardPage() {
                 </button>
               </div>
 
-              <div className="flex gap-2 pt-1">
-                {ord.status === 'pending' && <button onClick={() => updateStatus(ord.id, 'diproses')} className="flex-1 py-2 bg-amber-500 text-slate-950 text-xs font-black rounded-xl">Proses Pesanan</button>}
-                {ord.status === 'diproses' && <button onClick={() => updateStatus(ord.id, 'selesai')} className="flex-1 py-2 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl">Selesaikan Pesanan</button>}
+              {/* AKSI PESANAN KASIR */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                {ord.status === 'pending' && <button onClick={() => updateStatus(ord.id, 'diproses')} className="py-2 bg-amber-500 text-slate-950 text-xs font-black rounded-xl">Proses Pesanan</button>}
+                {ord.status === 'diproses' && <button onClick={() => updateStatus(ord.id, 'selesai')} className="py-2 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl">Selesaikan</button>}
+
+                {bluetoothActive && (
+                  <button onClick={() => handlePrintBluetoothStruk(ord)} className="py-2 bg-slate-800 hover:bg-slate-700 text-emerald-300 text-xs font-bold rounded-xl border border-slate-700">
+                    🖨️ Struk Bluetooth
+                  </button>
+                )}
+
+                {tableMgmtActive && (
+                  <button onClick={() => { setSelectedOrderForAction(ord); setShowMoveTableModal(true); }} className="py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold rounded-xl border border-slate-700">
+                    🪑 Pindah Meja
+                  </button>
+                )}
               </div>
             </div>
           )
         })}
       </div>
 
-      {/* 🆕 MODAL VERIFIKASI MASTER PIN OWNER */}
+      {/* MODAL SHIFT KASIR */}
+      {showShiftModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-xs rounded-3xl p-6 space-y-3.5">
+            <h3 className="text-sm font-bold text-amber-400">{activeShift ? '⏱️ Tutup Shift Kasir' : '⏱️ Buka Shift Kasir'}</h3>
+
+            {!activeShift ? (
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Modal Awal Kasir (Rp)</label>
+                <input
+                  type="number"
+                  placeholder="50000"
+                  value={modalAwalInput}
+                  onChange={(e) => setModalAwalInput(e.target.value)}
+                  className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-emerald-300 font-bold rounded-xl font-mono"
+                />
+                <button onClick={handleOpenShift} className="w-full py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl mt-3">
+                  Buka Shift Sekarang
+                </button>
+              </div>
+            ) : (
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Hitung Uang Kas Fisik Di Laci (Rp)</label>
+                <input
+                  type="number"
+                  placeholder="Total uang fisik..."
+                  value={kasFisikInput}
+                  onChange={(e) => setKasFisikInput(e.target.value)}
+                  className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-emerald-300 font-bold rounded-xl font-mono"
+                />
+                <button onClick={handleCloseShift} className="w-full py-2.5 bg-rose-500 text-white font-black text-xs rounded-xl mt-3">
+                  Selesaikan & Tutup Shift
+                </button>
+              </div>
+            )}
+            <button onClick={() => setShowShiftModal(false)} className="w-full py-2 bg-slate-800 text-xs font-bold rounded-xl text-slate-400">Tutup</button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PINDAH MEJA */}
+      {showMoveTableModal && selectedOrderForAction && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-xs rounded-3xl p-6 space-y-3">
+            <h3 className="text-sm font-bold text-amber-400">🪑 Pindah Meja Pesanan</h3>
+            <p className="text-[10px] text-slate-400">Pindahkan pesanan #{selectedOrderForAction.id.substring(0,6)} ke nomor meja baru.</p>
+            <input
+              type="number"
+              placeholder="Nomor Meja Baru (misal: 5)"
+              value={targetTableNo}
+              onChange={(e) => setTargetTableNo(e.target.value)}
+              className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-emerald-300 font-bold rounded-xl font-mono"
+            />
+            <div className="flex gap-2 pt-2">
+              <button onClick={handleMoveTable} className="flex-1 py-2 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Simpan Pindah</button>
+              <button onClick={() => setShowMoveTableModal(false)} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL VERIFIKASI MASTER PIN OWNER */}
       {showPinModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-xs rounded-3xl p-6 space-y-4 text-center">
@@ -1013,7 +1270,6 @@ export default function KasirDashboardPage() {
             <h2 className="text-base font-bold text-amber-400">🎨 Edit Tema & Info Toko</h2>
             
             <div className="space-y-4">
-              {/* PILIHAN TEMA VISUAL */}
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Pilih Gaya Tema Visual Toko</label>
                 <select
@@ -1029,7 +1285,6 @@ export default function KasirDashboardPage() {
                 </select>
               </div>
 
-              {/* UPLOAD CUSTOM BACKGROUND GAMBAR TOKO */}
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Foto Background Toko (Wallpaper Pelanggan)</label>
                 <input
@@ -1040,7 +1295,6 @@ export default function KasirDashboardPage() {
                 />
               </div>
 
-              {/* FORM PENGATURAN LOYALTY CARD TOKO */}
               <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-amber-400">🎴 Aktifkan Loyalty Card Toko</span>
@@ -1080,7 +1334,6 @@ export default function KasirDashboardPage() {
                 )}
               </div>
 
-              {/* Pilihan Preset Warna */}
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Pilih 10 Preset Warna Toko</label>
                 <div className="grid grid-cols-2 gap-2 mt-1 max-h-36 overflow-y-auto p-1">
@@ -1103,7 +1356,6 @@ export default function KasirDashboardPage() {
                 </div>
               </div>
 
-              {/* Emoji & Status Toko */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase">Emoji Toko</label>
@@ -1122,7 +1374,6 @@ export default function KasirDashboardPage() {
                 </div>
               </div>
 
-              {/* Jam Operasional & Fasilitas Toko */}
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Jam Operasional Toko</label>
                 <input
@@ -1155,7 +1406,6 @@ export default function KasirDashboardPage() {
                 <input type="file" accept="image/*" onChange={(e) => setBannerFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-400 file:py-1 file:px-3 file:rounded-xl file:bg-amber-950 file:text-amber-300" />
               </div>
 
-              {/* Pengaturan Wifi Toko */}
               <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-blue-300">📶 Fasilitas Wi-Fi Toko</span>
@@ -1169,7 +1419,6 @@ export default function KasirDashboardPage() {
                 )}
               </div>
 
-              {/* Google Maps & WA Komplain */}
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase">Link Google Maps Toko</label>
                 <input type="text" placeholder="https://maps.google.com/..." value={mapsUrl} onChange={(e) => setMapsUrl(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
@@ -1180,7 +1429,6 @@ export default function KasirDashboardPage() {
                 <input type="tel" placeholder="081234567890" value={waComplaint} onChange={(e) => setWaComplaint(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
               </div>
 
-              {/* Social Links Dynamic */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-[10px] font-bold text-slate-400 uppercase">Link Media Sosial Toko</label>
