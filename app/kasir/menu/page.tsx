@@ -23,6 +23,11 @@ export default function KasirMenuPage() {
   const [hargaDinginMenu, setHargaDinginMenu] = useState('')
   const [selectedCatId, setSelectedCatId] = useState('')
   const [labelMenu, setLabelMenu] = useState('') // 🌟 State baru untuk Label Badge Menu
+  
+  // 🆕 STATE BARU: STOK & HPP (MODAL BAHAN BAKU)
+  const [stokMenu, setStokMenu] = useState<string>('0')
+  const [hppMenu, setHppMenu] = useState<string>('0')
+
   const [fotoFile, setFotoFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -62,7 +67,7 @@ export default function KasirMenuPage() {
     setLoading(false)
   }
 
-  // TAMBAH / EDIT MENU (DENGAN LABEL BADGE DAN HARGA PANAS/DINGIN)
+  // TAMBAH / EDIT MENU (DENGAN LABEL BADGE, HARGA PANAS/DINGIN, STOK & HPP)
   const handleSaveMenu = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!storeId) return
@@ -85,6 +90,11 @@ export default function KasirMenuPage() {
 
       const mainHarga = parseInt(hargaMenu)
       const dinginHarga = hargaDinginMenu ? parseInt(hargaDinginMenu) : null
+      const parsedStok = parseInt(stokMenu) || 0
+      const parsedHpp = parseInt(hppMenu) || 0
+
+      // 🌟 Jika stok 0, otomatis tandai status is_sold_out
+      const isSoldOutState = parsedStok <= 0
 
       const menuDataPayload = {
         store_id: storeId,
@@ -94,9 +104,12 @@ export default function KasirMenuPage() {
         harga: mainHarga,
         harga_panas: mainHarga,
         harga_dingin: dinginHarga,
+        stok: parsedStok,
+        hpp: parsedHpp,
+        is_sold_out: isSoldOutState,
         label: labelMenu.trim() || null, // 🌟 Simpan label badge menu
         foto_url: fotoUrl,
-        tersedia: editingMenuItem ? editingMenuItem.tersedia : true,
+        tersedia: editingMenuItem ? (parsedStok > 0 ? editingMenuItem.tersedia : false) : true,
       }
 
       if (editingMenuItem) {
@@ -119,7 +132,10 @@ export default function KasirMenuPage() {
   // TOGGLE STOK TERSEDIA / HABIS
   const toggleAvailable = async (id: string, currentStatus: boolean) => {
     if (!storeId) return
-    await supabase.from('menu_items').update({ tersedia: !currentStatus }).eq('id', id)
+    await supabase.from('menu_items').update({ 
+      tersedia: !currentStatus,
+      is_sold_out: currentStatus // jika status sekarang true (tersedia), dipindah jadi sold out
+    }).eq('id', id)
     fetchData(storeId)
   }
 
@@ -155,6 +171,8 @@ export default function KasirMenuPage() {
     setHargaDinginMenu('')
     setSelectedCatId('')
     setLabelMenu('')
+    setStokMenu('0')
+    setHppMenu('0')
     setFotoFile(null)
   }
 
@@ -166,6 +184,8 @@ export default function KasirMenuPage() {
     setHargaDinginMenu(item.harga_dingin ? item.harga_dingin.toString() : '')
     setSelectedCatId(item.category_id)
     setLabelMenu(item.label || '')
+    setStokMenu((item.stok ?? 0).toString())
+    setHppMenu((item.hpp ?? 0).toString())
     setShowMenuModal(true)
   }
 
@@ -177,7 +197,7 @@ export default function KasirMenuPage() {
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div>
             <Link href="/kasir" className="text-xs text-emerald-400 font-bold hover:underline">← Kembali ke Dasbor</Link>
-            <h1 className="text-xl font-black text-white mt-1">🌸 Kelola Menu & Label Promosi</h1>
+            <h1 className="text-xl font-black text-white mt-1">🌸 Kelola Menu, Stok & HPP Modal</h1>
           </div>
 
           <div className="flex gap-2">
@@ -227,15 +247,26 @@ export default function KasirMenuPage() {
                         </p>
                       )}
                     </div>
+
+                    {/* 🆕 Display Stok & Modal HPP */}
+                    <div className="flex gap-2 text-[10px] text-slate-400 mt-1">
+                      <span className={`font-mono font-bold ${item.stok > 0 ? 'text-emerald-300' : 'text-rose-400'}`}>
+                        📦 Stok: {item.stok ?? 0}
+                      </span>
+                      <span>•</span>
+                      <span className="font-mono text-slate-400">
+                         Modal: Rp {(item.hpp || 0).toLocaleString('id-ID')}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex flex-col items-end gap-1.5">
                   <button
                     onClick={() => toggleAvailable(item.id, item.tersedia)}
-                    className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${item.tersedia ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}`}
+                    className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase ${item.tersedia && !item.is_sold_out ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'}`}
                   >
-                    {item.tersedia ? 'Tersedia' : 'Habis'}
+                    {item.tersedia && !item.is_sold_out ? 'Tersedia' : 'Sold Out'}
                   </button>
 
                   <div className="flex gap-1.5 text-xs">
@@ -250,7 +281,7 @@ export default function KasirMenuPage() {
 
       </div>
 
-      {/* Modal Tambah/Edit Menu (Dengan Input Label Badge & Harga) */}
+      {/* Modal Tambah/Edit Menu (Dengan Input Label Badge, Harga, Stok & HPP) */}
       {showMenuModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <form onSubmit={handleSaveMenu} className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-3.5 max-h-[90vh] overflow-y-auto">
@@ -295,6 +326,31 @@ export default function KasirMenuPage() {
               <div>
                 <label className="text-[10px] font-bold text-cyan-400 uppercase">🧊 Harga Dingin (Opsional)</label>
                 <input type="number" value={hargaDinginMenu} onChange={(e) => setHargaDinginMenu(e.target.value)} placeholder="17000" className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white font-bold" />
+              </div>
+            </div>
+
+            {/* 🆕 INPUT STOK FISIK & MODAL HPP */}
+            <div className="grid grid-cols-2 gap-2 p-3 bg-slate-950 border border-slate-800 rounded-2xl">
+              <div>
+                <label className="text-[10px] font-bold text-emerald-400 uppercase">📦 Jumlah Stok Fisik</label>
+                <input
+                  type="number"
+                  value={stokMenu}
+                  onChange={(e) => setStokMenu(e.target.value)}
+                  placeholder="50"
+                  className="w-full mt-1 p-2 bg-slate-900 border border-slate-800 text-xs rounded-xl text-emerald-300 font-bold font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-indigo-400 uppercase">🧮 HPP / Modal Bahan (Rp)</label>
+                <input
+                  type="number"
+                  value={hppMenu}
+                  onChange={(e) => setHppMenu(e.target.value)}
+                  placeholder="6000"
+                  className="w-full mt-1 p-2 bg-slate-900 border border-slate-800 text-xs rounded-xl text-indigo-300 font-bold font-mono"
+                />
               </div>
             </div>
 
