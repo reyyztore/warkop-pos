@@ -17,7 +17,7 @@ function DynamicStoreContent() {
   const [showInstallBtn, setShowInstallBtn] = useState<boolean>(true)
   const [showScanNotice, setShowScanNotice] = useState<boolean>(true)
 
-  // Toko State Pertama
+  // Toko State
   const [storeData, setStoreData] = useState<any>(null)
   const [storeId, setStoreId] = useState<string>('')
   const [storeName, setStoreName] = useState('Warung Kopi')
@@ -109,7 +109,7 @@ function DynamicStoreContent() {
   const [inputPromoCode, setInputPromoCode] = useState('')
   const [appliedPromo, setAppliedPromo] = useState<any>(null)
 
-  // Data Menu & Cart Baru
+  // Data Menu & Cart
   const [menuItems, setMenuItems] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [cart, setCart] = useState<{ [key: string]: { qty: number; varian: 'panas' | 'dingin'; catatan: string; menuId: string } }>({})
@@ -495,17 +495,30 @@ function DynamicStoreContent() {
     if (store.recommendation_active !== undefined) setRecommendationActive(store.recommendation_active)
   }
 
+  // SAFE FETCH ORDERS WITH FALLBACK (Mencegah Item Hilang di Pelanggan)
   const fetchMyOrders = async (targetStoreId: string, nameFilter: string) => {
     if (!targetStoreId || !nameFilter) return
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('orders')
-      .select('*, tables(nomor), order_items(*, menu_items(nama))')
+      .select('*, tables(nomor), order_items(*, menu_items(*))')
       .eq('store_id', targetStoreId)
       .eq('nama_pemesan', nameFilter)
       .order('created_at', { ascending: false })
 
-    if (data) setMyOrders(data)
+    if (error) {
+      console.error('Fetch my orders with join failed, running fallback:', error)
+      const { data: fallbackData } = await supabase
+        .from('orders')
+        .select('*, tables(nomor), order_items(*)')
+        .eq('store_id', targetStoreId)
+        .eq('nama_pemesan', nameFilter)
+        .order('created_at', { ascending: false })
+
+      if (fallbackData) setMyOrders(fallbackData)
+    } else if (data) {
+      setMyOrders(data)
+    }
   }
 
   const fetchUserLoyalty = async (targetStoreId: string, userId: string) => {
@@ -644,7 +657,7 @@ function DynamicStoreContent() {
     Object.values(cart).forEach((item) => {
       const menu = menuItems.find((m) => m.id === item.menuId)
       const hargaSatuan = item.varian === 'dingin' && menu?.harga_dingin ? menu.harga_dingin : (menu?.harga_panas || menu?.harga || 0)
-      text += `• ${item.qty}x ${menu?.nama} (${item.varian}) = Rp ${(hargaSatuan * item.qty).toLocaleString('id-ID')}\n`
+      text += `• ${item.qty}x ${menu?.nama || 'Menu'} (${item.varian}) = Rp ${(hargaSatuan * item.qty).toLocaleString('id-ID')}\n`
       if (item.catatan) text += `  _Catatan: ${item.catatan}_\n`
     })
 
@@ -697,6 +710,7 @@ function DynamicStoreContent() {
 
       if (orderErr) throw orderErr
 
+      // MENYIMPAN NAMA MENU MANUAL/BACKUP AGAR TIDAK HILANG DI KASIR/STRUK
       const orderItems = Object.entries(cart).map(([key, item]) => {
         const menu = menuItems.find((m) => m.id === item.menuId)
         const hargaSatuan = item.varian === 'dingin' && menu?.harga_dingin ? menu.harga_dingin : (menu?.harga_panas || menu?.harga || 0)
@@ -708,6 +722,8 @@ function DynamicStoreContent() {
           varian: item.varian,
           catatan: item.catatan || null,
           hpp_satuan: menu?.hpp || 0,
+          nama_menu_manual: menu?.nama || 'Item Menu',
+          nama_item: menu?.nama || 'Item Menu',
         }
       })
 
@@ -789,7 +805,8 @@ function DynamicStoreContent() {
     text += `*DETAIL MENU:*\n`
 
     ord.order_items?.forEach((i: any) => {
-      text += `• ${i.qty}x ${i.menu_items?.nama} (${i.varian || 'Panas'}) = Rp ${(i.harga_satuan * i.qty).toLocaleString('id-ID')}\n`
+      const itemNama = i.menu_items?.nama || i.nama_menu_manual || i.nama_item || 'Item'
+      text += `• ${i.qty}x ${itemNama} (${i.varian || 'Panas'}) = Rp ${(i.harga_satuan * i.qty).toLocaleString('id-ID')}\n`
       if (i.catatan) text += `  _Catatan: ${i.catatan}_\n`
     })
 
@@ -1834,12 +1851,11 @@ function DynamicStoreContent() {
         )}
       </div>
 
-      {/* Floating Bottom Cart, Kode Promo & Rekomendasi Menu Pendamping */}
+      {/* Floating Bottom Cart */}
       {activeNav === 'menu' && Object.keys(cart).length > 0 && (
         <div className="fixed bottom-20 left-4 right-4 max-w-md mx-auto z-30">
           <div className={`${themeClasses.card} p-3.5 space-y-3 shadow-2xl backdrop-blur-xl border border-white/80`}>
             
-            {/* 💡 WIDGET REKOMENDASI MENU PENDAMPING (CROSS-SELLING) */}
             {recommendationActive && recommendedItems.length > 0 && (
               <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-1.5">
                 <p className="text-[10px] font-black text-amber-700 uppercase tracking-wider">💡 Pas banget dikombinasikan dengan:</p>
@@ -1908,7 +1924,7 @@ function DynamicStoreContent() {
         </div>
       )}
 
-      {/* MODAL ULASAN & FEEDBACK PELANGGAN */}
+      {/* MODAL ULASAN */}
       {showReviewModal && reviewOrderTarget && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white text-slate-900 border border-slate-200 w-full max-w-sm rounded-3xl p-6 text-center space-y-4 shadow-2xl">
@@ -1968,7 +1984,7 @@ function DynamicStoreContent() {
         </div>
       )}
 
-      {/* MODAL STRUK INTERAKTIF & CUSTOM BACKGROUND */}
+      {/* MODAL STRUK INTERAKTIF DENGAN FALLBACK NAMA ITEM SAFE */}
       {selectedStrukOrder && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -2019,16 +2035,19 @@ function DynamicStoreContent() {
                     weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
                   })} WIB
                 </p>
-                <p className="text-[10px] text-slate-600 font-sans">Meja: #{selectedStrukOrder.tables?.nomor} | Pemesan: {selectedStrukOrder.nama_pemesan}</p>
+                <p className="text-[10px] text-slate-600 font-sans">Meja: #{selectedStrukOrder.tables?.nomor || '-'} | Pemesan: {selectedStrukOrder.nama_pemesan}</p>
               </div>
 
               <div className="space-y-1.5">
-                {selectedStrukOrder.order_items?.map((item: any) => (
-                  <div key={item.id} className="flex justify-between text-[11px]">
-                    <span>{item.qty}x {item.menu_items?.nama} ({item.varian || 'Panas'})</span>
-                    <span>Rp {(item.harga_satuan * item.qty).toLocaleString('id-ID')}</span>
-                  </div>
-                ))}
+                {selectedStrukOrder.order_items?.map((item: any) => {
+                  const itemNama = item.menu_items?.nama || item.nama_menu_manual || item.nama_item || 'Item'
+                  return (
+                    <div key={item.id} className="flex justify-between text-[11px]">
+                      <span>{item.qty}x {itemNama} ({item.varian || 'Panas'})</span>
+                      <span>Rp {(item.harga_satuan * item.qty).toLocaleString('id-ID')}</span>
+                    </div>
+                  )
+                })}
               </div>
 
               <div className="border-t border-dashed border-slate-400 pt-2 space-y-1 text-right font-bold text-xs">
