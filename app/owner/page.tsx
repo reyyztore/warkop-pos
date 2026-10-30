@@ -30,6 +30,12 @@ export default function OwnerDashboardPage() {
   const [showAddStoreModal, setShowAddStoreModal] = useState<boolean>(false)
   const [newStoreSlug, setNewStoreSlug] = useState<string>('')
 
+  // State Ganti Master PIN 6-Digit
+  const [showPinModal, setShowPinModal] = useState<boolean>(false)
+  const [oldPin, setOldPin] = useState<string>('')
+  const [newPin, setNewPin] = useState<string>('')
+  const [confirmPin, setConfirmPin] = useState<string>('')
+
   const supabase = createClient()
 
   useEffect(() => {
@@ -218,6 +224,47 @@ export default function OwnerDashboardPage() {
     }
   }
 
+  // Fungsi Simpan Master PIN Baru
+  const handleUpdateMasterPin = async () => {
+    if (!selectedStoreId || !storeData) return
+    if (!oldPin || !newPin || !confirmPin) {
+      alert('⚠️ Mohon isi semua kolom PIN!')
+      return
+    }
+
+    if (newPin.length !== 6 || confirmPin.length !== 6) {
+      alert('⚠️ PIN Master harus terdiri dari tepat 6 digit angka!')
+      return
+    }
+
+    if (newPin !== confirmPin) {
+      alert('❌ Konfirmasi PIN baru tidak cocok!')
+      return
+    }
+
+    // Cek PIN lama (jika di database sudah ada master_pin)
+    if (storeData.master_pin && storeData.master_pin !== oldPin) {
+      alert('❌ PIN Master lama yang kamu masukkan salah!')
+      return
+    }
+
+    const { error } = await supabase
+      .from('stores')
+      .update({ master_pin: newPin })
+      .eq('id', selectedStoreId)
+
+    if (error) {
+      alert('❌ Gagal mengubah Master PIN: ' + error.message)
+    } else {
+      alert('🔒 Master PIN berhasil diperbarui!')
+      setShowPinModal(false)
+      setOldPin('')
+      setNewPin('')
+      setConfirmPin('')
+      fetchStoreDetails(selectedStoreId)
+    }
+  }
+
   const handleLinkNewStore = async () => {
     if (!newStoreSlug) {
       alert('⚠️ Mohon masukkan Slug URL cabang toko!')
@@ -321,6 +368,12 @@ export default function OwnerDashboardPage() {
           <p className="text-xs text-slate-400 mt-0.5">Pantau laporan keuangan, multi-cabang tertaut, produk terlaris, stok, dan rekap shift kasir.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowPinModal(true)}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black rounded-xl shadow transition"
+          >
+            🔒 Ganti Master PIN
+          </button>
           <button
             onClick={() => setShowAddStoreModal(true)}
             className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black rounded-xl shadow transition"
@@ -617,6 +670,66 @@ export default function OwnerDashboardPage() {
             <div className="flex gap-2 pt-2">
               <button onClick={handleSaveMonthlyTarget} className="flex-1 py-2 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Simpan Target</button>
               <button onClick={() => setShowTargetModal(false)} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL GANTI MASTER PIN 6-DIGIT */}
+      {showPinModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-6 space-y-3.5 shadow-2xl">
+            <h3 className="text-sm font-black text-indigo-400 uppercase tracking-wider">🔒 Ganti Master PIN (6-Digit)</h3>
+            <p className="text-[10px] text-slate-400">PIN Master digunakan untuk otorisasi khusus oleh Owner pada sistem kasir.</p>
+            
+            <div className="space-y-3 pt-1">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">PIN Master Lama</label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  placeholder="******"
+                  value={oldPin}
+                  onChange={(e) => setOldPin(e.target.value)}
+                  className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl font-mono text-center tracking-widest"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">PIN Master Baru (6 Digit)</label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  placeholder="******"
+                  value={newPin}
+                  onChange={(e) => setNewPin(e.target.value)}
+                  className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl font-mono text-center tracking-widest"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Konfirmasi PIN Baru</label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  placeholder="******"
+                  value={confirmPin}
+                  onChange={(e) => setConfirmPin(e.target.value)}
+                  className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl font-mono text-center tracking-widest"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button onClick={handleUpdateMasterPin} className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl shadow transition">
+                Simpan PIN Baru
+              </button>
+              <button
+                onClick={() => { setShowPinModal(false); setOldPin(''); setNewPin(''); setConfirmPin(''); }}
+                className="px-4 py-2.5 bg-slate-800 text-xs font-bold rounded-xl text-slate-400 hover:text-white"
+              >
+                Batal
+              </button>
             </div>
           </div>
         </div>
