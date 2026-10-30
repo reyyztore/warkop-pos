@@ -895,7 +895,7 @@ function DynamicStoreContent() {
       fetchMyOrders(storeId, userData.name)
     } catch (e: any) {
       alert(e.message || 'Gagal mengirim bukti pembayaran.')
-    } fontally {
+    } finally {
       setUploadingBukti(false)
     }
   }
