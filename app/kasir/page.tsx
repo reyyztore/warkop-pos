@@ -263,6 +263,7 @@ export default function KasirDashboardPage() {
     }
   }
 
+  // PERBAIKAN UTAMA DI SINI (QUERY SAFE SUPABASE WITH FALLBACK)
   const fetchOrders = async (targetStoreId: string) => {
     setLoading(true)
     const { data, error } = await supabase
@@ -271,20 +272,22 @@ export default function KasirDashboardPage() {
         *,
         tables(nomor),
         order_items(
-          id,
-          qty,
-          harga_satuan,
-          varian,
-          catatan,
-          nama_menu_manual,
-          menu_items(id, nama, harga)
+          *,
+          menu_items(*)
         )
       `)
       .eq('store_id', targetStoreId)
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetching orders:', error)
+      console.error('Error fetching orders with join, attempting fallback:', error)
+      const { data: fallbackData } = await supabase
+        .from('orders')
+        .select('*, tables(nomor), order_items(*)')
+        .eq('store_id', targetStoreId)
+        .order('created_at', { ascending: false })
+        
+      if (fallbackData) setOrders(fallbackData)
     } else if (data) {
       setOrders(data)
     }
@@ -351,7 +354,7 @@ export default function KasirDashboardPage() {
       receiptText += `------------------------------\n`
 
       ord.order_items?.forEach((i: any) => {
-        const itemNama = i.menu_items?.nama || i.nama_menu_manual || 'Item'
+        const itemNama = i.menu_items?.nama || i.nama_menu_manual || i.nama_item || 'Item'
         const itemHarga = i.harga_satuan || i.menu_items?.harga || 0
         receiptText += `${i.qty}x ${itemNama} (${i.varian || 'Panas'})\n`
         receiptText += `   Rp ${(itemHarga * i.qty).toLocaleString('id-ID')}\n`
@@ -709,7 +712,7 @@ export default function KasirDashboardPage() {
       const nama = `"${(o.nama_pemesan || 'Tanpa Nama').replace(/"/g, '""')}"`
       
       const itemsString = o.order_items?.map((i: any) => {
-        const nameStr = i.menu_items?.nama || i.nama_menu_manual || 'Item'
+        const nameStr = i.menu_items?.nama || i.nama_menu_manual || i.nama_item || 'Item'
         return `${i.qty}x ${nameStr} (${i.varian || 'Normal'})`
       }).join('; ') || '-'
       const itemsEscaped = `"${itemsString.replace(/"/g, '""')}"`
@@ -1047,7 +1050,7 @@ export default function KasirDashboardPage() {
                 ) : (
                   <ul className="space-y-2 text-xs text-slate-300">
                     {itemsList.map((item: any, idx: number) => {
-                      const namaProduk = item.menu_items?.nama || item.nama_menu_manual || 'Menu / Produk'
+                      const namaProduk = item.menu_items?.nama || item.nama_menu_manual || item.nama_item || 'Menu / Produk'
                       const unitPrice = item.harga_satuan || item.menu_items?.harga || 0
                       const hargaSubtotal = unitPrice * (item.qty || 1)
 
