@@ -134,7 +134,6 @@ export default function OwnerDashboardPage() {
     setLoading(false)
   }
 
-  // 💸 Simpan atau Update Pengeluaran
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!expenseTitle || !expenseAmount || !selectedStoreId) {
@@ -200,7 +199,6 @@ export default function OwnerDashboardPage() {
     }
   }
 
-  // 🎯 Simpan Target Omzet Bulanan ke DB
   const handleSaveMonthlyTarget = async () => {
     if (!selectedStoreId || !inputTarget) return
     const targetVal = parseFloat(inputTarget)
@@ -220,7 +218,6 @@ export default function OwnerDashboardPage() {
     }
   }
 
-  // 🔗 Tautkan Cabang Toko Berdasarkan Slug yang Sudah Ada
   const handleLinkNewStore = async () => {
     if (!newStoreSlug) {
       alert('⚠️ Mohon masukkan Slug URL cabang toko!')
@@ -259,7 +256,6 @@ export default function OwnerDashboardPage() {
     }
   }
 
-  // 🔓 Lepas Tautan (Unlink) Cabang
   const handleUnlinkStore = async () => {
     if (stores.length <= 1) {
       alert('⚠️ Tidak dapat melepas tautan karena ini adalah satu-satunya cabang toko yang kamu miliki.')
@@ -299,11 +295,9 @@ export default function OwnerDashboardPage() {
 
   const targetPercentage = monthlyTarget > 0 ? Math.min(100, Math.round((totalOmzet / monthlyTarget) * 100)) : 0
 
-  // 🏆 Analisis Produk Paling Laku (Hanya menampilkan menu aktif yang valid)
   const productSalesMap: { [key: string]: { name: string; qty: number; revenue: number } } = {}
   completedOrders.forEach((ord) => {
     ord.order_items?.forEach((item: any) => {
-      // Abaikan jika menu_items kosong atau sudah terhapus
       if (!item.menu_items || !item.menu_items.nama) return
 
       const menuName = item.menu_items.nama
@@ -651,6 +645,10 @@ export default function OwnerDashboardPage() {
           </div>
         </div>
       )}
+
+      <footer className="text-center py-6 text-[10px] text-slate-400 font-medium border-t border-slate-800 mt-8">
+        Powered by <strong className="text-emerald-400">reyyztore</strong> • Digital POS System
+      </footer>
 
     </div>
   )
