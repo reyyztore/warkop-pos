@@ -200,7 +200,7 @@ export default function KasirDashboardPage() {
 
       let currentStoreId = profile.store_id
       if (!currentStoreId) {
-        const { data: userStore } = await supabase.from('stores').select('id, slug').eq('owner_id', session.user.id).limit(1).single()
+        const { data: userStore } = await supabase.from('stores').select('id, slug').eq('owner_id', session.user.id).order('created_at', { ascending: false }).limit(1).single()
         if (userStore) {
           currentStoreId = userStore.id
           await supabase.from('profiles').update({ store_id: userStore.id }).eq('id', session.user.id)
@@ -263,7 +263,6 @@ export default function KasirDashboardPage() {
     }
   }
 
-  // REVISI UTAMA: QUERY RELASI DENGAN SUPABASE EMBEDDED DUA TINGKAT & FALLBACK MANUAL
   const fetchOrders = async (targetStoreId: string) => {
     setLoading(true)
     const { data, error } = await supabase
@@ -285,7 +284,7 @@ export default function KasirDashboardPage() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error fetch orders:', error)
+      console.error('Error fetching orders:', error)
     } else if (data) {
       setOrders(data)
     }
@@ -308,7 +307,7 @@ export default function KasirDashboardPage() {
       .select('*')
       .eq('store_id', targetStoreId)
       .eq('status', 'open')
-      .single()
+      .maybeSingle()
 
     if (data) setActiveShift(data)
   }
@@ -1000,6 +999,10 @@ export default function KasirDashboardPage() {
       <div className="max-w-6xl mx-auto mt-4 space-y-3">
         {loading ? (
           <div className="h-44 bg-slate-900/50 rounded-3xl animate-pulse border border-slate-800" />
+        ) : filteredOrders.length === 0 ? (
+          <div className="bg-slate-900 border border-slate-800 p-8 text-center rounded-3xl text-slate-400 text-xs font-medium">
+            Belum ada pesanan masuk untuk toko <strong className="text-white">{storeName}</strong> ({storeSlug}).
+          </div>
         ) : filteredOrders.map((ord) => {
           const formattedDate = new Date(ord.created_at).toLocaleString('id-ID', {
             weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -1035,7 +1038,6 @@ export default function KasirDashboardPage() {
                 </div>
               )}
 
-              {/* REVISI BAGIAN RINCIAN PRODUK & CATATAN */}
               <div className="space-y-2">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📦 RINCIAN PRODUK / MENU DIPESAN:</p>
                 {itemsList.length === 0 ? (
