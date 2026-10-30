@@ -26,9 +26,12 @@ export default function OwnerDashboardPage() {
   const [showTargetModal, setShowTargetModal] = useState<boolean>(false)
   const [inputTarget, setInputTarget] = useState<string>('')
 
-  // State Modal Tautan Cabang Toko Baru
+  // State Modal Tautan Cabang Toko Baru & Verifikasi Master PIN
   const [showAddStoreModal, setShowAddStoreModal] = useState<boolean>(false)
   const [newStoreSlug, setNewStoreSlug] = useState<string>('')
+  const [storeToLink, setStoreToLink] = useState<any>(null)
+  const [inputMasterPin, setInputMasterPin] = useState<string>('')
+  const [showLinkPinModal, setShowLinkPinModal] = useState<boolean>(false)
 
   // State Ganti Master PIN 6-Digit
   const [showPinModal, setShowPinModal] = useState<boolean>(false)
@@ -242,7 +245,6 @@ export default function OwnerDashboardPage() {
       return
     }
 
-    // Cek PIN lama (jika di database sudah ada master_pin)
     if (storeData.master_pin && storeData.master_pin !== oldPin) {
       alert('❌ PIN Master lama yang kamu masukkan salah!')
       return
@@ -265,14 +267,12 @@ export default function OwnerDashboardPage() {
     }
   }
 
-  const handleLinkNewStore = async () => {
+  // Langkah 1: Cek Slug dan Status owner_mode_active
+  const handleCheckStoreToLink = async () => {
     if (!newStoreSlug) {
       alert('⚠️ Mohon masukkan Slug URL cabang toko!')
       return
     }
-
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
 
     const cleanSlug = newStoreSlug.toLowerCase().trim().replace(/\s+/g, '-')
 
@@ -287,19 +287,50 @@ export default function OwnerDashboardPage() {
       return
     }
 
+    // Cek apakah Mode Owner di-OFF-kan di toko tersebut
+    if (existingStore.owner_mode_active === false) {
+      alert('🚫 Penautan ditolak! Mode Owner pada cabang toko ini sedang di-OFF-kan (privat/terkunci oleh kasir).')
+      return
+    }
+
+    setStoreToLink(existingStore)
+    setShowAddStoreModal(false)
+    setInputMasterPin('')
+    setShowLinkPinModal(true)
+  }
+
+  // Langkah 2: Verifikasi Master PIN Toko Tujuan sebelum Tautkan
+  const handleVerifyAndLinkStore = async () => {
+    if (!storeToLink) return
+
+    if (!inputMasterPin || inputMasterPin.length !== 6) {
+      alert('⚠️ Masukkan 6-digit Master PIN yang valid dari toko tersebut!')
+      return
+    }
+
+    if (storeToLink.master_pin && storeToLink.master_pin !== inputMasterPin) {
+      alert('❌ Master PIN yang kamu masukkan salah!')
+      return
+    }
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
     const { error: updateError } = await supabase
       .from('stores')
       .update({ owner_id: session.user.id })
-      .eq('id', existingStore.id)
+      .eq('id', storeToLink.id)
 
     if (updateError) {
       alert('❌ Gagal menautkan cabang: ' + updateError.message)
     } else {
-      alert(`✅ Cabang "${existingStore.store_name}" berhasil ditautkan ke akun owner kamu!`)
-      setShowAddStoreModal(false)
+      alert(`✅ Cabang "${storeToLink.store_name}" berhasil ditautkan ke akun owner kamu!`)
+      setShowLinkPinModal(false)
       setNewStoreSlug('')
+      setStoreToLink(null)
+      setInputMasterPin('')
       checkOwnerAuthAndFetchStores()
-      setSelectedStoreId(existingStore.id)
+      setSelectedStoreId(storeToLink.id)
     }
   }
 
@@ -752,8 +783,39 @@ export default function OwnerDashboardPage() {
               />
             </div>
             <div className="flex gap-2 pt-2">
-              <button onClick={handleLinkNewStore} className="flex-1 py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Tautkan Cabang</button>
+              <button onClick={handleCheckStoreToLink} className="flex-1 py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Lanjutkan</button>
               <button onClick={() => setShowAddStoreModal(false)} className="px-4 py-2.5 bg-slate-800 text-xs font-bold rounded-xl text-slate-400">Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL MASUKKAN MASTER PIN UNTUK MENAUTKAN CABANG */}
+      {showLinkPinModal && storeToLink && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-6 space-y-3.5 text-center shadow-2xl">
+            <div className="text-3xl">🔑</div>
+            <h3 className="text-sm font-bold text-amber-400">Verifikasi Master PIN Toko</h3>
+            <p className="text-[10px] text-slate-400">
+              Menautkan cabang <strong className="text-white">{storeToLink.store_name}</strong> memerlukan 6-digit Master PIN dari toko tersebut.
+            </p>
+            
+            <input
+              type="password"
+              maxLength={6}
+              placeholder="******"
+              value={inputMasterPin}
+              onChange={(e) => setInputMasterPin(e.target.value)}
+              className="w-full text-center text-lg font-mono tracking-widest p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-amber-300 focus:outline-none"
+            />
+
+            <div className="flex gap-2 pt-2">
+              <button onClick={handleVerifyAndLinkStore} className="flex-1 py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl">
+                Konfirmasi & Tautkan
+              </button>
+              <button onClick={() => { setShowLinkPinModal(false); setStoreToLink(null); setInputMasterPin(''); }} className="px-4 py-2.5 bg-slate-800 text-xs font-bold rounded-xl text-slate-400">
+                Batal
+              </button>
             </div>
           </div>
         </div>
