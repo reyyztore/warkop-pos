@@ -263,15 +263,32 @@ export default function KasirDashboardPage() {
     }
   }
 
+  // REVISI UTAMA: QUERY RELASI DENGAN SUPABASE EMBEDDED DUA TINGKAT & FALLBACK MANUAL
   const fetchOrders = async (targetStoreId: string) => {
     setLoading(true)
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('orders')
-      .select('*, tables(nomor), order_items(*, menu_items(id, nama, harga, store_id))')
+      .select(`
+        *,
+        tables(nomor),
+        order_items(
+          id,
+          qty,
+          harga_satuan,
+          varian,
+          catatan,
+          nama_menu_manual,
+          menu_items(id, nama, harga)
+        )
+      `)
       .eq('store_id', targetStoreId)
       .order('created_at', { ascending: false })
 
-    if (data) setOrders(data)
+    if (error) {
+      console.error('Error fetch orders:', error)
+    } else if (data) {
+      setOrders(data)
+    }
     setLoading(false)
   }
 
@@ -335,8 +352,11 @@ export default function KasirDashboardPage() {
       receiptText += `------------------------------\n`
 
       ord.order_items?.forEach((i: any) => {
-        receiptText += `${i.qty}x ${i.menu_items?.nama || 'Item'} (${i.varian || 'Panas'})\n`
-        receiptText += `   Rp ${(i.harga_satuan * i.qty).toLocaleString('id-ID')}\n`
+        const itemNama = i.menu_items?.nama || i.nama_menu_manual || 'Item'
+        const itemHarga = i.harga_satuan || i.menu_items?.harga || 0
+        receiptText += `${i.qty}x ${itemNama} (${i.varian || 'Panas'})\n`
+        receiptText += `   Rp ${(itemHarga * i.qty).toLocaleString('id-ID')}\n`
+        if (i.catatan) receiptText += `   *Catatan: ${i.catatan}\n`
       })
 
       receiptText += `------------------------------\n`
@@ -689,7 +709,10 @@ export default function KasirDashboardPage() {
       const meja = `"Meja #${o.tables?.nomor ?? '-'}"`
       const nama = `"${(o.nama_pemesan || 'Tanpa Nama').replace(/"/g, '""')}"`
       
-      const itemsString = o.order_items?.map((i: any) => `${i.qty}x ${i.menu_items?.nama || 'Item'} (${i.varian || 'Normal'})`).join('; ') || '-'
+      const itemsString = o.order_items?.map((i: any) => {
+        const nameStr = i.menu_items?.nama || i.nama_menu_manual || 'Item'
+        return `${i.qty}x ${nameStr} (${i.varian || 'Normal'})`
+      }).join('; ') || '-'
       const itemsEscaped = `"${itemsString.replace(/"/g, '""')}"`
 
       const totalHarga = o.total_harga || 0
@@ -982,6 +1005,8 @@ export default function KasirDashboardPage() {
             weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
           })
 
+          const itemsList = ord.order_items || []
+
           return (
             <div key={ord.id} className="bg-slate-900 border border-slate-800 p-4 rounded-3xl space-y-3 shadow-lg">
               <div className="flex justify-between items-start pb-3 border-b border-slate-800">
@@ -1010,32 +1035,45 @@ export default function KasirDashboardPage() {
                 </div>
               )}
 
+              {/* REVISI BAGIAN RINCIAN PRODUK & CATATAN */}
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📦 Rincian Produk / Menu Dipesan:</p>
-                <ul className="space-y-2 text-xs text-slate-300">
-                  {ord.order_items?.map((item: any) => (
-                    <li key={item.id} className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 space-y-1">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="font-bold text-white text-sm">
-                            <strong className="text-emerald-400">{item.qty}x</strong> {item.menu_items?.nama || 'Menu / Produk'}
-                          </span>
-                          {item.varian && (
-                            <span className={`ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${item.varian === 'dingin' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'bg-amber-950 text-amber-300 border border-amber-800'}`}>
-                              {item.varian === 'dingin' ? '🧊 Dingin' : '🔥 Panas'}
-                            </span>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📦 RINCIAN PRODUK / MENU DIPESAN:</p>
+                {itemsList.length === 0 ? (
+                  <p className="text-xs text-rose-400 italic bg-rose-950/20 p-2.5 rounded-xl border border-rose-900/40">
+                    ⚠️ Data rincian menu kosong / belum terisi.
+                  </p>
+                ) : (
+                  <ul className="space-y-2 text-xs text-slate-300">
+                    {itemsList.map((item: any, idx: number) => {
+                      const namaProduk = item.menu_items?.nama || item.nama_menu_manual || 'Menu / Produk'
+                      const unitPrice = item.harga_satuan || item.menu_items?.harga || 0
+                      const hargaSubtotal = unitPrice * (item.qty || 1)
+
+                      return (
+                        <li key={item.id || idx} className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 space-y-1">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <span className="font-bold text-white text-sm">
+                                <strong className="text-emerald-400">{item.qty}x</strong> {namaProduk}
+                              </span>
+                              {item.varian && (
+                                <span className={`ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${item.varian === 'dingin' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'bg-amber-950 text-amber-300 border border-amber-800'}`}>
+                                  {item.varian === 'dingin' ? '🧊 Dingin' : '🔥 Panas'}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-emerald-300 font-mono font-bold">Rp {hargaSubtotal.toLocaleString('id-ID')}</span>
+                          </div>
+                          {item.catatan && (
+                            <p className="text-[11px] text-amber-300 italic bg-amber-950/40 px-2.5 py-1 rounded-lg border border-amber-900/50 mt-1">
+                              📝 Catatan Pembeli: "{item.catatan}"
+                            </p>
                           )}
-                        </div>
-                        <span className="text-emerald-300 font-mono font-bold">Rp {(item.harga_satuan * item.qty).toLocaleString('id-ID')}</span>
-                      </div>
-                      {item.catatan && (
-                        <p className="text-[11px] text-amber-300 italic bg-amber-950/30 px-2.5 py-1 rounded-lg border border-amber-900/30">
-                          📝 Catatan Pembeli: "{item.catatan}"
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
               </div>
 
               {ord.bukti_pembayaran_url && (
