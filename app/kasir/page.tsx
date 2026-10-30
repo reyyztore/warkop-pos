@@ -88,7 +88,7 @@ export default function KasirDashboardPage() {
   const [bluetoothActive, setBluetoothActive] = useState<boolean>(true)
   const [shiftActive, setShiftActive] = useState<boolean>(true)
   const [tableMgmtActive, setTableMgmtActive] = useState<boolean>(true)
-  const [ownerModeActive, setOwnerModeActive] = useState<boolean>(false)
+  const [ownerModeActive, setOwnerModeActive] = useState<boolean>(true) // default ON
 
   const [masterPin, setMasterPin] = useState<string>('123456')
   const [showPinModal, setShowPinModal] = useState<boolean>(false)
@@ -267,11 +267,9 @@ export default function KasirDashboardPage() {
     }
   }
 
-  // FIX PENTING: FETCH ORDERS + MANUAL MATCHING MENU ITEM (AGAR RINCIAN TIDAK PERNAH KOSONG)
   const fetchOrders = async (targetStoreId: string) => {
     setLoading(true)
     try {
-      // Step 1: Fetch data orders utama
       const { data: ordersData, error: ordersErr } = await supabase
         .from('orders')
         .select('*, tables!left(nomor)')
@@ -286,10 +284,8 @@ export default function KasirDashboardPage() {
         return
       }
 
-      // Step 2: Kumpulkan semua Order ID
       const orderIds = ordersData.map((o) => o.id)
 
-      // Step 3: Fetch order_items & menu_items
       const { data: itemsData, error: itemsErr } = await supabase
         .from('order_items')
         .select('*, menu_items!left(*)')
@@ -297,7 +293,6 @@ export default function KasirDashboardPage() {
 
       if (itemsErr) console.error('Error fetching order_items:', itemsErr)
 
-      // Step 4: Fetch seluruh menu toko untuk fallback manual jika join null
       const { data: allMenuItems } = await supabase
         .from('menu_items')
         .select('*')
@@ -305,7 +300,6 @@ export default function KasirDashboardPage() {
 
       const menuMap = new Map((allMenuItems || []).map((m) => [m.id, m]))
 
-      // Step 5: Gabungkan order_items ke masing-masing order
       const combinedOrders = ordersData.map((ord) => {
         const matchingItems = (itemsData || [])
           .filter((item) => item.order_id === ord.id)
@@ -970,6 +964,23 @@ export default function KasirDashboardPage() {
               className={`px-3 py-1.5 text-xs font-black rounded-xl border transition ${tableMgmtActive ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-900 text-slate-400 border-slate-800'}`}
             >
               {tableMgmtActive ? 'ON' : 'OFF'}
+            </button>
+          </div>
+
+          <div className="p-3 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center sm:col-span-2 lg:col-span-3">
+            <div>
+              <p className="text-xs font-bold text-white">🚪 Mode Owner (Tautan Cabang)</p>
+              <p className="text-[10px] text-slate-400">Jika ON, toko bisa ditautkan ke panel owner dengan verifikasi Master PIN asli.</p>
+            </div>
+            <button
+              onClick={() => executeWithPinProtection(() => { 
+                const next = !ownerModeActive; 
+                setOwnerModeActive(next); 
+                updateToggleInDb('owner_mode_active', next); 
+              })}
+              className={`px-3.5 py-1.5 text-xs font-black rounded-xl border transition ${ownerModeActive ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-rose-950 text-rose-300 border-rose-800'}`}
+            >
+              {ownerModeActive ? 'ON (Dapat Ditautkan Owner)' : 'OFF (Terkunci / Privat)'}
             </button>
           </div>
         </div>
