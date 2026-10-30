@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
-// PRESET TEMA DENGAN KOMBINASI WARNA & EMOJI
 const THEME_PRESETS = [
   { name: 'Slate Dark', bgColor: '#0f172a', textColor: '#ffffff', accentColor: '#10b981', emoji: '☕' },
   { name: 'Emerald Warkop', bgColor: '#064e3b', textColor: '#ecfdf5', accentColor: '#34d399', emoji: '🍵' },
@@ -27,7 +26,6 @@ export default function KasirDashboardPage() {
   const [activeTab, setActiveTab] = useState<string>('semua')
   const [selectedBuktiUrl, setSelectedBuktiUrl] = useState<string | null>(null)
 
-  // Profile Store & Multi-Tenant State
   const [storeId, setStoreId] = useState<string | null>(null)
   const [storeSlug, setStoreSlug] = useState<string>('')
   const [cashierName, setCashierName] = useState('')
@@ -41,14 +39,12 @@ export default function KasirDashboardPage() {
   const [qrisFile, setQrisFile] = useState<File | null>(null)
   const [showProfileModal, setShowProfileModal] = useState(false)
 
-  // Tampilan Toko & Tema Kustom State
   const [announcement, setAnnouncement] = useState('')
   const [isOpen, setIsOpen] = useState(true)
   const [bannerUrl, setBannerUrl] = useState('')
   const [bannerFile, setBannerFile] = useState<File | null>(null)
   const [showTampilanModal, setShowTampilanModal] = useState(false)
 
-  // Fitur Wifi, Maps, WA Komplain, Sosmed, Jam Operasional, Fasilitas & Tema Visual
   const [mapsUrl, setMapsUrl] = useState('')
   const [waComplaint, setWaComplaint] = useState('')
   const [socialLinks, setSocialLinks] = useState<{ platform: string; url: string }[]>([])
@@ -61,7 +57,6 @@ export default function KasirDashboardPage() {
   const [bgImageUrl, setBgImageUrl] = useState('')
   const [bgImageFile, setBgImageFile] = useState<File | null>(null)
 
-  // LOYALTY CARD STATE DISIMPAN KASIR
   const [loyaltyActive, setLoyaltyActive] = useState<boolean>(false)
   const [loyaltyCode, setLoyaltyCode] = useState<string>('')
   const [loyaltyMaxStamps, setLoyaltyMaxStamps] = useState<number>(10)
@@ -74,7 +69,6 @@ export default function KasirDashboardPage() {
     emoji: '☕'
   })
 
-  // KODE PROMO STATE
   const [promos, setPromos] = useState<any[]>([])
   const [showPromoModal, setShowPromoModal] = useState(false)
   const [newPromoCode, setNewPromoCode] = useState('')
@@ -82,15 +76,12 @@ export default function KasirDashboardPage() {
   const [newPromoVal, setNewPromoVal] = useState<number>(0)
   const [newPromoMin, setNewPromoMin] = useState<number>(0)
 
-  // REKAP & LAPORAN STATE
   const [rekapPeriode, setRekapPeriode] = useState<'hari' | 'minggu' | 'bulan'>('hari')
   const [showRekapModal, setShowRekapModal] = useState(false)
 
-  // Sound Options & Notifications
   const [kasirSoundOption, setKasirSoundOption] = useState<number>(2)
   const [customerBellAlert, setCustomerBellAlert] = useState<string | null>(null)
 
-  // 🎛️ MASTER TOGGLE SAKLAR FITUR LENGKAP
   const [kdsActive, setKdsActive] = useState<boolean>(true)
   const [stockActive, setStockActive] = useState<boolean>(true)
   const [recommendationActive, setRecommendationActive] = useState<boolean>(true)
@@ -99,24 +90,20 @@ export default function KasirDashboardPage() {
   const [tableMgmtActive, setTableMgmtActive] = useState<boolean>(true)
   const [ownerModeActive, setOwnerModeActive] = useState<boolean>(false)
 
-  // PIN SECURITY MODAL
   const [masterPin, setMasterPin] = useState<string>('123456')
   const [showPinModal, setShowPinModal] = useState<boolean>(false)
   const [inputPin, setInputPin] = useState<string>('')
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
 
-  // ⏱️ SHIFT KASIR STATE
   const [activeShift, setActiveShift] = useState<any>(null)
   const [showShiftModal, setShowShiftModal] = useState<boolean>(false)
   const [modalAwalInput, setModalAwalInput] = useState<string>('')
   const [kasFisikInput, setKasFisikInput] = useState<string>('')
 
-  // 🪑 MANAJEMEN MEJA LANJUTAN STATE
   const [selectedOrderForAction, setSelectedOrderForAction] = useState<any>(null)
   const [targetTableNo, setTargetTableNo] = useState<string>('')
   const [showMoveTableModal, setShowMoveTableModal] = useState<boolean>(false)
 
-  // 🖨️ WEB BLUETOOTH PRINTER STATE
   const [btDevice, setBtDevice] = useState<any>(null)
   const [btServer, setBtServer] = useState<any>(null)
   const [isBtConnected, setIsBtConnected] = useState<boolean>(false)
@@ -249,7 +236,6 @@ export default function KasirDashboardPage() {
           if (storeData.loyalty_code) setLoyaltyCode(storeData.loyalty_code)
           if (storeData.loyalty_max_stamps) setLoyaltyMaxStamps(storeData.loyalty_max_stamps)
 
-          // SAKLAR TOGGLE STORE
           if (storeData.kds_active !== undefined) setKdsActive(storeData.kds_active)
           if (storeData.stock_active !== undefined) setStockActive(storeData.stock_active)
           if (storeData.recommendation_active !== undefined) setRecommendationActive(storeData.recommendation_active)
@@ -281,7 +267,7 @@ export default function KasirDashboardPage() {
     setLoading(true)
     const { data } = await supabase
       .from('orders')
-      .select('*, tables(nomor), order_items(*, menu_items(nama))')
+      .select('*, tables(nomor), order_items(*, menu_items(id, nama, harga, store_id))')
       .eq('store_id', targetStoreId)
       .order('created_at', { ascending: false })
 
@@ -685,7 +671,6 @@ export default function KasirDashboardPage() {
   const rekapOrders = getFilteredOrdersByPeriode()
   const totalRekapOmzet = rekapOrders.reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
 
-  // REVISI REKAP CSV DENGAN RINCIAN NAMA PRODUK/MENU
   const downloadRekapCSV = () => {
     if (rekapOrders.length === 0) {
       alert('Tidak ada data pesanan selesai pada periode ini.')
@@ -704,7 +689,6 @@ export default function KasirDashboardPage() {
       const meja = `"Meja #${o.tables?.nomor ?? '-'}"`
       const nama = `"${(o.nama_pemesan || 'Tanpa Nama').replace(/"/g, '""')}"`
       
-      // Menggabungkan nama produk/menu dalam pesanan untuk file CSV
       const itemsString = o.order_items?.map((i: any) => `${i.qty}x ${i.menu_items?.nama || 'Item'} (${i.varian || 'Normal'})`).join('; ') || '-'
       const itemsEscaped = `"${itemsString.replace(/"/g, '""')}"`
 
@@ -741,10 +725,8 @@ export default function KasirDashboardPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 font-sans pb-16 relative overflow-hidden">
       
-      {/* Top Bar Header dengan Navigasi Kiri & Kanan */}
       <div className="max-w-6xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-800">
         
-        {/* Identitas Toko */}
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden flex items-center justify-center text-xl shrink-0">
             {avatarUrl ? <img src={avatarUrl} alt="Logo" className="w-full h-full object-cover" /> : themeConfig.emoji}
@@ -765,10 +747,8 @@ export default function KasirDashboardPage() {
           </div>
         </div>
 
-        {/* NAVIGASI UTAMA (DIPISAH KIRI & KANAN) */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           
-          {/* SISI KIRI: Navigasi Pesanan & Analitik/Rekap */}
           <div className="flex items-center gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl">
             <span className="text-[10px] font-bold text-slate-400 px-2 uppercase tracking-wider hidden sm:inline">📦 Operasional:</span>
             <button onClick={() => setActiveTab('semua')} className={`px-3 py-1.5 text-xs font-bold rounded-xl transition ${activeTab === 'semua' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-800'}`}>
@@ -779,7 +759,6 @@ export default function KasirDashboardPage() {
             </button>
           </div>
 
-          {/* SISI KANAN: Navigasi Profil, Edit Toko, Tema, Promo, Menu, Meja, Printer, & Shift */}
           <div className="flex items-center gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl flex-wrap">
             <span className="text-[10px] font-bold text-slate-400 px-2 uppercase tracking-wider hidden sm:inline">⚙️ Manajemen:</span>
             
@@ -823,7 +802,6 @@ export default function KasirDashboardPage() {
         </div>
       </div>
 
-      {/* BOX LINK PELANGGAN KHUSUS TOKO INI */}
       {customerStoreUrl && (
         <div className="max-w-6xl mx-auto mt-4 p-3.5 bg-emerald-950/60 border border-emerald-800/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
           <div>
@@ -852,7 +830,6 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* PANEL PENGATURAN SAKLAR FITUR TOKO */}
       <div className="max-w-6xl mx-auto mt-4 p-4 bg-slate-900 border border-slate-800 rounded-3xl space-y-3">
         <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">🎛️ Pengaturan Saklar Fitur Toko</h3>
         
@@ -936,7 +913,6 @@ export default function KasirDashboardPage() {
           </div>
         </div>
 
-        {/* LINK DAPUR HANYA MUNCUL JIKA KDS ON */}
         {kdsActive && storeSlug && (
           <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row justify-between items-center gap-2">
             <span className="text-xs text-amber-300 font-bold">👨‍🍳 Layar Dapur Aktif! Akses link dapur:</span>
@@ -951,7 +927,6 @@ export default function KasirDashboardPage() {
           </div>
         )}
 
-        {/* TOMBOL OWNER PANEL */}
         <div className="pt-2 border-t border-slate-800/80 flex justify-between items-center">
           <span className="text-xs text-slate-400">Akses Laporan Keuangan & Analitik Eksekutif:</span>
           <button
@@ -963,7 +938,6 @@ export default function KasirDashboardPage() {
         </div>
       </div>
 
-      {/* Alert Bell & Notifikasi Pembatalan Pelanggan */}
       {customerBellAlert && (
         <div className="max-w-6xl mx-auto mt-4 p-3.5 bg-amber-500 text-slate-950 text-xs font-black rounded-2xl shadow-xl flex justify-between items-center animate-bounce">
           <span>{customerBellAlert}</span>
@@ -971,7 +945,6 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* Ringkasan Omzet */}
       <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl">
           <p className="text-[10px] font-bold text-slate-400 uppercase">Omzet Hari Ini</p>
@@ -987,7 +960,6 @@ export default function KasirDashboardPage() {
         </div>
       </div>
 
-      {/* Filter Tabs Status Pesanan */}
       <div className="max-w-6xl mx-auto flex gap-2 overflow-x-auto mt-6 pb-1 no-scrollbar">
         {[
           { id: 'semua', label: 'Semua Status' },
@@ -1002,7 +974,6 @@ export default function KasirDashboardPage() {
         ))}
       </div>
 
-      {/* Grid Pesanan dengan Informasi Nama Menu Lengkap */}
       <div className="max-w-6xl mx-auto mt-4 space-y-3">
         {loading ? (
           <div className="h-44 bg-slate-900/50 rounded-3xl animate-pulse border border-slate-800" />
@@ -1039,7 +1010,6 @@ export default function KasirDashboardPage() {
                 </div>
               )}
 
-              {/* RINCIAN NAMA MENU & PRODUK YANG DIPESAN */}
               <div className="space-y-2">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📦 Rincian Produk / Menu Dipesan:</p>
                 <ul className="space-y-2 text-xs text-slate-300">
@@ -1084,7 +1054,6 @@ export default function KasirDashboardPage() {
                 </button>
               </div>
 
-              {/* AKSI PESANAN KASIR */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
                 {ord.status === 'pending' && <button onClick={() => updateStatus(ord.id, 'diproses')} className="py-2.5 bg-amber-500 text-slate-950 text-xs font-black rounded-xl">Proses Pesanan</button>}
                 {ord.status === 'diproses' && <button onClick={() => updateStatus(ord.id, 'selesai')} className="py-2.5 bg-emerald-500 text-slate-950 text-xs font-black rounded-xl">Selesaikan</button>}
@@ -1106,7 +1075,6 @@ export default function KasirDashboardPage() {
         })}
       </div>
 
-      {/* MODAL SHIFT KASIR */}
       {showShiftModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-xs rounded-3xl p-6 space-y-3.5">
@@ -1146,7 +1114,6 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* MODAL PINDAH MEJA */}
       {showMoveTableModal && selectedOrderForAction && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-xs rounded-3xl p-6 space-y-3">
@@ -1167,7 +1134,6 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* MODAL VERIFIKASI MASTER PIN OWNER */}
       {showPinModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-xs rounded-3xl p-6 space-y-4 text-center">
@@ -1196,7 +1162,6 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* MODAL REKAP LAPORAN PENJUALAN */}
       {showRekapModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-4">
@@ -1230,7 +1195,6 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* MODAL KELOLA KODE PROMO */}
       {showPromoModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-4 max-h-[85vh] overflow-y-auto">
@@ -1274,7 +1238,6 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* MODAL PROFIL & LANGGANAN KASIR */}
       {showProfileModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -1324,7 +1287,6 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* MODAL EDIT TEMA VISUAL, BACKGROUND GAMBAR, WIFI, MAPS, SOSMED & LOYALTY CARD */}
       {showTampilanModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-lg rounded-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -1513,7 +1475,6 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* Modal View Bukti */}
       {selectedBuktiUrl && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-5 text-center space-y-3">
@@ -1526,7 +1487,6 @@ export default function KasirDashboardPage() {
         </div>
       )}
 
-      {/* FOOTER BRANDING REYYZTORE */}
       <footer className="text-center py-6 text-[10px] text-slate-400 font-medium border-t border-slate-800 mt-8">
         Powered by <strong className="text-emerald-400">Reyyztore</strong> • Digital POS System
       </footer>
