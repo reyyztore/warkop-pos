@@ -299,11 +299,14 @@ export default function OwnerDashboardPage() {
 
   const targetPercentage = monthlyTarget > 0 ? Math.min(100, Math.round((totalOmzet / monthlyTarget) * 100)) : 0
 
-  // 🏆 Analisis Produk Paling Laku (Best Seller)
+  // 🏆 Analisis Produk Paling Laku (Hanya menampilkan menu aktif yang valid)
   const productSalesMap: { [key: string]: { name: string; qty: number; revenue: number } } = {}
   completedOrders.forEach((ord) => {
     ord.order_items?.forEach((item: any) => {
-      const menuName = item.menu_items?.nama || 'Menu Terhapus'
+      // Abaikan jika menu_items kosong atau sudah terhapus
+      if (!item.menu_items || !item.menu_items.nama) return
+
+      const menuName = item.menu_items.nama
       if (!productSalesMap[menuName]) {
         productSalesMap[menuName] = { name: menuName, qty: 0, revenue: 0 }
       }
