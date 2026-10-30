@@ -23,7 +23,6 @@ export default function KitchenDisplayPage() {
   const fetchKdsData = async () => {
     setLoading(true)
 
-    // 1. Cek konfigurasi toko
     const { data: store } = await supabase
       .from('stores')
       .select('*')
@@ -43,10 +42,9 @@ export default function KitchenDisplayPage() {
   }
 
   const fetchKitchenOrders = async (storeId: string) => {
-    // Ambil pesanan yang belum selesai (pending / diproses)
     const { data } = await supabase
       .from('orders')
-      .select('*, tables(nomor), order_items(*, menu_items(nama))')
+      .select('*, tables(nomor), order_items(*, menu_items(id, nama, harga, store_id))')
       .eq('store_id', storeId)
       .in('status', ['pending', 'diproses'])
       .order('created_at', { ascending: true })
@@ -76,13 +74,12 @@ export default function KitchenDisplayPage() {
         .update({ status: statusBaru })
         .eq('id', orderId)
 
-      fetchKitchenOrders(storeData.id)
+      if (storeData?.id) fetchKitchenOrders(storeData.id)
     } catch (err: any) {
       alert('Gagal memperbarui status pesanan: ' + err.message)
     }
   }
 
-  // 🔔 TOMBOL MANUAL: Membunyikan bel ke HP pelanggan di meja terkait
   const handleRingCustomerBell = async (tableNo: string) => {
     if (!storeData?.id) return
     try {
@@ -105,7 +102,6 @@ export default function KitchenDisplayPage() {
     )
   }
 
-  // 🔒 JIKA MODE DAPUR (KDS) TIDAK DIAKTIFKAN OLEH TOKO
   if (!isKdsActive) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 text-center">
@@ -115,9 +111,6 @@ export default function KitchenDisplayPage() {
           <p className="text-xs text-slate-400 leading-relaxed">
             Fitur Layar Dapur (KDS) belum diaktifkan oleh pengelola toko <strong>{storeData?.store_name || slug}</strong>.
           </p>
-          <p className="text-[10px] text-slate-500 italic">
-            Aktifkan saklar "Mode Layar Dapur (KDS)" di Pengaturan Toko melalui Dashboard Kasir.
-          </p>
         </div>
       </div>
     )
@@ -125,7 +118,6 @@ export default function KitchenDisplayPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white p-4 font-sans pb-12">
-      {/* Top Bar Dapur */}
       <div className="flex justify-between items-center bg-slate-900 border border-slate-800 p-4 rounded-2xl mb-6 shadow-lg">
         <div className="flex items-center gap-3">
           <div className="text-2xl">👨‍🍳</div>
@@ -139,7 +131,6 @@ export default function KitchenDisplayPage() {
         </div>
       </div>
 
-      {/* Grid Kartu Pesanan Dapur */}
       {orders.length === 0 ? (
         <div className="text-center py-24 bg-slate-900/50 border border-slate-800/80 rounded-3xl text-slate-500 text-xs font-bold">
           ☕ Belum ada pesanan masuk ke dapur saat ini.
@@ -172,12 +163,11 @@ export default function KitchenDisplayPage() {
                     </span>
                   </div>
 
-                  {/* List Detail Menu Dapur */}
                   <div className="space-y-2">
                     {ord.order_items?.map((item: any) => (
                       <div key={item.id} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
                         <div className="flex justify-between font-bold text-xs text-white">
-                          <span>{item.menu_items?.nama}</span>
+                          <span>{item.menu_items?.nama || 'Menu / Produk'}</span>
                           <span className="text-emerald-400 font-black">{item.qty}x</span>
                         </div>
                         <div className="flex gap-2 text-[10px] mt-1 text-slate-400">
@@ -193,9 +183,7 @@ export default function KitchenDisplayPage() {
                   </div>
                 </div>
 
-                {/* Tombol Aksi Dapur */}
                 <div className="space-y-2 pt-2 border-t border-slate-800">
-                  {/* Tombol Manual Bel Pelanggan */}
                   <button
                     onClick={() => handleRingCustomerBell(ord.tables?.nomor)}
                     className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl transition shadow flex items-center justify-center gap-1.5"
