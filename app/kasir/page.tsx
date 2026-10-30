@@ -263,35 +263,51 @@ export default function KasirDashboardPage() {
     }
   }
 
-  // PERBAIKAN: LEFT JOIN PADA TABLES DAN FALLBACK QUERY KHUSUS
+  // FIX: TWO-STEP FETCHING UNTUK MEMASTIKAN ITEM SAMA SEKALI TIDAK HILANG / KOSONG
   const fetchOrders = async (targetStoreId: string) => {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        tables!left(nomor),
-        order_items!left(
-          *,
-          menu_items!left(*)
-        )
-      `)
-      .eq('store_id', targetStoreId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching orders with join, attempting fallback:', error)
-      const { data: fallbackData } = await supabase
+    try {
+      // Step 1: Fetch data orders utama
+      const { data: ordersData, error: ordersErr } = await supabase
         .from('orders')
-        .select('*')
+        .select('*, tables!left(nomor)')
         .eq('store_id', targetStoreId)
         .order('created_at', { ascending: false })
-        
-      if (fallbackData) setOrders(fallbackData)
-    } else if (data) {
-      setOrders(data)
+
+      if (ordersErr) throw ordersErr
+
+      if (!ordersData || ordersData.length === 0) {
+        setOrders([])
+        setLoading(false)
+        return
+      }
+
+      // Step 2: Kumpulkan semua Order ID
+      const orderIds = ordersData.map((o) => o.id)
+
+      // Step 3: Fetch order_items & menu_items secara terpisah
+      const { data: itemsData, error: itemsErr } = await supabase
+        .from('order_items')
+        .select('*, menu_items!left(*)')
+        .in('order_id', orderIds)
+
+      if (itemsErr) console.error('Error fetching order_items:', itemsErr)
+
+      // Step 4: Gabungkan order_items ke masing-masing order
+      const combinedOrders = ordersData.map((ord) => {
+        const matchingItems = (itemsData || []).filter((item) => item.order_id === ord.id)
+        return {
+          ...ord,
+          order_items: matchingItems,
+        }
+      })
+
+      setOrders(combinedOrders)
+    } catch (err: any) {
+      console.error('Error fetching orders:', err)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const fetchTables = async (targetStoreId: string) => {
