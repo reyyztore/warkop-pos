@@ -15,10 +15,66 @@ export default function KitchenDisplayPage() {
   const [isKdsActive, setIsKdsActive] = useState(false)
   const [storeData, setStoreData] = useState<any>(null)
   const [orders, setOrders] = useState<any[]>([])
+  const [customerBellAlert, setCustomerBellAlert] = useState<string | null>(null)
+
+  // Suara & Text-to-Speech untuk Bel Panggilan Pelanggan
+  const speakText = (text: string) => {
+    if (!('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = 'id-ID'
+    window.speechSynthesis.speak(utterance)
+  }
+
+  const playBellSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+      const audioCtx = new AudioCtx()
+      const osc = audioCtx.createOscillator()
+      const gain = audioCtx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime)
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1)
+      osc.connect(gain)
+      gain.connect(audioCtx.destination)
+      osc.start()
+      osc.stop(audioCtx.currentTime + 1)
+    } catch (e) {
+      console.log(e)
+    }
+  }
 
   useEffect(() => {
     if (slug) fetchKdsData()
   }, [slug])
+
+  // Realtime Listener untuk pesanan baru & bel dari pelanggan
+  useEffect(() => {
+    if (!storeData?.id) return
+
+    const channel = supabase
+      .channel(`kitchen-display-${storeData.id}`)
+      .on('broadcast', { event: 'customer-ring-bell' }, (payload: any) => {
+        playBellSound()
+        const table = payload.payload?.tableNo || '??'
+        speakText(`Panggilan! Meja ${table} menekan panggilan.`)
+        setCustomerBellAlert(`🔔 Meja #${table} menekan panggilan ke Dapur!`)
+        setTimeout(() => setCustomerBellAlert(null), 8000)
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `store_id=eq.${storeData.id}` }, () => {
+        playBellSound()
+        fetchKitchenOrders(storeData.id)
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `store_id=eq.${storeData.id}` }, () => {
+        fetchKitchenOrders(storeData.id)
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [storeData?.id])
 
   const fetchKdsData = async () => {
     setLoading(true)
@@ -35,35 +91,63 @@ export default function KitchenDisplayPage() {
 
       if (store.kds_active) {
         fetchKitchenOrders(store.id)
-        subscribeRealtimeOrders(store.id)
       }
     }
     setLoading(false)
   }
 
+  // TWO-STEP FETCHING UNTUK MEMASTIKAN ITEM & CATATAN TIDAK HILANG DI DAPUR
   const fetchKitchenOrders = async (storeId: string) => {
-    const { data } = await supabase
-      .from('orders')
-      .select('*, tables(nomor), order_items(*, menu_items(id, nama, harga, store_id))')
-      .eq('store_id', storeId)
-      .in('status', ['pending', 'diproses'])
-      .order('created_at', { ascending: true })
+    try {
+      const { data: ordersData, error: ordersErr } = await supabase
+        .from('orders')
+        .select('*, tables!left(nomor)')
+        .eq('store_id', storeId)
+        .in('status', ['pending', 'diproses'])
+        .order('created_at', { ascending: true })
 
-    if (data) setOrders(data)
-  }
+      if (ordersErr) throw ordersErr
 
-  const subscribeRealtimeOrders = (storeId: string) => {
-    const channel = supabase
-      .channel(`kds-orders-${storeId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders', filter: `store_id=eq.${storeId}` },
-        () => fetchKitchenOrders(storeId)
-      )
-      .subscribe()
+      if (!ordersData || ordersData.length === 0) {
+        setOrders([])
+        return
+      }
 
-    return () => {
-      supabase.removeChannel(channel)
+      const orderIds = ordersData.map((o) => o.id)
+
+      const { data: itemsData } = await supabase
+        .from('order_items')
+        .select('*, menu_items!left(*)')
+        .in('order_id', orderIds)
+
+      const { data: allMenuItems } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('store_id', storeId)
+
+      const menuMap = new Map((allMenuItems || []).map((m) => [m.id, m]))
+
+      const combinedOrders = ordersData.map((ord) => {
+        const matchingItems = (itemsData || [])
+          .filter((item) => item.order_id === ord.id)
+          .map((item) => {
+            const targetMenuId = item.menu_id || item.menu_item_id
+            const fallbackMenu = targetMenuId ? menuMap.get(targetMenuId) : null
+            return {
+              ...item,
+              menu_items: item.menu_items || fallbackMenu || null,
+            }
+          })
+
+        return {
+          ...ord,
+          order_items: matchingItems,
+        }
+      })
+
+      setOrders(combinedOrders)
+    } catch (err: any) {
+      console.error('Error fetching kitchen orders:', err)
     }
   }
 
@@ -117,8 +201,8 @@ export default function KitchenDisplayPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-4 font-sans pb-12">
-      <div className="flex justify-between items-center bg-slate-900 border border-slate-800 p-4 rounded-2xl mb-6 shadow-lg">
+    <div className="min-h-screen bg-slate-950 text-white p-4 sm:p-6 font-sans pb-12">
+      <div className="flex justify-between items-center bg-slate-900 border border-slate-800 p-4 rounded-2xl mb-4 shadow-lg">
         <div className="flex items-center gap-3">
           <div className="text-2xl">👨‍🍳</div>
           <div>
@@ -131,6 +215,13 @@ export default function KitchenDisplayPage() {
         </div>
       </div>
 
+      {customerBellAlert && (
+        <div className="mb-4 p-3.5 bg-amber-500 text-slate-950 text-xs font-black rounded-2xl shadow-xl flex justify-between items-center animate-bounce">
+          <span>{customerBellAlert}</span>
+          <button onClick={() => setCustomerBellAlert(null)} className="text-xs px-2 py-1 bg-slate-950 text-white rounded-lg">Tutup</button>
+        </div>
+      )}
+
       {orders.length === 0 ? (
         <div className="text-center py-24 bg-slate-900/50 border border-slate-800/80 rounded-3xl text-slate-500 text-xs font-bold">
           ☕ Belum ada pesanan masuk ke dapur saat ini.
@@ -142,6 +233,8 @@ export default function KitchenDisplayPage() {
               hour: '2-digit',
               minute: '2-digit',
             })
+
+            const itemsList = ord.order_items || []
 
             return (
               <div
@@ -164,22 +257,34 @@ export default function KitchenDisplayPage() {
                   </div>
 
                   <div className="space-y-2">
-                    {ord.order_items?.map((item: any) => (
-                      <div key={item.id} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
-                        <div className="flex justify-between font-bold text-xs text-white">
-                          <span>{item.menu_items?.nama || 'Menu / Produk'}</span>
-                          <span className="text-emerald-400 font-black">{item.qty}x</span>
+                    {itemsList.map((item: any, idx: number) => {
+                      const namaProduk = 
+                        item.menu_items?.nama || 
+                        item.nama_menu_manual || 
+                        item.nama_item || 
+                        'Menu / Produk'
+
+                      return (
+                        <div key={item.id || idx} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 space-y-1">
+                          <div className="flex justify-between font-bold text-xs text-white">
+                            <span>{namaProduk}</span>
+                            <span className="text-emerald-400 font-black">{item.qty}x</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 text-[10px] mt-1 text-slate-400">
+                            {item.varian && (
+                              <span className={`px-1.5 py-0.5 rounded font-semibold uppercase ${item.varian === 'dingin' ? 'bg-cyan-950 text-cyan-300' : 'bg-amber-950 text-amber-300'}`}>
+                                {item.varian === 'dingin' ? '🧊 Dingin' : '🔥 Panas'}
+                              </span>
+                            )}
+                            {item.catatan && (
+                              <span className="italic text-amber-300 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-900/40">
+                                📝 "{item.catatan}"
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex gap-2 text-[10px] mt-1 text-slate-400">
-                          <span className="px-1.5 py-0.5 bg-slate-800 rounded font-semibold text-amber-300">
-                            {item.varian === 'dingin' ? '🧊 Dingin' : '🔥 Panas'}
-                          </span>
-                          {item.catatan && (
-                            <span className="italic text-rose-300">"{item.catatan}"</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
 
