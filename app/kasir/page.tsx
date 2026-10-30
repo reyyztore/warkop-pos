@@ -263,17 +263,17 @@ export default function KasirDashboardPage() {
     }
   }
 
-  // PERBAIKAN UTAMA DI SINI (QUERY SAFE SUPABASE WITH FALLBACK)
+  // PERBAIKAN: LEFT JOIN PADA TABLES DAN FALLBACK QUERY KHUSUS
   const fetchOrders = async (targetStoreId: string) => {
     setLoading(true)
     const { data, error } = await supabase
       .from('orders')
       .select(`
         *,
-        tables(nomor),
-        order_items(
+        tables!left(nomor),
+        order_items!left(
           *,
-          menu_items(*)
+          menu_items!left(*)
         )
       `)
       .eq('store_id', targetStoreId)
@@ -283,7 +283,7 @@ export default function KasirDashboardPage() {
       console.error('Error fetching orders with join, attempting fallback:', error)
       const { data: fallbackData } = await supabase
         .from('orders')
-        .select('*, tables(nomor), order_items(*)')
+        .select('*')
         .eq('store_id', targetStoreId)
         .order('created_at', { ascending: false })
         
