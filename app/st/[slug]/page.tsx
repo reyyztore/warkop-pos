@@ -495,29 +495,41 @@ function DynamicStoreContent() {
     if (store.recommendation_active !== undefined) setRecommendationActive(store.recommendation_active)
   }
 
-  // SAFE FETCH ORDERS WITH FALLBACK (Mencegah Item Hilang di Pelanggan)
+  // TWO-STEP FETCHING UNTUK PELANGGAN
   const fetchMyOrders = async (targetStoreId: string, nameFilter: string) => {
     if (!targetStoreId || !nameFilter) return
 
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*, tables(nomor), order_items(*, menu_items(*))')
-      .eq('store_id', targetStoreId)
-      .eq('nama_pemesan', nameFilter)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Fetch my orders with join failed, running fallback:', error)
-      const { data: fallbackData } = await supabase
+    try {
+      const { data: ordersData, error: ordersErr } = await supabase
         .from('orders')
-        .select('*, tables(nomor), order_items(*)')
+        .select('*, tables!left(nomor)')
         .eq('store_id', targetStoreId)
         .eq('nama_pemesan', nameFilter)
         .order('created_at', { ascending: false })
 
-      if (fallbackData) setMyOrders(fallbackData)
-    } else if (data) {
-      setMyOrders(data)
+      if (ordersErr || !ordersData || ordersData.length === 0) {
+        setMyOrders(ordersData || [])
+        return
+      }
+
+      const orderIds = ordersData.map((o) => o.id)
+
+      const { data: itemsData } = await supabase
+        .from('order_items')
+        .select('*, menu_items!left(*)')
+        .in('order_id', orderIds)
+
+      const combinedOrders = ordersData.map((ord) => {
+        const matchingItems = (itemsData || []).filter((item) => item.order_id === ord.id)
+        return {
+          ...ord,
+          order_items: matchingItems,
+        }
+      })
+
+      setMyOrders(combinedOrders)
+    } catch (e) {
+      console.error('Error fetching my orders:', e)
     }
   }
 
@@ -710,7 +722,7 @@ function DynamicStoreContent() {
 
       if (orderErr) throw orderErr
 
-      // MENYIMPAN NAMA MENU MANUAL/BACKUP AGAR TIDAK HILANG DI KASIR/STRUK
+      // INSERT ITEM DENGAN NAMA MENUMANUAL ATAU FALLBACK
       const orderItems = Object.entries(cart).map(([key, item]) => {
         const menu = menuItems.find((m) => m.id === item.menuId)
         const hargaSatuan = item.varian === 'dingin' && menu?.harga_dingin ? menu.harga_dingin : (menu?.harga_panas || menu?.harga || 0)
@@ -883,7 +895,7 @@ function DynamicStoreContent() {
       fetchMyOrders(storeId, userData.name)
     } catch (e: any) {
       alert(e.message || 'Gagal mengirim bukti pembayaran.')
-    } finally {
+    } fontally {
       setUploadingBukti(false)
     }
   }
