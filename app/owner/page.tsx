@@ -13,6 +13,7 @@ export default function OwnerDashboardPage() {
   const [orders, setOrders] = useState<any[]>([])
   const [expenses, setExpenses] = useState<any[]>([])
   const [shifts, setShifts] = useState<any[]>([])
+  const [menuItems, setMenuItems] = useState<any[]>([])
   const [loading, setLoading] = useState<boolean>(true)
 
   // State Form Tambah/Edit Pengeluaran
@@ -47,10 +48,16 @@ export default function OwnerDashboardPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `store_id=eq.${selectedStoreId}` }, () => {
         fetchStoreTransactions(selectedStoreId)
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, () => {
+        fetchStoreTransactions(selectedStoreId)
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses', filter: `store_id=eq.${selectedStoreId}` }, () => {
         fetchStoreTransactions(selectedStoreId)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cashier_shifts', filter: `store_id=eq.${selectedStoreId}` }, () => {
+        fetchStoreTransactions(selectedStoreId)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items', filter: `store_id=eq.${selectedStoreId}` }, () => {
         fetchStoreTransactions(selectedStoreId)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'stores', filter: `id=eq.${selectedStoreId}` }, () => {
@@ -97,7 +104,7 @@ export default function OwnerDashboardPage() {
 
     const { data: orderData } = await supabase
       .from('orders')
-      .select('*, tables(nomor), order_items(*, menu_items(nama))')
+      .select('*, tables(nomor), order_items(*, menu_items(nama, harga))')
       .eq('store_id', storeId)
       .order('created_at', { ascending: false })
 
@@ -113,9 +120,16 @@ export default function OwnerDashboardPage() {
       .eq('store_id', storeId)
       .order('created_at', { ascending: false })
 
+    const { data: menuData } = await supabase
+      .from('menu_items')
+      .select('*')
+      .eq('store_id', storeId)
+      .order('nama')
+
     if (orderData) setOrders(orderData)
     if (expenseData) setExpenses(expenseData)
     if (shiftData) setShifts(shiftData)
+    if (menuData) setMenuItems(menuData)
 
     setLoading(false)
   }
@@ -285,6 +299,21 @@ export default function OwnerDashboardPage() {
 
   const targetPercentage = monthlyTarget > 0 ? Math.min(100, Math.round((totalOmzet / monthlyTarget) * 100)) : 0
 
+  // 🏆 Analisis Produk Paling Laku (Best Seller)
+  const productSalesMap: { [key: string]: { name: string; qty: number; revenue: number } } = {}
+  completedOrders.forEach((ord) => {
+    ord.order_items?.forEach((item: any) => {
+      const menuName = item.menu_items?.nama || 'Menu Terhapus'
+      if (!productSalesMap[menuName]) {
+        productSalesMap[menuName] = { name: menuName, qty: 0, revenue: 0 }
+      }
+      productSalesMap[menuName].qty += (item.qty || 0)
+      productSalesMap[menuName].revenue += ((item.harga_satuan || item.menu_items?.harga || 0) * (item.qty || 0))
+    })
+  })
+
+  const bestSellerProducts = Object.values(productSalesMap).sort((a, b) => b.qty - a.qty)
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 font-sans pb-20 overflow-x-hidden w-full box-border">
       
@@ -292,7 +321,7 @@ export default function OwnerDashboardPage() {
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
           <h1 className="text-2xl font-black text-amber-400">🚪 Panel Eksekutif Owner</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Pantau laporan keuangan, multi-cabang tertaut, pengeluaran, dan rekap shift kasir secara real-time.</p>
+          <p className="text-xs text-slate-400 mt-0.5">Pantau laporan keuangan, multi-cabang tertaut, produk terlaris, stok, dan rekap shift kasir.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -396,6 +425,65 @@ export default function OwnerDashboardPage() {
               </p>
               <p className="text-[10px] text-slate-500">Omzet dikurangi pengeluaran</p>
             </div>
+          </div>
+
+          {/* 🏆 PRODUK TERLARIS & 📦 MONITORING STOK */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Produk Paling Laku (Best Seller) */}
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-4">
+              <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider">🏆 Produk Paling Laku (Best Seller)</h3>
+              
+              <div className="max-h-72 overflow-y-auto space-y-2.5 pr-1">
+                {bestSellerProducts.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic text-center py-6">Belum ada data penjualan produk.</p>
+                ) : (
+                  bestSellerProducts.map((prod, idx) => (
+                    <div key={idx} className="p-3 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center text-xs">
+                      <div className="flex items-center gap-3">
+                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${idx === 0 ? 'bg-amber-500 text-slate-950' : idx === 1 ? 'bg-slate-300 text-slate-950' : idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                          #{idx + 1}
+                        </span>
+                        <div>
+                          <p className="font-bold text-white">{prod.name}</p>
+                          <p className="text-[10px] text-slate-400">Terjual: <strong className="text-emerald-400">{prod.qty} Porsi/Item</strong></p>
+                        </div>
+                      </div>
+                      <span className="font-mono font-bold text-cyan-300">Rp {prod.revenue.toLocaleString('id-ID')}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Monitoring Stok Produk Real-Time */}
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-4">
+              <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider">📦 Monitoring Stok Produk & Menu</h3>
+              
+              <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+                {menuItems.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic text-center py-6">Belum ada data menu/produk di cabang ini.</p>
+                ) : (
+                  menuItems.map((menu) => {
+                    const isLowStock = menu.stok !== undefined && menu.stok !== null && menu.stok <= 5
+                    return (
+                      <div key={menu.id} className="p-3 bg-slate-950 border border-slate-800 rounded-2xl flex justify-between items-center text-xs">
+                        <div>
+                          <p className="font-bold text-white">{menu.nama}</p>
+                          <p className="text-[10px] text-slate-400">Harga: Rp {menu.harga?.toLocaleString('id-ID')}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black font-mono ${menu.stok === 0 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40' : isLowStock ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'}`}>
+                            {menu.stok !== undefined && menu.stok !== null ? `Stok: ${menu.stok}` : 'Stok: Unlimited'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+
           </div>
 
           {/* Grid Kelola Pengeluaran & Riwayat Shift */}
