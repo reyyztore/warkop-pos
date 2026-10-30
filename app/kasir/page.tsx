@@ -345,7 +345,7 @@ export default function KasirDashboardPage() {
       }
       receiptText += `TOTAL: Rp ${ord.total_harga?.toLocaleString('id-ID')}\n`
       receiptText += `==============================\n`
-      receiptText += `Terima Kasih! - Reyyztore POS\n\n\n`
+      receiptText += `Terima Kasih! - reyyztore POS\n\n\n`
 
       alert('🖨️ Perintah cetak terkirim ke printer bluetooth!')
     } catch (err: any) {
@@ -1488,7 +1488,7 @@ export default function KasirDashboardPage() {
       )}
 
       <footer className="text-center py-6 text-[10px] text-slate-400 font-medium border-t border-slate-800 mt-8">
-        Powered by <strong className="text-emerald-400">Reyyztore</strong> • Digital POS System
+        Powered by <strong className="text-emerald-400">reyyztore</strong> • Digital POS System
       </footer>
     </div>
   )
