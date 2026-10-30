@@ -157,6 +157,10 @@ export default function KasirDashboardPage() {
 
     const channel = supabase
       .channel(`kasir-dashboard-${storeId}`)
+      .on('broadcast', { event: 'new-order' }, () => {
+        playIncomingOrderSound()
+        fetchOrders(storeId)
+      })
       .on('broadcast', { event: 'customer-ring-bell' }, (payload: any) => {
         const table = payload.payload?.tableNo || '??'
         speakTableBell(table)
@@ -263,7 +267,7 @@ export default function KasirDashboardPage() {
     }
   }
 
-  // FIX: TWO-STEP FETCHING UNTUK MEMASTIKAN ITEM SAMA SEKALI TIDAK HILANG / KOSONG
+  // FIX PENTING: FETCH ORDERS + MANUAL MATCHING MENU ITEM (AGAR RINCIAN TIDAK PERNAH KOSONG)
   const fetchOrders = async (targetStoreId: string) => {
     setLoading(true)
     try {
@@ -285,7 +289,7 @@ export default function KasirDashboardPage() {
       // Step 2: Kumpulkan semua Order ID
       const orderIds = ordersData.map((o) => o.id)
 
-      // Step 3: Fetch order_items & menu_items secara terpisah
+      // Step 3: Fetch order_items & menu_items
       const { data: itemsData, error: itemsErr } = await supabase
         .from('order_items')
         .select('*, menu_items!left(*)')
@@ -293,9 +297,27 @@ export default function KasirDashboardPage() {
 
       if (itemsErr) console.error('Error fetching order_items:', itemsErr)
 
-      // Step 4: Gabungkan order_items ke masing-masing order
+      // Step 4: Fetch seluruh menu toko untuk fallback manual jika join null
+      const { data: allMenuItems } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('store_id', targetStoreId)
+
+      const menuMap = new Map((allMenuItems || []).map((m) => [m.id, m]))
+
+      // Step 5: Gabungkan order_items ke masing-masing order
       const combinedOrders = ordersData.map((ord) => {
-        const matchingItems = (itemsData || []).filter((item) => item.order_id === ord.id)
+        const matchingItems = (itemsData || [])
+          .filter((item) => item.order_id === ord.id)
+          .map((item) => {
+            const targetMenuId = item.menu_id || item.menu_item_id
+            const fallbackMenu = targetMenuId ? menuMap.get(targetMenuId) : null
+            return {
+              ...item,
+              menu_items: item.menu_items || fallbackMenu || null,
+            }
+          })
+
         return {
           ...ord,
           order_items: matchingItems,
@@ -789,7 +811,6 @@ export default function KasirDashboardPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          
           <div className="flex items-center gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl">
             <span className="text-[10px] font-bold text-slate-400 px-2 uppercase tracking-wider hidden sm:inline">📦 Operasional:</span>
             <button onClick={() => setActiveTab('semua')} className={`px-3 py-1.5 text-xs font-bold rounded-xl transition ${activeTab === 'semua' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-800'}`}>
@@ -839,7 +860,6 @@ export default function KasirDashboardPage() {
               🪑 Meja
             </Link>
           </div>
-
         </div>
       </div>
 
@@ -1057,6 +1077,7 @@ export default function KasirDashboardPage() {
                 </div>
               )}
 
+              {/* TAMPILAN RINCIAN MENU DENGAN ALL FALLBACK PROPERTIES */}
               <div className="space-y-2">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📦 RINCIAN PRODUK / MENU DIPESAN:</p>
                 {itemsList.length === 0 ? (
@@ -1066,8 +1087,14 @@ export default function KasirDashboardPage() {
                 ) : (
                   <ul className="space-y-2 text-xs text-slate-300">
                     {itemsList.map((item: any, idx: number) => {
-                      const namaProduk = item.menu_items?.nama || item.nama_menu_manual || item.nama_item || 'Menu / Produk'
-                      const unitPrice = item.harga_satuan || item.menu_items?.harga || 0
+                      const namaProduk = 
+                        item.menu_items?.nama || 
+                        item.nama_menu_manual || 
+                        item.nama_item || 
+                        item.nama || 
+                        'Menu / Produk'
+
+                      const unitPrice = item.harga_satuan || item.menu_items?.harga || item.harga || 0
                       const hargaSubtotal = unitPrice * (item.qty || 1)
 
                       return (
