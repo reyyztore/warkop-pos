@@ -310,7 +310,6 @@ export default function KasirDashboardPage() {
     if (data) setActiveShift(data)
   }
 
-  // 🖨️ KONEKSI WEB BLUETOOTH API NATIVE
   const connectBluetoothPrinter = async () => {
     try {
       const nav = navigator as any
@@ -334,7 +333,6 @@ export default function KasirDashboardPage() {
     }
   }
 
-  // 🖨️ CETAK STRUK DIRECT PER PESANAN VIA BLUETOOTH
   const handlePrintBluetoothStruk = async (ord: any) => {
     if (!isBtConnected) {
       const wantConnect = confirm('Printer Bluetooth belum terhubung. Hubungkan sekarang?')
@@ -363,16 +361,12 @@ export default function KasirDashboardPage() {
       receiptText += `==============================\n`
       receiptText += `Terima Kasih! - Reyyztore POS\n\n\n`
 
-      const encoder = new TextEncoder()
-      const data = encoder.encode(receiptText)
-
       alert('🖨️ Perintah cetak terkirim ke printer bluetooth!')
     } catch (err: any) {
       alert('Gagal cetak struk: ' + err.message)
     }
   }
 
-  // ⏱️ FUNGSI BUKA SHIFT KASIR (DENGAN FIELD cashier_name)
   const handleOpenShift = async () => {
     if (!modalAwalInput || !storeId) {
       alert('⚠️ Masukkan nominal modal awal kasir terlebih dahulu!')
@@ -398,10 +392,7 @@ export default function KasirDashboardPage() {
         .select()
         .single()
 
-      if (error) {
-        console.error('Database Error:', error)
-        throw error
-      }
+      if (error) throw error
 
       setActiveShift(data)
       setShowShiftModal(false)
@@ -412,7 +403,6 @@ export default function KasirDashboardPage() {
     }
   }
 
-  // ⏱️ FUNGSI TUTUP SHIFT KASIR (HITUNG KAS FISIK & PENJUALAN TUNAI)
   const handleCloseShift = async () => {
     if (!kasFisikInput || !activeShift) {
       alert('⚠️ Masukkan nominal total kas fisik terlebih dahulu!')
@@ -461,7 +451,6 @@ export default function KasirDashboardPage() {
     }
   }
 
-  // 🪑 FUNGSI PINDAH MEJA
   const handleMoveTable = async () => {
     if (!selectedOrderForAction || !targetTableNo || !storeId) return
     const targetTable = tables.find((t) => t.nomor.toString() === targetTableNo.toString())
@@ -476,7 +465,6 @@ export default function KasirDashboardPage() {
     alert(`✅ Pesanan berhasil dipindah ke Meja #${targetTableNo}!`)
   }
 
-  // PROTEKSI PIN UTAMA UNTUK TOGGLE SAKLAR
   const executeWithPinProtection = (action: () => void) => {
     setPendingAction(() => action)
     setInputPin('')
@@ -697,6 +685,7 @@ export default function KasirDashboardPage() {
   const rekapOrders = getFilteredOrdersByPeriode()
   const totalRekapOmzet = rekapOrders.reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
 
+  // REVISI REKAP CSV DENGAN RINCIAN NAMA PRODUK/MENU
   const downloadRekapCSV = () => {
     if (rekapOrders.length === 0) {
       alert('Tidak ada data pesanan selesai pada periode ini.')
@@ -704,7 +693,7 @@ export default function KasirDashboardPage() {
     }
 
     let csvContent = '\uFEFF'
-    csvContent += 'ID Pesanan,Tanggal,Waktu,Nomor Meja,Nama Pemesan,Total Harga (Rp),Status\n'
+    csvContent += 'ID Pesanan,Tanggal,Waktu,Nomor Meja,Nama Pemesan,Daftar Menu & Qty,Total Harga (Rp),Status\n'
 
     rekapOrders.forEach((o) => {
       const d = new Date(o.created_at)
@@ -714,10 +703,15 @@ export default function KasirDashboardPage() {
       const orderId = `"${o.id || ''}"`
       const meja = `"Meja #${o.tables?.nomor ?? '-'}"`
       const nama = `"${(o.nama_pemesan || 'Tanpa Nama').replace(/"/g, '""')}"`
+      
+      // Menggabungkan nama produk/menu dalam pesanan untuk file CSV
+      const itemsString = o.order_items?.map((i: any) => `${i.qty}x ${i.menu_items?.nama || 'Item'} (${i.varian || 'Normal'})`).join('; ') || '-'
+      const itemsEscaped = `"${itemsString.replace(/"/g, '""')}"`
+
       const totalHarga = o.total_harga || 0
       const status = `"${(o.status || '').toUpperCase()}"`
 
-      csvContent += `${orderId},${dateStr},${timeStr},${meja},${nama},${totalHarga},${status}\n`
+      csvContent += `${orderId},${dateStr},${timeStr},${meja},${nama},${itemsEscaped},${totalHarga},${status}\n`
     })
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -747,7 +741,7 @@ export default function KasirDashboardPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 font-sans pb-16 relative overflow-hidden">
       
-      {/* Top Bar Header dengan Pembagian Navigasi Kiri & Kanan */}
+      {/* Top Bar Header dengan Navigasi Kiri & Kanan */}
       <div className="max-w-6xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-800">
         
         {/* Identitas Toko */}
@@ -1008,7 +1002,7 @@ export default function KasirDashboardPage() {
         ))}
       </div>
 
-      {/* Grid Pesanan dengan Informasi Menu Lengkap */}
+      {/* Grid Pesanan dengan Informasi Nama Menu Lengkap */}
       <div className="max-w-6xl mx-auto mt-4 space-y-3">
         {loading ? (
           <div className="h-44 bg-slate-900/50 rounded-3xl animate-pulse border border-slate-800" />
@@ -1045,15 +1039,17 @@ export default function KasirDashboardPage() {
                 </div>
               )}
 
-              {/* RINCIAN MENU YANG DIPESAN */}
+              {/* RINCIAN NAMA MENU & PRODUK YANG DIPESAN */}
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📦 Rincian Menu Dipesan:</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📦 Rincian Produk / Menu Dipesan:</p>
                 <ul className="space-y-2 text-xs text-slate-300">
                   {ord.order_items?.map((item: any) => (
                     <li key={item.id} className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 space-y-1">
                       <div className="flex justify-between items-center">
                         <div>
-                          <span className="font-bold text-white text-sm"><strong className="text-emerald-400">{item.qty}x</strong> {item.menu_items?.nama || 'Menu'}</span>
+                          <span className="font-bold text-white text-sm">
+                            <strong className="text-emerald-400">{item.qty}x</strong> {item.menu_items?.nama || 'Menu / Produk'}
+                          </span>
                           {item.varian && (
                             <span className={`ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${item.varian === 'dingin' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'bg-amber-950 text-amber-300 border border-amber-800'}`}>
                               {item.varian === 'dingin' ? '🧊 Dingin' : '🔥 Panas'}
@@ -1225,7 +1221,7 @@ export default function KasirDashboardPage() {
             </div>
 
             <button onClick={downloadRekapCSV} className="w-full py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl shadow-md">
-              📥 Download Laporan (CSV / Excel)
+              📥 Download Laporan (CSV / Excel Termasuk Nama Produk)
             </button>
             <button onClick={() => setShowRekapModal(false)} className="w-full py-2 bg-slate-800 text-xs font-bold rounded-xl">
               Tutup
