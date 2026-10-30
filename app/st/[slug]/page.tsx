@@ -681,6 +681,7 @@ function DynamicStoreContent() {
     window.open(waUrl, '_blank')
   }
 
+  // FIX PENTING: CHECKOUT PEMBELI MENGIRIM DATA NAMA MENU DAN CATATAN LENGKAP
   const handleCheckout = async () => {
     if (!isOpen) {
       alert('Maaf, Toko sedang TUTUP. Pemesanan tidak dapat diproses.')
@@ -722,24 +723,40 @@ function DynamicStoreContent() {
 
       if (orderErr) throw orderErr
 
-      // INSERT ITEM DENGAN NAMA MENUMANUAL ATAU FALLBACK
+      // INSERT KE TABEL order_items DENGAN MEMASTIKAN NAMA_MENU, MENU_ID DAN CATATAN TERISI
       const orderItems = Object.entries(cart).map(([key, item]) => {
         const menu = menuItems.find((m) => m.id === item.menuId)
         const hargaSatuan = item.varian === 'dingin' && menu?.harga_dingin ? menu.harga_dingin : (menu?.harga_panas || menu?.harga || 0)
+        const namaMenuFix = menu?.nama || 'Item Menu'
+
         return {
           order_id: orderData.id,
           menu_id: item.menuId,
+          menu_item_id: item.menuId,
           qty: item.qty,
           harga_satuan: hargaSatuan,
           varian: item.varian,
           catatan: item.catatan || null,
           hpp_satuan: menu?.hpp || 0,
-          nama_menu_manual: menu?.nama || 'Item Menu',
-          nama_item: menu?.nama || 'Item Menu',
+          nama_menu_manual: namaMenuFix,
+          nama_item: namaMenuFix,
         }
       })
 
-      await supabase.from('order_items').insert(orderItems)
+      const { error: itemsErr } = await supabase.from('order_items').insert(orderItems)
+      if (itemsErr) throw itemsErr
+
+      // Kirim sinyal Realtime ke Dashboard Kasir
+      await supabase.channel(`kasir-dashboard-${storeId}`).send({
+        type: 'broadcast',
+        event: 'new-order',
+        payload: {
+          orderId: orderData.id,
+          tableNo: selectedTable,
+          customerName: userData.name,
+          total: getTotalHarga(),
+        },
+      })
 
       if (selectedPayment === 'qris') {
         setActiveOrderForQris(orderData)
