@@ -46,6 +46,7 @@ export default function KasirDashboardPage() {
   const [isOpen, setIsOpen] = useState(true)
   const [bannerUrl, setBannerUrl] = useState('')
   const [bannerFile, setBannerFile] = useState<File | null>(null)
+  const [showTampilanModal, setShowTampilanModal] = useState(false)
 
   // Fitur Wifi, Maps, WA Komplain, Sosmed, Jam Operasional, Fasilitas & Tema Visual
   const [mapsUrl, setMapsUrl] = useState('')
@@ -655,6 +656,7 @@ export default function KasirDashboardPage() {
 
       setBannerUrl(newBannerUrl)
       setBgImageUrl(newBgImageUrl)
+      setShowTampilanModal(false)
       alert('🎨 Tampilan & Fitur Toko Berhasil Diperbarui!')
     } catch (e: any) {
       alert(e.message)
@@ -733,8 +735,10 @@ export default function KasirDashboardPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 sm:p-6 font-sans pb-16 relative overflow-hidden">
       
-      {/* Top Bar Header */}
-      <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-800">
+      {/* Top Bar Header dengan Pembagian Navigasi Kiri & Kanan */}
+      <div className="max-w-6xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-800">
+        
+        {/* Identitas Toko */}
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden flex items-center justify-center text-xl shrink-0">
             {avatarUrl ? <img src={avatarUrl} alt="Logo" className="w-full h-full object-cover" /> : themeConfig.emoji}
@@ -755,46 +759,46 @@ export default function KasirDashboardPage() {
           </div>
         </div>
 
-        {/* Menu Navigasi Kasir (Hanya Fitur Utama Operasional Cepat) */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {bluetoothActive && (
-            <button
-              onClick={connectBluetoothPrinter}
-              className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition ${
-                isBtConnected ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-slate-800 text-slate-400 border-slate-700'
-              }`}
-            >
-              {isBtConnected ? '🖨️ Printer Connected' : '🖨️ Hubungkan Printer'}
+        {/* NAVIGASI UTAMA (DIPISAH KIRI & KANAN SESUAI PERMINTAAN) */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          
+          {/* SISI KIRI: Navigasi Pesanan & Analitik/Rekap */}
+          <div className="flex items-center gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl">
+            <span className="text-[10px] font-bold text-slate-400 px-2 uppercase tracking-wider hidden sm:inline">📦 Operasional:</span>
+            <button onClick={() => setActiveTab('semua')} className={`px-3 py-1.5 text-xs font-bold rounded-xl transition ${activeTab === 'semua' ? 'bg-emerald-500 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-800'}`}>
+              Pesanan Masuk
             </button>
-          )}
-
-          {shiftActive && (
-            <button
-              onClick={() => setShowShiftModal(true)}
-              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black rounded-xl shadow"
-            >
-              {activeShift ? '⏱️ Shift Aktif (Tutup)' : '⏱️ Buka Shift Kasir'}
+            <button onClick={() => setShowRekapModal(true)} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-amber-300 rounded-xl transition">
+              📊 Analitik & Rekap
             </button>
-          )}
+          </div>
 
-          <Link href="/kasir/menu" className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-xs font-bold text-slate-200 rounded-xl">
-            🌸 Menu
-          </Link>
-          <Link href="/kasir/meja" className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-xs font-bold text-slate-200 rounded-xl">
-            🪑 Meja
-          </Link>
-          <button
-            onClick={() => setShowProfileModal(true)}
-            className="px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-slate-950 font-black text-xs rounded-xl shadow-lg transition"
-          >
-            ⚙️ Pengaturan & Profil Toko
-          </button>
+          {/* SISI KANAN: Navigasi Profil, Edit Toko, Tema, Promo, & Fitur Lainnya */}
+          <div className="flex items-center gap-2 p-1.5 bg-slate-900/90 border border-slate-800 rounded-2xl flex-wrap">
+            <span className="text-[10px] font-bold text-slate-400 px-2 uppercase tracking-wider hidden sm:inline">⚙️ Manajemen:</span>
+            <button onClick={() => setShowProfileModal(true)} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-emerald-300 rounded-xl transition">
+              👤 Profil
+            </button>
+            <button onClick={() => setShowTampilanModal(true)} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-amber-300 rounded-xl transition">
+              🎨 Edit Toko & Tema
+            </button>
+            <button onClick={() => setShowPromoModal(true)} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-cyan-300 rounded-xl transition">
+              🎟️ Promo
+            </button>
+            <Link href="/kasir/menu" className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-xl transition">
+              🌸 Menu
+            </Link>
+            <Link href="/kasir/meja" className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 rounded-xl transition">
+              🪑 Meja
+            </Link>
+          </div>
+
         </div>
       </div>
 
       {/* BOX LINK PELANGGAN KHUSUS TOKO INI */}
       {customerStoreUrl && (
-        <div className="max-w-5xl mx-auto mt-4 p-3.5 bg-emerald-950/60 border border-emerald-800/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+        <div className="max-w-6xl mx-auto mt-4 p-3.5 bg-emerald-950/60 border border-emerald-800/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
           <div>
             <p className="font-bold text-emerald-300">🔗 Link Toko Pelanggan Kamu (Khusus Akun Ini):</p>
             <p className="text-slate-300 font-mono text-[11px] mt-0.5 select-all">{customerStoreUrl}</p>
@@ -823,14 +827,14 @@ export default function KasirDashboardPage() {
 
       {/* Alert Bell & Notifikasi Pembatalan Pelanggan */}
       {customerBellAlert && (
-        <div className="max-w-5xl mx-auto mt-4 p-3.5 bg-amber-500 text-slate-950 text-xs font-black rounded-2xl shadow-xl flex justify-between items-center animate-bounce">
+        <div className="max-w-6xl mx-auto mt-4 p-3.5 bg-amber-500 text-slate-950 text-xs font-black rounded-2xl shadow-xl flex justify-between items-center animate-bounce">
           <span>{customerBellAlert}</span>
           <button onClick={() => setCustomerBellAlert(null)} className="text-xs px-2 py-1 bg-slate-950 text-white rounded-lg">Tutup</button>
         </div>
       )}
 
       {/* Ringkasan Omzet */}
-      <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-3xl">
           <p className="text-[10px] font-bold text-slate-400 uppercase">Omzet Hari Ini</p>
           <p className="text-xl font-black text-emerald-400 mt-1">Rp {totalOmzetHariIni.toLocaleString('id-ID')}</p>
@@ -845,8 +849,8 @@ export default function KasirDashboardPage() {
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="max-w-5xl mx-auto flex gap-2 overflow-x-auto mt-6 pb-1 no-scrollbar">
+      {/* Filter Tabs Status Pesanan */}
+      <div className="max-w-6xl mx-auto flex gap-2 overflow-x-auto mt-6 pb-1 no-scrollbar">
         {[
           { id: 'semua', label: 'Semua Status' },
           { id: 'pending', label: '⏳ Baru' },
@@ -860,8 +864,8 @@ export default function KasirDashboardPage() {
         ))}
       </div>
 
-      {/* Grid Pesanan (Informasi pesanan lengkap ditampilkan di setiap kartu) */}
-      <div className="max-w-5xl mx-auto mt-4 space-y-3">
+      {/* Grid Pesanan dengan Informasi Menu Lengkap */}
+      <div className="max-w-6xl mx-auto mt-4 space-y-3">
         {loading ? (
           <div className="h-44 bg-slate-900/50 rounded-3xl animate-pulse border border-slate-800" />
         ) : filteredOrders.map((ord) => {
@@ -962,126 +966,241 @@ export default function KasirDashboardPage() {
         })}
       </div>
 
-      {/* MODAL PUSAT PENGATURAN & PROFIL TOKO (KONSOLIDASI SEMUA FITUR LANJUTAN) */}
+      {/* MODAL PROFIL & PENGATURAN TOKO */}
       {showProfileModal && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-2xl rounded-3xl p-6 space-y-6 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-md rounded-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-base font-bold text-emerald-400">👤 Pengaturan Profil & QRIS</h2>
             
-            <div className="flex justify-between items-center pb-3 border-b border-slate-800">
-              <h2 className="text-base font-black text-amber-400">⚙️ Pusat Pengaturan & Profil Toko</h2>
-              <button onClick={() => setShowProfileModal(false)} className="text-xs px-3 py-1 bg-slate-800 text-slate-300 rounded-xl font-bold">✕ Tutup</button>
+            <div className="bg-slate-950 border border-amber-500/40 p-3.5 rounded-2xl space-y-2">
+              <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider">⏳ Masa Aktif Langganan Toko</span>
+              <p className="text-xs font-bold text-white">
+                Sisa Waktu: <span className="text-emerald-400 font-mono text-sm font-black">{daysRemaining} Hari</span>
+              </p>
+              <p className="text-[10px] text-slate-400">
+                Tanggal Kedaluwarsa: {expiredAt ? new Date(expiredAt).toLocaleDateString('id-ID') : 'Belum Ditentukan'}
+              </p>
+              <a
+                href="https://wa.me/6285150725531?text=Halo%20Raihan,%20saya%20mau%20tambah%20waktu%20langganan%20sistem%20POS%20toko%20saya"
+                target="_blank"
+                rel="noreferrer"
+                className="block text-center w-full py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition"
+              >
+                ➕ Tambah Waktu Langganan (Chat Raihan WhatsApp)
+              </a>
             </div>
 
-            {/* Navigasi Sub-Fitur Di Dalam Modal */}
-            <div className="space-y-6">
-              
-              {/* BAGIAN 1: PROFIL & LANGGANAN */}
-              <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-3">
-                <h3 className="text-xs font-black text-emerald-400 uppercase tracking-wider">👤 Identitas Toko & Langganan</h3>
-                
-                <div className="bg-slate-900 border border-amber-500/40 p-3 rounded-xl space-y-1">
-                  <span className="text-[10px] font-black uppercase text-amber-400">⏳ Masa Aktif Langganan Toko</span>
-                  <p className="text-xs font-bold text-white">Sisa Waktu: <span className="text-emerald-400">{daysRemaining} Hari</span> (Kedaluwarsa: {expiredAt ? new Date(expiredAt).toLocaleDateString('id-ID') : '-'})</p>
-                  <a
-                    href="https://wa.me/6285150725531?text=Halo%20Raihan,%20saya%20mau%20tambah%20waktu%20langganan%20sistem%20POS%20toko%20saya"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block text-center mt-2 py-1.5 bg-emerald-500 text-slate-950 font-black text-[11px] rounded-lg"
-                  >
-                    ➕ Tambah Waktu Langganan (WhatsApp)
-                  </a>
-                </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Nama Akun Kasir</label>
+                <input type="text" value={cashierName} onChange={(e) => setCashierName(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Nama Warkop / Warung</label>
+                <input type="text" value={storeName} onChange={(e) => setStoreName(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Foto Logo Warkop</label>
+                <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-400 file:py-1 file:px-3 file:rounded-xl file:bg-emerald-950 file:text-emerald-300" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Foto QRIS Pembayaran</label>
+                <input type="file" accept="image/*" onChange={(e) => setQrisFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-400 file:py-1 file:px-3 file:rounded-xl file:bg-emerald-950 file:text-emerald-300" />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button onClick={handleSaveProfile} className="flex-1 py-2.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl">Simpan Profil</button>
+              <button onClick={() => setShowProfileModal(false)} className="px-4 py-2.5 bg-slate-800 text-xs font-bold rounded-xl">Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Nama Kasir</label>
-                    <input type="text" value={cashierName} onChange={(e) => setCashierName(e.target.value)} className="w-full mt-1 p-2 bg-slate-900 border border-slate-800 text-xs text-white rounded-xl" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Nama Toko</label>
-                    <input type="text" value={storeName} onChange={(e) => setStoreName(e.target.value)} className="w-full mt-1 p-2 bg-slate-900 border border-slate-800 text-xs text-white rounded-xl" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Logo Toko</label>
-                    <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)} className="w-full text-[11px] text-slate-400 mt-1" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">QRIS Pembayaran</label>
-                    <input type="file" accept="image/*" onChange={(e) => setQrisFile(e.target.files?.[0] || null)} className="w-full text-[11px] text-slate-400 mt-1" />
-                  </div>
-                </div>
-
-                <button onClick={handleSaveProfile} className="w-full py-2 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl mt-2">
-                  💾 Simpan Perubahan Profil
-                </button>
+      {/* MODAL EDIT TEMA VISUAL, BACKGROUND GAMBAR, WIFI, MAPS, SOSMED & LOYALTY CARD */}
+      {showTampilanModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-lg rounded-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-base font-bold text-amber-400">🎨 Edit Tema & Info Toko</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Pilih Gaya Tema Visual Toko</label>
+                <select
+                  value={themeStyle}
+                  onChange={(e) => setThemeStyle(e.target.value)}
+                  className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white font-bold"
+                >
+                  <option value="glassmorphic">🍸 Gelas Kaca / Frosted Glass (Cerah Transparan)</option>
+                  <option value="bubble">🫧 Gelembung Ceria (Merah Muda / Pink Pastel)</option>
+                  <option value="fresh_mint">🍃 Fresh Mint (Hijau Muda)</option>
+                  <option value="sky_blue">☁️ Soft Sky (Biru Muda)</option>
+                  <option value="warm_latte">☕ Warm Latte (Cokelat Muda Aesthetic)</option>
+                </select>
               </div>
 
-              {/* BAGIAN 2: SAKLAR FITUR TOKO */}
-              <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-3">
-                <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">🎛️ Saklar Fitur Toko</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div className="p-2.5 bg-slate-900 rounded-xl flex justify-between items-center text-xs">
-                    <span>Layar Dapur (KDS)</span>
-                    <button onClick={() => executeWithPinProtection(() => { const next = !kdsActive; setKdsActive(next); updateToggleInDb('kds_active', next); })} className={`px-2.5 py-1 font-black rounded-lg ${kdsActive ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>{kdsActive ? 'ON' : 'OFF'}</button>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Foto Background Toko (Wallpaper Pelanggan)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setBgImageFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs text-slate-400 file:py-1 file:px-3 file:rounded-xl file:bg-amber-950 file:text-amber-300"
+                />
+              </div>
+
+              <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-amber-400">🎴 Aktifkan Loyalty Card Toko</span>
+                  <input
+                    type="checkbox"
+                    checked={loyaltyActive}
+                    onChange={(e) => setLoyaltyActive(e.target.checked)}
+                    className="w-4 h-4 accent-amber-500 cursor-pointer"
+                  />
+                </div>
+
+                {loyaltyActive && (
+                  <div className="space-y-2 pt-1 border-t border-slate-800">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Kode Loyalty Hari Ini</label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: WARKOPPING01"
+                        value={loyaltyCode}
+                        onChange={(e) => setLoyaltyCode(e.target.value.toUpperCase())}
+                        className="w-full mt-1 p-2 bg-slate-900 border border-slate-800 text-xs font-mono font-bold text-amber-300 rounded-xl uppercase"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Jumlah Target Kotak Stamp</label>
+                      <input
+                        type="number"
+                        min={3}
+                        max={20}
+                        value={loyaltyMaxStamps}
+                        onChange={(e) => setLoyaltyMaxStamps(Number(e.target.value))}
+                        className="w-full mt-1 p-2 bg-slate-900 border border-slate-800 text-xs text-white rounded-xl"
+                      />
+                    </div>
                   </div>
-                  <div className="p-2.5 bg-slate-900 rounded-xl flex justify-between items-center text-xs">
-                    <span>Stok Menu</span>
-                    <button onClick={() => executeWithPinProtection(() => { const next = !stockActive; setStockActive(next); updateToggleInDb('stock_active', next); })} className={`px-2.5 py-1 font-black rounded-lg ${stockActive ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>{stockActive ? 'ON' : 'OFF'}</button>
-                  </div>
-                  <div className="p-2.5 bg-slate-900 rounded-xl flex justify-between items-center text-xs">
-                    <span>Rekomendasi Menu</span>
-                    <button onClick={() => executeWithPinProtection(() => { const next = !recommendationActive; setRecommendationActive(next); updateToggleInDb('recommendation_active', next); })} className={`px-2.5 py-1 font-black rounded-lg ${recommendationActive ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>{recommendationActive ? 'ON' : 'OFF'}</button>
-                  </div>
-                  <div className="p-2.5 bg-slate-900 rounded-xl flex justify-between items-center text-xs">
-                    <span>Manajemen Meja</span>
-                    <button onClick={() => executeWithPinProtection(() => { const next = !tableMgmtActive; setTableMgmtActive(next); updateToggleInDb('table_mgmt_active', next); })} className={`px-2.5 py-1 font-black rounded-lg ${tableMgmtActive ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>{tableMgmtActive ? 'ON' : 'OFF'}</button>
-                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Pilih 10 Preset Warna Toko</label>
+                <div className="grid grid-cols-2 gap-2 mt-1 max-h-36 overflow-y-auto p-1">
+                  {THEME_PRESETS.map((preset) => (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      onClick={() => handleSelectPresetTheme(preset)}
+                      className={`p-2 rounded-xl text-left text-xs font-bold border flex items-center justify-between ${
+                        themeConfig.bgColor === preset.bgColor ? 'border-amber-400 bg-slate-950' : 'border-slate-800 bg-slate-950/40'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span>{preset.emoji}</span>
+                        <span className="text-white text-[11px]">{preset.name}</span>
+                      </span>
+                      <div className="w-4 h-4 rounded-full border border-slate-700" style={{ backgroundColor: preset.bgColor }} />
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* BAGIAN 3: AKSES LAPORAN, PROMO, & PANEL OWNER */}
-              <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-3">
-                <h3 className="text-xs font-black text-cyan-400 uppercase tracking-wider">📊 Analitik, Rekap & Promo</h3>
-                <div className="flex flex-wrap gap-2">
-                  <button onClick={() => setShowRekapModal(true)} className="px-3 py-2 bg-slate-900 border border-slate-800 font-bold text-xs rounded-xl text-amber-300">📊 Buka Rekap Laporan & Download</button>
-                  <button onClick={() => setShowPromoModal(true)} className="px-3 py-2 bg-slate-900 border border-slate-800 font-bold text-xs rounded-xl text-cyan-300">🎟️ Kelola Kode Promo</button>
-                  <button onClick={() => executeWithPinProtection(() => { window.location.href = '/owner' })} className="px-3 py-2 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">🚪 Masuk Panel Owner (PIN)</button>
-                </div>
-              </div>
-
-              {/* BAGIAN 4: TEMA VISUAL & WIFI */}
-              <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-3">
-                <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">🎨 Tema & Info Pelanggan</h3>
-                
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase">Gaya Tema Visual Toko</label>
-                  <select value={themeStyle} onChange={(e) => setThemeStyle(e.target.value)} className="w-full mt-1 p-2 bg-slate-900 border border-slate-800 text-xs rounded-xl text-white font-bold">
-                    <option value="glassmorphic">🍸 Gelas Kaca / Frosted Glass</option>
-                    <option value="bubble">🫧 Gelembung Ceria</option>
-                    <option value="fresh_mint">🍃 Fresh Mint</option>
-                    <option value="sky_blue">☁️ Soft Sky</option>
-                    <option value="warm_latte">☕ Warm Latte</option>
-                  </select>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Emoji Toko</label>
+                  <input
+                    type="text"
+                    value={themeConfig.emoji}
+                    onChange={(e) => setThemeConfig({ ...themeConfig, emoji: e.target.value })}
+                    className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-center rounded-xl text-white"
+                  />
                 </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Jam Operasional</label>
-                    <input type="text" value={jamOperasional} onChange={(e) => setJamOperasional(e.target.value)} placeholder="09:00 - 23:00" className="w-full mt-1 p-2 bg-slate-900 border border-slate-800 text-xs rounded-xl text-white" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase">Fasilitas (Koma)</label>
-                    <input type="text" value={fasilitasInput} onChange={(e) => setFasilitasInput(e.target.value)} placeholder="AC, Wifi" className="w-full mt-1 p-2 bg-slate-900 border border-slate-800 text-xs rounded-xl text-white" />
-                  </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Status Toko</label>
+                  <button onClick={handleToggleStoreOpen} type="button" className={`w-full p-2.5 rounded-xl text-xs font-black ${isOpen ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'}`}>
+                    {isOpen ? 'TOKO BUKA' : 'TOKO TUTUP'}
+                  </button>
                 </div>
-
-                <button onClick={handleSaveTampilan} className="w-full py-2 bg-amber-500 text-slate-950 font-black text-xs rounded-xl mt-2">
-                  🎨 Terapkan Tema & Info Baru
-                </button>
               </div>
 
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Jam Operasional Toko</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Setiap Hari 09.00 - 23.00 WIB"
+                  value={jamOperasional}
+                  onChange={(e) => setJamOperasional(e.target.value)}
+                  className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Fasilitas Toko (Pisahkan Koma)</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: 🔌 Colokan Listrik, ❄️ AC, 🚬 Smoking Area, 🎮 Board Game"
+                  value={fasilitasInput}
+                  onChange={(e) => setFasilitasInput(e.target.value)}
+                  className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Pesan Pengumuman</label>
+                <input type="text" value={announcement} onChange={(e) => setAnnouncement(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Banner Promosi</label>
+                <input type="file" accept="image/*" onChange={(e) => setBannerFile(e.target.files?.[0] || null)} className="w-full text-xs text-slate-400 file:py-1 file:px-3 file:rounded-xl file:bg-amber-950 file:text-amber-300" />
+              </div>
+
+              <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-blue-300">📶 Fasilitas Wi-Fi Toko</span>
+                  <input type="checkbox" checked={wifiActive} onChange={(e) => setWifiActive(e.target.checked)} className="w-4 h-4" />
+                </div>
+                {wifiActive && (
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <input type="text" placeholder="Nama Wifi (SSID)" value={wifiName} onChange={(e) => setWifiName(e.target.value)} className="p-2 bg-slate-900 border border-slate-800 text-xs text-white rounded-xl" />
+                    <input type="text" placeholder="Password Wifi" value={wifiPassword} onChange={(e) => setWifiPassword(e.target.value)} className="p-2 bg-slate-900 border border-slate-800 text-xs text-white rounded-xl" />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Link Google Maps Toko</label>
+                <input type="text" placeholder="https://maps.google.com/..." value={mapsUrl} onChange={(e) => setMapsUrl(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase">Nomor WhatsApp Komplain Toko</label>
+                <input type="tel" placeholder="081234567890" value={waComplaint} onChange={(e) => setWaComplaint(e.target.value)} className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Link Media Sosial Toko</label>
+                  <button type="button" onClick={handleAddSocialLink} className="text-[10px] px-2 py-1 bg-amber-500/20 text-amber-300 rounded-lg font-bold">+ Tambah Sosmed</button>
+                </div>
+                {socialLinks.map((link, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <input type="text" placeholder="Instagram / TikTok" value={link.platform} onChange={(e) => handleUpdateSocialLink(idx, 'platform', e.target.value)} className="w-1/3 p-2 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+                    <input type="text" placeholder="https://instagram.com/..." value={link.url} onChange={(e) => handleUpdateSocialLink(idx, 'url', e.target.value)} className="flex-1 p-2 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl" />
+                    <button type="button" onClick={() => handleRemoveSocialLink(idx)} className="text-xs text-rose-400 font-bold px-1.5">✕</button>
+                  </div>
+                ))}
+              </div>
             </div>
 
+            <div className="flex gap-2 pt-2">
+              <button onClick={handleSaveTampilan} className="flex-1 py-2.5 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Terapkan Perubahan</button>
+              <button onClick={() => setShowTampilanModal(false)} className="px-4 py-2.5 bg-slate-800 text-xs font-bold rounded-xl">Batal</button>
+            </div>
           </div>
         </div>
       )}
