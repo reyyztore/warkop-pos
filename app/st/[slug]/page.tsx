@@ -17,6 +17,16 @@ function DynamicStoreContent() {
   const [showInstallBtn, setShowInstallBtn] = useState<boolean>(true)
   const [showScanNotice, setShowScanNotice] = useState<boolean>(true)
 
+  // Toko State Pertama
+  const [storeData, setStoreData] = useState<any>(null)
+  const [storeId, setStoreId] = useState<string>('')
+  const [storeName, setStoreName] = useState('Warung Kopi')
+  const [storeAvatar, setStoreAvatar] = useState('')
+  const [qrisUrl, setQrisUrl] = useState('')
+  const [announcement, setAnnouncement] = useState('')
+  const [bannerUrl, setBannerUrl] = useState('')
+  const [isOpen, setIsOpen] = useState(true)
+
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
@@ -30,7 +40,7 @@ function DynamicStoreContent() {
 
   const handleInstallClick = async () => {
     alert(
-      `Cara Pasang Aplikasi ${storeName}:\n\n` +
+      `Cara Pasang Aplikasi ${storeName || 'Toko'}:\n\n` +
       `1. Klik ikon titik tiga (⋮) atau tombol Share (📤) di browser HP kamu.\n` +
       `2. Pilih menu "Tambahkan ke Layar Utama" / "Add to Home Screen".\n` +
       `3. Setelah aplikasi terpasang, SCAN KEMBALI barcode di meja agar nomor meja otomatis terdeteksi!`
@@ -69,16 +79,6 @@ function DynamicStoreContent() {
   const [customerSoundOption, setCustomerSoundOption] = useState<number>(2)
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'info' | 'game' | 'profile'>('menu')
   const [selectedGame, setSelectedGame] = useState<number>(1)
-
-  // Toko State
-  const [storeData, setStoreData] = useState<any>(null)
-  const [storeId, setStoreId] = useState<string>('')
-  const [storeName, setStoreName] = useState('Warung Kopi')
-  const [storeAvatar, setStoreAvatar] = useState('')
-  const [qrisUrl, setQrisUrl] = useState('')
-  const [announcement, setAnnouncement] = useState('')
-  const [bannerUrl, setBannerUrl] = useState('')
-  const [isOpen, setIsOpen] = useState(true)
 
   // 🌟 FITUR TEMA VISUAL, BACKGROUND WALLPAPER, INFO TOKO & CROSS SELLING
   const [mapsUrl, setMapsUrl] = useState('')
@@ -632,7 +632,6 @@ function DynamicStoreContent() {
     alert(`🎉 Kode promo ${found.kode} berhasil dipasang!`)
   }
 
-  // 📲 BAGIKAN DETAIL TAGIHAN KE WHATSAPP (PATUNGAN)
   const handleShareCartToWA = () => {
     if (Object.keys(cart).length === 0) {
       alert('Keranjang masih kosong!')
@@ -900,7 +899,6 @@ function DynamicStoreContent() {
     ? menuItems 
     : menuItems.filter(m => m.category_id === activeCategory)
 
-  // 💡 MENCARI REKOMENDASI MENU PENDAMPING (CROSS-SELLING)
   const getRecommendedItems = () => {
     if (Object.keys(cart).length === 0) return []
     const cartMenuIds = Object.values(cart).map((i) => i.menuId)
@@ -975,10 +973,6 @@ function DynamicStoreContent() {
   if (!session) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-3 sm:p-6 font-sans">
-        <head>
-          <link rel="manifest" href={`/st/${slug}/manifest`} />
-        </head>
-
         <style jsx global>{`
           .pupil { transition: transform 0.05s ease-out; }
           .eyelid { transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease; transform-origin: center; }
@@ -1124,7 +1118,7 @@ function DynamicStoreContent() {
                       onChange={(e) => setNama(e.target.value)}
                       onFocus={() => handleInputFocus(nameRef)}
                       onBlur={handleInputBlur}
-                      placeholder="Contoh: Raihan"
+                      placeholder="Contoh: Raihan Aji Saputra"
                       required
                       className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-all"
                     />
@@ -1210,10 +1204,6 @@ function DynamicStoreContent() {
         backgroundAttachment: 'fixed',
       }}
     >
-      <head>
-        <link rel="manifest" href={`/st/${slug}/manifest`} />
-      </head>
-
       {/* PWA INSTALLER BANNER */}
       {showInstallBtn && (
         <div className="bg-slate-900 border-b border-emerald-500/40 p-3 sticky top-0 z-40 shadow-lg flex items-center justify-between gap-3 text-white">
@@ -2050,7 +2040,7 @@ function DynamicStoreContent() {
 
               <div className="text-center pt-2 border-t border-slate-300 text-[9px] text-slate-500 font-sans">
                 <p>Terima Kasih Atas Kunjungan Anda!</p>
-                <p className="font-bold text-slate-700 mt-0.5">Powered by Reyyztore</p>
+                <p className="font-bold text-slate-700 mt-0.5">by reyyztore</p>
               </div>
             </div>
 
@@ -2071,7 +2061,7 @@ function DynamicStoreContent() {
 
       {/* FOOTER BRANDING REYYZTORE */}
       <footer className="text-center py-4 text-[10px] text-slate-400 font-medium">
-        Powered by <strong className="text-emerald-400">Reyyztore</strong> • Digital POS System
+        Powered by <strong className="text-emerald-400">reyyztore</strong> • Digital POS System
       </footer>
 
       {/* Bottom Nav Bar Pelanggan */}
