@@ -1613,7 +1613,7 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 3: INFO TOKO & REVISI KOTAK ULASAN KHUSUS DI TAB INFO */}
+        {/* TAB 3: INFO TOKO & KOTAK ULASAN MANDIRI PERMANEN */}
         {activeNav === 'info' && (
           <div className="space-y-4">
             {jamOperasional && (
@@ -1646,69 +1646,67 @@ function DynamicStoreContent() {
               </div>
             )}
 
-            {/* KOTAK ULASAN PELANGGAN (HANYA MUNCUL DI TAB INFO) */}
-            {reviewActive && (
-              <div className={`${themeClasses.card} p-4 space-y-3.5 border-2 border-amber-300/80 shadow-lg bg-white/90`}>
-                <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-                  <h3 className="text-xs font-black uppercase text-amber-600 flex items-center gap-1.5">
-                    💬 Ulasan & Masukan Pelanggan ({storeReviewsList.length})
-                  </h3>
-                  <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Transparan</span>
-                </div>
+            {/* KOTAK ULASAN PELANGGAN (DIBUAT PASTI MUNCUL TANPA SYARAT) */}
+            <div className={`${themeClasses.card} p-4 space-y-3.5 border-2 border-amber-300/80 shadow-lg bg-white/90`}>
+              <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                <h3 className="text-xs font-black uppercase text-amber-600 flex items-center gap-1.5">
+                  💬 Ulasan & Masukan Pelanggan ({storeReviewsList.length})
+                </h3>
+                <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Transparan</span>
+              </div>
 
-                {/* Form Tulis Ulasan Mandiri (Nama otomatis dari Akun Login) */}
-                <form onSubmit={handleSendDirectReview} className="space-y-2 bg-white p-3 rounded-2xl border border-slate-300">
-                  <div className="flex justify-between items-center">
-                    <p className="text-[11px] font-bold text-slate-800">⭐ Beri Ulasan (sebagai: <span className="text-amber-600">{userData.name || 'Pelanggan'}</span>)</p>
-                    <div className="flex gap-1 text-lg cursor-pointer shrink-0">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <span
-                          key={star}
-                          onClick={() => setDirectReviewRating(star)}
-                          className={star <= directReviewRating ? 'text-amber-400' : 'text-slate-300'}
-                        >
-                          ★
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <textarea
-                    rows={2}
-                    placeholder="Bagikan pengalaman / kritik & saran kamu..."
-                    value={directReviewComment}
-                    onChange={(e) => setDirectReviewComment(e.target.value)}
-                    className="w-full p-2 bg-slate-50 border border-slate-300 text-xs rounded-xl focus:outline-none text-slate-800"
-                    required
-                  />
-
-                  <button
-                    type="submit"
-                    disabled={submittingDirectReview}
-                    className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow transition active:scale-95 disabled:opacity-50"
-                  >
-                    {submittingDirectReview ? 'Kirim...' : '⭐ Kirim Ulasan Sekarang'}
-                  </button>
-                </form>
-
-                {/* List Ulasan Pelanggan */}
-                {storeReviewsList.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic text-center py-2">Belum ada ulasan untuk toko ini. Yuk kirim ulasan pertama kamu di atas!</p>
-                ) : (
-                  <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                    {storeReviewsList.map((rev) => (
-                      <div key={rev.id} className={`${themeClasses.subCard} p-2.5 space-y-1 bg-slate-50/90`}>
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="font-bold text-slate-900">{rev.customer_name || 'Pelanggan'}</span>
-                          <span className="text-amber-500 font-bold">{'★'.repeat(rev.rating || 5)}</span>
-                        </div>
-                        <p className="text-[11px] text-slate-700 italic">"{rev.comment || 'Toko sangat bagus!'}"</p>
-                      </div>
+              {/* Form Tulis Ulasan Mandiri (Nama otomatis dari Akun Login) */}
+              <form onSubmit={handleSendDirectReview} className="space-y-2 bg-white p-3 rounded-2xl border border-slate-300">
+                <div className="flex justify-between items-center">
+                  <p className="text-[11px] font-bold text-slate-800">⭐ Beri Ulasan (sebagai: <span className="text-amber-600">{userData.name || 'Pelanggan'}</span>)</p>
+                  <div className="flex gap-1 text-lg cursor-pointer shrink-0">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <span
+                        key={star}
+                        onClick={() => setDirectReviewRating(star)}
+                        className={star <= directReviewRating ? 'text-amber-400' : 'text-slate-300'}
+                      >
+                        ★
+                      </span>
                     ))}
                   </div>
-                )}
-              </div>
-            )}
+                </div>
+
+                <textarea
+                  rows={2}
+                  placeholder="Bagikan pengalaman / kritik & saran kamu..."
+                  value={directReviewComment}
+                  onChange={(e) => setDirectReviewComment(e.target.value)}
+                  className="w-full p-2 bg-slate-50 border border-slate-300 text-xs rounded-xl focus:outline-none text-slate-800"
+                  required
+                />
+
+                <button
+                  type="submit"
+                  disabled={submittingDirectReview}
+                  className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow transition active:scale-95 disabled:opacity-50"
+                >
+                  {submittingDirectReview ? 'Kirim...' : '⭐ Kirim Ulasan Sekarang'}
+                </button>
+              </form>
+
+              {/* List Ulasan Pelanggan */}
+              {storeReviewsList.length === 0 ? (
+                <p className="text-xs text-slate-500 italic text-center py-2">Belum ada ulasan untuk toko ini. Yuk kirim ulasan pertama kamu di atas!</p>
+              ) : (
+                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                  {storeReviewsList.map((rev) => (
+                    <div key={rev.id} className={`${themeClasses.subCard} p-2.5 space-y-1 bg-slate-50/90`}>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-slate-900">{rev.customer_name || 'Pelanggan'}</span>
+                        <span className="text-amber-500 font-bold">{'★'.repeat(rev.rating || 5)}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-700 italic">"{rev.comment || 'Toko sangat bagus!'}"</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {mapsUrl && (
               <a href={mapsUrl} target="_blank" rel="noreferrer" className={`${themeClasses.card} block p-4 text-xs font-bold text-center text-sky-600 hover:underline`}>
