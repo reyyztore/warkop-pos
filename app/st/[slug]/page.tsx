@@ -173,7 +173,7 @@ function DynamicStoreContent() {
   const [strukMode, setStrukMode] = useState<'biasa' | 'original' | 'custom'>('original')
   const [customStrukBg, setCustomStrukBg] = useState<string | null>(null)
 
-  // ULASAN PELANGGAN STATE (PERMANEN AKTIF)
+  // ULASAN PELANGGAN STATE
   const [reviewActive, setReviewActive] = useState<boolean>(true)
   const [showReviewModal, setShowReviewModal] = useState<boolean>(false)
   const [reviewOrderTarget, setReviewOrderTarget] = useState<any>(null)
@@ -181,8 +181,7 @@ function DynamicStoreContent() {
   const [reviewComment, setReviewComment] = useState<string>('')
   const [storeReviewsList, setStoreReviewsList] = useState<any[]>([])
   
-  // State Input Form Ulasan Mandiri
-  const [directReviewName, setDirectReviewName] = useState('')
+  // State Input Form Ulasan Mandiri (Nama Menggunakan Akun Logged-In)
   const [directReviewRating, setDirectReviewRating] = useState(5)
   const [directReviewComment, setDirectReviewComment] = useState('')
   const [submittingDirectReview, setSubmittingDirectReview] = useState(false)
@@ -407,7 +406,6 @@ function DynamicStoreContent() {
       const avatarUrl = activeSession.user.user_metadata?.avatar_url || ''
       setUserData({ name, phone, email: realEmail, avatarUrl })
       setEditingName(name)
-      setDirectReviewName(name)
       if (storeId) {
         fetchMyOrders(storeId, name)
         fetchUserLoyalty(storeId, activeSession.user.id)
@@ -462,7 +460,6 @@ function DynamicStoreContent() {
         const avatarUrl = data.session.user.user_metadata?.avatar_url || ''
         setUserData({ name, phone: userPhone, email: realEmail, avatarUrl })
         setEditingName(name)
-        setDirectReviewName(name)
         if (storeId) {
           fetchMyOrders(storeId, name)
           fetchUserLoyalty(storeId, data.session.user.id)
@@ -489,7 +486,6 @@ function DynamicStoreContent() {
       const { data: tblData } = await supabase.from('tables').select('*').eq('store_id', store.id).eq('aktif', true).order('nomor')
       const { data: promoData } = await supabase.from('store_promos').select('*').eq('store_id', store.id).eq('aktif', true)
       
-      // Fetch Ulasan Toko Realtime
       const { data: revData } = await supabase.from('store_reviews').select('*').eq('store_id', store.id).order('created_at', { ascending: false }).limit(20)
 
       if (catData) setCategories(catData)
@@ -527,7 +523,6 @@ function DynamicStoreContent() {
     if (store.theme_style) setThemeStyle(store.theme_style)
     if (store.theme_config) setThemeConfig(store.theme_config)
     
-    // Ulasan dibuat aktif secara default kecuali di-OFF-kan secara eksplisit
     setReviewActive(store.review_active !== false)
     if (store.recommendation_active !== undefined) setRecommendationActive(store.recommendation_active)
 
@@ -838,7 +833,7 @@ function DynamicStoreContent() {
       await supabase.from('store_reviews').insert({
         store_id: storeId,
         order_id: reviewOrderTarget.id,
-        customer_name: userData.name,
+        customer_name: userData.name || 'Pelanggan',
         rating: reviewRating,
         comment: reviewComment,
       })
@@ -852,7 +847,7 @@ function DynamicStoreContent() {
     }
   }
 
-  // SUBMIT ULASAN MANDIRI LOKAL (BAWAH PENGUMUMAN)
+  // REVISI: SUBMIT ULASAN MANDIRI (NAMA OTOMATIS SESUAI AKUN PELANGGAN)
   const handleSendDirectReview = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!storeId) return
@@ -865,12 +860,12 @@ function DynamicStoreContent() {
     try {
       await supabase.from('store_reviews').insert({
         store_id: storeId,
-        customer_name: directReviewName.trim() || 'Pelanggan',
+        customer_name: userData.name || 'Pelanggan',
         rating: directReviewRating,
         comment: directReviewComment.trim(),
       })
 
-      alert('🎉 Ulasan kamu berhasil terkirim dan dipublikasikan!')
+      alert('🎉 Ulasan kamu berhasil terkirim!')
       setDirectReviewComment('')
       fetchStoreDetails()
     } catch (err: any) {
@@ -1432,77 +1427,6 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* KOTAK ULASAN TOKO (PERMANEN TAMPIL DAN SANGAT DIPERJAS) */}
-        <div className={`${themeClasses.card} p-4 space-y-3.5 border-2 border-amber-300/80 shadow-lg bg-white/90`}>
-          <div className="flex justify-between items-center border-b border-slate-200 pb-2">
-            <h3 className="text-xs font-black uppercase text-amber-600 flex items-center gap-1.5">
-              💬 Ulasan & Masukan Pelanggan ({storeReviewsList.length})
-            </h3>
-            <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Transparan</span>
-          </div>
-
-          {/* Form Tulis Ulasan Mandiri */}
-          <form onSubmit={handleSendDirectReview} className="space-y-2 bg-white p-3 rounded-2xl border border-slate-300">
-            <p className="text-[11px] font-bold text-slate-800">⭐ Berikan Ulasan Kamu Untuk Toko Ini:</p>
-            
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Nama Kamu..."
-                value={directReviewName}
-                onChange={(e) => setDirectReviewName(e.target.value)}
-                className="flex-1 p-2 bg-slate-50 border border-slate-300 text-xs rounded-xl focus:outline-none font-bold text-slate-800"
-                required
-              />
-              <div className="flex gap-1 text-lg cursor-pointer shrink-0">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <span
-                    key={star}
-                    onClick={() => setDirectReviewRating(star)}
-                    className={star <= directReviewRating ? 'text-amber-400' : 'text-slate-300'}
-                  >
-                    ★
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <textarea
-              rows={2}
-              placeholder="Bagikan pengalaman / kritik & saran kamu..."
-              value={directReviewComment}
-              onChange={(e) => setDirectReviewComment(e.target.value)}
-              className="w-full p-2 bg-slate-50 border border-slate-300 text-xs rounded-xl focus:outline-none text-slate-800"
-              required
-            />
-
-            <button
-              type="submit"
-              disabled={submittingDirectReview}
-              className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow transition active:scale-95 disabled:opacity-50"
-            >
-              {submittingDirectReview ? 'Kirim...' : '⭐ Kirim Ulasan Sekarang'}
-            </button>
-          </form>
-
-          {/* List Ulasan Pelanggan */}
-          {storeReviewsList.length === 0 ? (
-            <p className="text-xs text-slate-500 italic text-center py-2">Belum ada ulasan untuk toko ini. Yuk kirim ulasan pertama kamu di atas!</p>
-          ) : (
-            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-              {storeReviewsList.map((rev) => (
-                <div key={rev.id} className={`${themeClasses.subCard} p-2.5 space-y-1 bg-slate-50/90`}>
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-slate-900">{rev.customer_name || 'Pelanggan'}</span>
-                    <span className="text-amber-500 font-bold">{'★'.repeat(rev.rating || 5)}</span>
-                  </div>
-                  <p className="text-[11px] text-slate-700 italic">"{rev.comment || 'Toko sangat bagus!'}"</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* TAB 1: MENU UTAMA */}
         {activeNav === 'menu' && (
           <div className="space-y-4">
@@ -1689,7 +1613,7 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 3: INFO TOKO */}
+        {/* TAB 3: INFO TOKO & REVISI KOTAK ULASAN KHUSUS DI TAB INFO */}
         {activeNav === 'info' && (
           <div className="space-y-4">
             {jamOperasional && (
@@ -1719,6 +1643,70 @@ function DynamicStoreContent() {
                   <p><span className="opacity-70">Nama SSID:</span> <strong>{wifiName || 'Tidak Diset'}</strong></p>
                   <p><span className="opacity-70">Password:</span> <strong className="font-mono text-emerald-600">{wifiPassword || 'Tidak Diset'}</strong></p>
                 </div>
+              </div>
+            )}
+
+            {/* KOTAK ULASAN PELANGGAN (HANYA MUNCUL DI TAB INFO) */}
+            {reviewActive && (
+              <div className={`${themeClasses.card} p-4 space-y-3.5 border-2 border-amber-300/80 shadow-lg bg-white/90`}>
+                <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                  <h3 className="text-xs font-black uppercase text-amber-600 flex items-center gap-1.5">
+                    💬 Ulasan & Masukan Pelanggan ({storeReviewsList.length})
+                  </h3>
+                  <span className="text-[9px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Transparan</span>
+                </div>
+
+                {/* Form Tulis Ulasan Mandiri (Nama otomatis dari Akun Login) */}
+                <form onSubmit={handleSendDirectReview} className="space-y-2 bg-white p-3 rounded-2xl border border-slate-300">
+                  <div className="flex justify-between items-center">
+                    <p className="text-[11px] font-bold text-slate-800">⭐ Beri Ulasan (sebagai: <span className="text-amber-600">{userData.name || 'Pelanggan'}</span>)</p>
+                    <div className="flex gap-1 text-lg cursor-pointer shrink-0">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <span
+                          key={star}
+                          onClick={() => setDirectReviewRating(star)}
+                          className={star <= directReviewRating ? 'text-amber-400' : 'text-slate-300'}
+                        >
+                          ★
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <textarea
+                    rows={2}
+                    placeholder="Bagikan pengalaman / kritik & saran kamu..."
+                    value={directReviewComment}
+                    onChange={(e) => setDirectReviewComment(e.target.value)}
+                    className="w-full p-2 bg-slate-50 border border-slate-300 text-xs rounded-xl focus:outline-none text-slate-800"
+                    required
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={submittingDirectReview}
+                    className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow transition active:scale-95 disabled:opacity-50"
+                  >
+                    {submittingDirectReview ? 'Kirim...' : '⭐ Kirim Ulasan Sekarang'}
+                  </button>
+                </form>
+
+                {/* List Ulasan Pelanggan */}
+                {storeReviewsList.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic text-center py-2">Belum ada ulasan untuk toko ini. Yuk kirim ulasan pertama kamu di atas!</p>
+                ) : (
+                  <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                    {storeReviewsList.map((rev) => (
+                      <div key={rev.id} className={`${themeClasses.subCard} p-2.5 space-y-1 bg-slate-50/90`}>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-slate-900">{rev.customer_name || 'Pelanggan'}</span>
+                          <span className="text-amber-500 font-bold">{'★'.repeat(rev.rating || 5)}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-700 italic">"{rev.comment || 'Toko sangat bagus!'}"</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2197,25 +2185,26 @@ function DynamicStoreContent() {
               </div>
             </div>
 
+            {/* REVISI FAQ NAVIGASI DISESUAIKAN DENGAN STRUKTUR SEKARANG */}
             <div className={`${themeClasses.card} p-5 space-y-3`}>
               <h3 className="text-xs font-black uppercase tracking-wider text-emerald-600 border-b border-slate-200 pb-2">
                 📖 FAQ & Panduan Navigasi Sistem
               </h3>
               <div className="space-y-2.5 text-[11px] text-slate-700 font-sans leading-relaxed">
                 <div>
-                  <strong className="text-slate-900">1. Tab ☕ Menu:</strong> Kategori makanan/minuman, varian (panas/dingin), serta catatan khusus.
+                  <strong className="text-slate-900">1. Tab ☕ Menu:</strong> Pilih kategori makanan/minuman, pilih varian (panas/dingin), serta masukkan catatan pesanan khusus.
                 </div>
                 <div>
-                  <strong className="text-slate-900">2. Tab 📡 Status:</strong> Melacak pesanan, memanggil bel kasir, dan memberikan ulasan toko.
+                  <strong className="text-slate-900">2. Tab 📡 Status:</strong> Pantau pesanan aktif kamu, gunakan tombol panggil bel kasir, cetak struk, dan beri ulasan khusus pesanan.
                 </div>
                 <div>
-                  <strong className="text-slate-900">3. Tab ℹ️ Info:</strong> Jam operasional, fasilitas, Wi-Fi gratis, dan Google Maps toko.
+                  <strong className="text-slate-900">3. Tab ℹ️ Info:</strong> Lihat jam operasional toko, fasilitas, password Wi-Fi gratis, Google Maps, dan **Kotak Ulasan Pelanggan Mandiri**.
                 </div>
                 <div>
-                  <strong className="text-slate-900">4. Tab 🎮 Game:</strong> Kuis tebak hewan & mini game interaktif anti-bosan saat menunggu pesanan.
+                  <strong className="text-slate-900">4. Tab 🎮 Game:</strong> Kuis tebak hewan & 50 mini games interaktif agar tidak bosan saat menunggu makanan disajikan.
                 </div>
                 <div>
-                  <strong className="text-slate-900">5. Tab 👤 Profil:</strong> Pengaturan akun & kartu VIP Loyalty.
+                  <strong className="text-slate-900">5. Tab 👤 Profil:</strong> Pengaturan profil akun pelanggan, ganti nada dering panggilan, dan klaim stamp Kartu VIP Loyalty.
                 </div>
               </div>
             </div>
