@@ -14,7 +14,19 @@ export default function OwnerDashboardPage() {
   const [expenses, setExpenses] = useState<any[]>([])
   const [shifts, setShifts] = useState<any[]>([])
   const [menuItems, setMenuItems] = useState<any[]>([])
+  const [reviews, setReviews] = useState<any[]>([])
   const [loading, setLoading] = useState<boolean>(true)
+
+  // State Pajak (PPh / PPN)
+  const [taxPercent, setTaxPercent] = useState<number>(0)
+  const [showTaxModal, setShowTaxModal] = useState<boolean>(false)
+  const [inputTax, setInputTax] = useState<string>('0')
+
+  // State Edit Ulasan Pelanggan
+  const [editingReview, setEditingReview] = useState<any>(null)
+  const [showReviewEditModal, setShowReviewEditModal] = useState<boolean>(false)
+  const [editReviewRating, setEditReviewRating] = useState<number>(5)
+  const [editReviewComment, setEditReviewComment] = useState<string>('')
 
   // State Form Tambah/Edit Pengeluaran
   const [expenseTitle, setExpenseTitle] = useState('')
@@ -69,6 +81,9 @@ export default function OwnerDashboardPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items', filter: `store_id=eq.${selectedStoreId}` }, () => {
         fetchStoreTransactions(selectedStoreId)
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'store_reviews', filter: `store_id=eq.${selectedStoreId}` }, () => {
+        fetchStoreTransactions(selectedStoreId)
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'stores', filter: `id=eq.${selectedStoreId}` }, () => {
         fetchStoreDetails(selectedStoreId)
       })
@@ -105,6 +120,7 @@ export default function OwnerDashboardPage() {
     if (data) {
       setStoreData(data)
       if (data.monthly_target) setMonthlyTarget(data.monthly_target)
+      if (data.pph_percent !== undefined) setTaxPercent(data.pph_percent || 0)
     }
   }
 
@@ -135,12 +151,79 @@ export default function OwnerDashboardPage() {
       .eq('store_id', storeId)
       .order('nama')
 
+    const { data: reviewData } = await supabase
+      .from('store_reviews')
+      .select('*')
+      .eq('store_id', storeId)
+      .order('created_at', { ascending: false })
+
     if (orderData) setOrders(orderData)
     if (expenseData) setExpenses(expenseData)
     if (shiftData) setShifts(shiftData)
     if (menuData) setMenuItems(menuData)
+    if (reviewData) setReviews(reviewData)
 
     setLoading(false)
+  }
+
+  // SIMPAN PAJAK (PPh / PPN)
+  const handleSaveTax = async () => {
+    if (!selectedStoreId) return
+    const taxVal = parseFloat(inputTax)
+    if (isNaN(taxVal) || taxVal < 0) {
+      alert('⚠️ Masukkan persentase pajak yang valid!')
+      return
+    }
+
+    const { error } = await supabase.from('stores').update({ pph_percent: taxVal }).eq('id', selectedStoreId)
+    if (error) {
+      alert('Gagal menyimpan pajak: ' + error.message)
+    } else {
+      setTaxPercent(taxVal)
+      setShowTaxModal(false)
+      alert('✅ Persentase PPh/PPN berhasil diperbarui!')
+    }
+  }
+
+  // HAPUS ULASAN PELANGGAN
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!confirm('Apakah kamu yakin ingin menghapus ulasan pelanggan ini?')) return
+    try {
+      const { error } = await supabase.from('store_reviews').delete().eq('id', reviewId)
+      if (error) throw error
+      alert('🗑️ Ulasan pelanggan berhasil dihapus!')
+      fetchStoreTransactions(selectedStoreId)
+    } catch (e: any) {
+      alert('Gagal menghapus ulasan: ' + e.message)
+    }
+  }
+
+  // EDIT ULASAN PELANGGAN
+  const handleOpenEditReview = (rev: any) => {
+    setEditingReview(rev)
+    setEditReviewRating(rev.rating || 5)
+    setEditReviewComment(rev.comment || '')
+    setShowReviewEditModal(true)
+  }
+
+  const handleSaveEditReview = async () => {
+    if (!editingReview) return
+    try {
+      const { error } = await supabase
+        .from('store_reviews')
+        .update({
+          rating: editReviewRating,
+          comment: editReviewComment,
+        })
+        .eq('id', editingReview.id)
+
+      if (error) throw error
+      alert('✅ Ulasan berhasil diperbarui!')
+      setShowReviewEditModal(false)
+      fetchStoreTransactions(selectedStoreId)
+    } catch (e: any) {
+      alert('Gagal memperbarui ulasan: ' + e.message)
+    }
   }
 
   const handleSaveExpense = async (e: React.FormEvent) => {
@@ -227,7 +310,6 @@ export default function OwnerDashboardPage() {
     }
   }
 
-  // Fungsi Simpan Master PIN Baru
   const handleUpdateMasterPin = async () => {
     if (!selectedStoreId || !storeData) return
     if (!oldPin || !newPin || !confirmPin) {
@@ -267,7 +349,6 @@ export default function OwnerDashboardPage() {
     }
   }
 
-  // Langkah 1: Cek Slug dan Status owner_mode_active
   const handleCheckStoreToLink = async () => {
     if (!newStoreSlug) {
       alert('⚠️ Mohon masukkan Slug URL cabang toko!')
@@ -287,7 +368,6 @@ export default function OwnerDashboardPage() {
       return
     }
 
-    // Cek apakah Mode Owner di-OFF-kan di toko tersebut
     if (existingStore.owner_mode_active === false) {
       alert('🚫 Penautan ditolak! Mode Owner pada cabang toko ini sedang di-OFF-kan (privat/terkunci oleh kasir).')
       return
@@ -299,7 +379,6 @@ export default function OwnerDashboardPage() {
     setShowLinkPinModal(true)
   }
 
-  // Langkah 2: Verifikasi Master PIN Toko Tujuan sebelum Tautkan
   const handleVerifyAndLinkStore = async () => {
     if (!storeToLink) return
 
@@ -365,13 +444,14 @@ export default function OwnerDashboardPage() {
     }
   }
 
-  // Kalkulasi Keuangan Real-Time
+  // Kalkulasi Keuangan Real-Time (Selesai + Pajak PPh/PPN)
   const completedOrders = orders.filter((o) => o.status === 'selesai')
-  const totalOmzet = completedOrders.reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
+  const totalOmzetKotor = completedOrders.reduce((acc, curr) => acc + (curr.total_harga || 0), 0)
+  const totalPajakNominal = (totalOmzetKotor * taxPercent) / 100
   const totalPengeluaran = expenses.reduce((acc, curr) => acc + (curr.amount || 0), 0)
-  const bersihOmzet = totalOmzet - totalPengeluaran
+  const bersihOmzet = totalOmzetKotor - totalPajakNominal - totalPengeluaran
 
-  const targetPercentage = monthlyTarget > 0 ? Math.min(100, Math.round((totalOmzet / monthlyTarget) * 100)) : 0
+  const targetPercentage = monthlyTarget > 0 ? Math.min(100, Math.round((totalOmzetKotor / monthlyTarget) * 100)) : 0
 
   const productSalesMap: { [key: string]: { name: string; qty: number; revenue: number } } = {}
   completedOrders.forEach((ord) => {
@@ -396,9 +476,15 @@ export default function OwnerDashboardPage() {
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
           <h1 className="text-2xl font-black text-amber-400">🚪 Panel Eksekutif Owner</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Pantau laporan keuangan, multi-cabang tertaut, produk terlaris, stok, dan rekap shift kasir.</p>
+          <p className="text-xs text-slate-400 mt-0.5">Pantau laporan keuangan, potongan PPh/PPN, ulasan pelanggan, produk terlaris & stok.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => { setInputTax(taxPercent.toString()); setShowTaxModal(true); }}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow transition"
+          >
+            🏛️ Pengaturan PPh/PPN ({taxPercent}%)
+          </button>
           <button
             onClick={() => setShowPinModal(true)}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black rounded-xl shadow transition"
@@ -417,7 +503,7 @@ export default function OwnerDashboardPage() {
         </div>
       </div>
 
-      {/* Selector Multi-Cabang Toko & Tombol Unlink */}
+      {/* Selector Multi-Cabang Toko */}
       <div className="max-w-6xl mx-auto mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 p-4 border border-slate-800 rounded-2xl">
         <div className="flex items-center gap-3 flex-wrap w-full">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">🏪 Pilih Cabang Tertaut:</span>
@@ -461,7 +547,7 @@ export default function OwnerDashboardPage() {
               <div>
                 <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">🎯 Target Omzet Bulanan Cabang Ini</h3>
                 <p className="text-sm font-bold text-white mt-0.5">
-                  Rp {totalOmzet.toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-normal">dari target Rp {monthlyTarget.toLocaleString('id-ID')}</span>
+                  Rp {totalOmzetKotor.toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-normal">dari target Rp {monthlyTarget.toLocaleString('id-ID')}</span>
                 </p>
               </div>
               <button
@@ -472,7 +558,6 @@ export default function OwnerDashboardPage() {
               </button>
             </div>
 
-            {/* Progress Bar */}
             <div className="w-full bg-slate-950 h-3.5 rounded-full overflow-hidden border border-slate-800 relative">
               <div
                 className="bg-gradient-to-r from-amber-500 to-emerald-400 h-full rounded-full transition-all duration-500"
@@ -485,33 +570,92 @@ export default function OwnerDashboardPage() {
             </div>
           </div>
 
-          {/* Ringkasan Grafik Keuangan Real-Time */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Ringkasan Grafik Keuangan Real-Time Termasuk PPh/PPN */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-1">
-              <p className="text-[10px] font-black text-slate-400 uppercase">Total Omzet Penjualan</p>
-              <p className="text-2xl font-black text-emerald-400">Rp {totalOmzet.toLocaleString('id-ID')}</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase">Omzet Kotor Penjualan</p>
+              <p className="text-xl font-black text-emerald-400">Rp {totalOmzetKotor.toLocaleString('id-ID')}</p>
               <p className="text-[10px] text-slate-500">Dari {completedOrders.length} pesanan selesai</p>
             </div>
 
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-1">
+              <p className="text-[10px] font-black text-slate-400 uppercase">Potongan PPh / PPN ({taxPercent}%)</p>
+              <p className="text-xl font-black text-amber-400">Rp {totalPajakNominal.toLocaleString('id-ID')}</p>
+              <p className="text-[10px] text-slate-500">Dihitung dari total omzet kotor</p>
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-1">
               <p className="text-[10px] font-black text-slate-400 uppercase">Total Pengeluaran Cabang</p>
-              <p className="text-2xl font-black text-rose-400">Rp {totalPengeluaran.toLocaleString('id-ID')}</p>
-              <p className="text-[10px] text-slate-500">Dari {expenses.length} catatan pengeluaran</p>
+              <p className="text-xl font-black text-rose-400">Rp {totalPengeluaran.toLocaleString('id-ID')}</p>
+              <p className="text-[10px] text-slate-500">Dari {expenses.length} pengeluaran</p>
             </div>
 
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-1">
               <p className="text-[10px] font-black text-slate-400 uppercase">Keuntungan Bersih (Profit)</p>
-              <p className={`text-2xl font-black ${bersihOmzet >= 0 ? 'text-cyan-400' : 'text-rose-500'}`}>
+              <p className={`text-xl font-black ${bersihOmzet >= 0 ? 'text-cyan-400' : 'text-rose-500'}`}>
                 Rp {bersihOmzet.toLocaleString('id-ID')}
               </p>
-              <p className="text-[10px] text-slate-500">Omzet dikurangi pengeluaran</p>
+              <p className="text-[10px] text-slate-500">Omzet - (Pajak + Pengeluaran)</p>
             </div>
           </div>
 
-          {/* 🏆 PRODUK TERLARIS & 📦 MONITORING STOK */}
+          {/* KOTAK ULASAN PELANGGAN (BISA DI-EDIT & DI-HAPUS OWNER) */}
+          <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                  <span>💬 Kelola Ulasan & Feedback Pelanggan</span>
+                  <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold">
+                    {reviews.length} Ulasan
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">Owner dapat memantau, mengedit, atau menghapus ulasan dari pelanggan.</p>
+              </div>
+            </div>
+
+            {reviews.length === 0 ? (
+              <p className="text-xs text-slate-500 italic text-center py-6">Belum ada ulasan masuk dari pelanggan untuk cabang ini.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto pr-1">
+                {reviews.map((rev) => (
+                  <div key={rev.id} className="p-3.5 bg-slate-950 border border-slate-800 rounded-2xl space-y-2 flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start">
+                        <span className="font-bold text-xs text-white line-clamp-1">{rev.customer_name || 'Pelanggan'}</span>
+                        <span className="text-xs text-amber-400 font-bold shrink-0">{'★'.repeat(rev.rating || 5)}</span>
+                      </div>
+                      <p className="text-xs text-slate-300 italic mt-1 leading-relaxed">"{rev.comment || 'Toko sangat bagus!'}"</p>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-900 flex justify-between items-center text-[10px]">
+                      <span className="text-slate-500 font-mono">
+                        {new Date(rev.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => handleOpenEditReview(rev)}
+                          className="px-2 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-lg font-bold hover:bg-amber-500/30 transition"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteReview(rev.id)}
+                          className="px-2 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/40 rounded-lg font-bold hover:bg-rose-500/30 transition"
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* PRODUK TERLARIS & MONITORING STOK */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            {/* Produk Paling Laku (Best Seller) */}
+            {/* Produk Best Seller */}
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-4">
               <h3 className="text-sm font-black text-amber-400 uppercase tracking-wider">🏆 Produk Paling Laku (Best Seller)</h3>
               
@@ -683,6 +827,68 @@ export default function OwnerDashboardPage() {
 
           </div>
 
+        </div>
+      )}
+
+      {/* MODAL PENGATURAN PAJAK (PPh / PPN) */}
+      {showTaxModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-xs rounded-3xl p-6 space-y-3">
+            <h3 className="text-sm font-bold text-emerald-400">🏛️ Atur Persentase PPh / PPN (%)</h3>
+            <p className="text-[10px] text-slate-400">Potongan pajak akan dikalkulasikan otomatis dari total omzet penjualan kotor.</p>
+            <input
+              type="number"
+              step="0.1"
+              placeholder="Contoh: 10 atau 11"
+              value={inputTax}
+              onChange={(e) => setInputTax(e.target.value)}
+              className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-emerald-300 font-bold rounded-xl font-mono text-center"
+            />
+            <div className="flex gap-2 pt-2">
+              <button onClick={handleSaveTax} className="flex-1 py-2 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl">Simpan Pajak</button>
+              <button onClick={() => setShowTaxModal(false)} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDIT ULASAN PELANGGAN */}
+      {showReviewEditModal && editingReview && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 text-white w-full max-w-sm rounded-3xl p-6 space-y-3">
+            <h3 className="text-sm font-bold text-amber-400">✏️ Edit Ulasan Pelanggan</h3>
+            <p className="text-[10px] text-slate-400">Nama Pelanggan: <strong className="text-white">{editingReview.customer_name || 'Pelanggan'}</strong></p>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase">Rating Bintang (1 - 5)</label>
+              <div className="flex gap-1 text-xl cursor-pointer my-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <span
+                    key={star}
+                    onClick={() => setEditReviewRating(star)}
+                    className={star <= editReviewRating ? 'text-amber-400' : 'text-slate-600'}
+                  >
+                    ★
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase">Komentar / Ulasan</label>
+              <textarea
+                rows={3}
+                value={editReviewComment}
+                onChange={(e) => setEditReviewComment(e.target.value)}
+                className="w-full p-2.5 bg-slate-950 border border-slate-800 text-xs text-white rounded-xl focus:outline-none"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button onClick={handleSaveEditReview} className="flex-1 py-2 bg-amber-500 text-slate-950 font-black text-xs rounded-xl">Simpan Ulasan</button>
+              <button onClick={() => setShowReviewEditModal(false)} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl">Batal</button>
+            </div>
+          </div>
         </div>
       )}
 
