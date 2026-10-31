@@ -327,7 +327,7 @@ export default function KasirDashboardPage() {
       setOrders(combinedOrders)
     } catch (err: any) {
       console.error('Error fetching orders:', err)
-    } fontally {
+    } finally {
       setLoading(false)
     }
   }
