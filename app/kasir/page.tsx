@@ -57,9 +57,13 @@ export default function KasirDashboardPage() {
   const [bgImageUrl, setBgImageUrl] = useState('')
   const [bgImageFile, setBgImageFile] = useState<File | null>(null)
 
+  // --- FITUR LOYALTY CARD STATE (DINAMIS) ---
   const [loyaltyActive, setLoyaltyActive] = useState<boolean>(false)
   const [loyaltyCode, setLoyaltyCode] = useState<string>('')
   const [loyaltyMaxStamps, setLoyaltyMaxStamps] = useState<number>(10)
+  const [loyaltyType, setLoyaltyType] = useState<'original' | 'theme' | 'custom'>('original')
+  const [loyaltyStampContent, setLoyaltyStampContent] = useState<string>('☕')
+  const [loyaltyStampImageFile, setLoyaltyStampImageFile] = useState<File | null>(null)
 
   const [selectedPreset, setSelectedPreset] = useState('Slate Dark')
   const [themeConfig, setThemeConfig] = useState({
@@ -88,7 +92,7 @@ export default function KasirDashboardPage() {
   const [bluetoothActive, setBluetoothActive] = useState<boolean>(true)
   const [shiftActive, setShiftActive] = useState<boolean>(true)
   const [tableMgmtActive, setTableMgmtActive] = useState<boolean>(true)
-  const [ownerModeActive, setOwnerModeActive] = useState<boolean>(true) // default ON
+  const [ownerModeActive, setOwnerModeActive] = useState<boolean>(true)
 
   const [masterPin, setMasterPin] = useState<string>('123456')
   const [showPinModal, setShowPinModal] = useState<boolean>(false)
@@ -239,6 +243,8 @@ export default function KasirDashboardPage() {
           if (storeData.loyalty_active !== undefined) setLoyaltyActive(storeData.loyalty_active)
           if (storeData.loyalty_code) setLoyaltyCode(storeData.loyalty_code)
           if (storeData.loyalty_max_stamps) setLoyaltyMaxStamps(storeData.loyalty_max_stamps)
+          if (storeData.loyalty_type) setLoyaltyType(storeData.loyalty_type)
+          if (storeData.loyalty_stamp_content) setLoyaltyStampContent(storeData.loyalty_stamp_content)
 
           if (storeData.kds_active !== undefined) setKdsActive(storeData.kds_active)
           if (storeData.stock_active !== undefined) setStockActive(storeData.stock_active)
@@ -321,7 +327,7 @@ export default function KasirDashboardPage() {
       setOrders(combinedOrders)
     } catch (err: any) {
       console.error('Error fetching orders:', err)
-    } finally {
+    } fontally {
       setLoading(false)
     }
   }
@@ -655,6 +661,7 @@ export default function KasirDashboardPage() {
     try {
       let newBannerUrl = bannerUrl
       let newBgImageUrl = bgImageUrl
+      let finalStampContent = loyaltyStampContent
 
       if (bannerFile) {
         const fileExt = bannerFile.name.split('.').pop()
@@ -670,6 +677,14 @@ export default function KasirDashboardPage() {
         await supabase.storage.from('menu-images').upload(filePath, bgImageFile)
         const { data } = supabase.storage.from('menu-images').getPublicUrl(filePath)
         newBgImageUrl = data.publicUrl
+      }
+
+      if (loyaltyType === 'custom' && loyaltyStampImageFile) {
+        const fileExt = loyaltyStampImageFile.name.split('.').pop()
+        const filePath = `store/${storeId}/stamp_${Date.now()}.${fileExt}`
+        await supabase.storage.from('menu-images').upload(filePath, loyaltyStampImageFile)
+        const { data } = supabase.storage.from('menu-images').getPublicUrl(filePath)
+        finalStampContent = data.publicUrl
       }
 
       const meFasilitas = fasilitasInput ? fasilitasInput.split(',').map((f) => f.trim()).filter(Boolean) : []
@@ -692,10 +707,13 @@ export default function KasirDashboardPage() {
         loyalty_active: loyaltyActive,
         loyalty_code: loyaltyCode,
         loyalty_max_stamps: loyaltyMaxStamps,
+        loyalty_type: loyaltyType,
+        loyalty_stamp_content: finalStampContent,
       }).eq('id', storeId)
 
       setBannerUrl(newBannerUrl)
       setBgImageUrl(newBgImageUrl)
+      setLoyaltyStampContent(finalStampContent)
       setShowTampilanModal(false)
       alert('🎨 Tampilan & Fitur Toko Berhasil Diperbarui!')
     } catch (e: any) {
@@ -1088,7 +1106,6 @@ export default function KasirDashboardPage() {
                 </div>
               )}
 
-              {/* TAMPILAN RINCIAN MENU DENGAN ALL FALLBACK PROPERTIES */}
               <div className="space-y-2">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📦 RINCIAN PRODUK / MENU DIPESAN:</p>
                 {itemsList.length === 0 ? (
@@ -1415,6 +1432,7 @@ export default function KasirDashboardPage() {
                 />
               </div>
 
+              {/* SECTION KONTROL LOYALTY CARD DINAMIS PERBARUI */}
               <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-amber-400">🎴 Aktifkan Loyalty Card Toko</span>
@@ -1427,7 +1445,55 @@ export default function KasirDashboardPage() {
                 </div>
 
                 {loyaltyActive && (
-                  <div className="space-y-2 pt-1 border-t border-slate-800">
+                  <div className="space-y-3 pt-2 border-t border-slate-800">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Pilih Tipe Visual Kartu & Stamp</label>
+                      <select
+                        value={loyaltyType}
+                        onChange={(e) => setLoyaltyType(e.target.value as any)}
+                        className="w-full mt-1 p-2 bg-slate-900 border border-slate-800 text-xs text-white rounded-xl font-bold"
+                      >
+                        <option value="original">Original (Menggunakan Emoji / Teks Stamp Standar)</option>
+                        <option value="theme">Ikuti Tema Toko (Otomatis Gunakan Emoji Tema Toko)</option>
+                        <option value="custom">Custom (Upload Foto Stamp / Bebas Emoji Khusus)</option>
+                      </select>
+                    </div>
+
+                    {loyaltyType === 'custom' ? (
+                      <div className="space-y-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase">Isi Emoji / Teks Stamp Kustom</label>
+                          <input
+                            type="text"
+                            placeholder="Contoh: 🌟 atau VIP"
+                            value={loyaltyStampContent.startsWith('http') ? '' : loyaltyStampContent}
+                            onChange={(e) => setLoyaltyStampContent(e.target.value)}
+                            className="w-full mt-1 p-2 bg-slate-900 border border-slate-800 text-xs text-white rounded-xl"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase">Atau Upload Gambar Logo Stamp (Opsional)</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => setLoyaltyStampImageFile(e.target.files?.[0] || null)}
+                            className="w-full mt-1 text-xs text-slate-400 file:py-1 file:px-3 file:rounded-xl file:bg-amber-950 file:text-amber-300"
+                          />
+                        </div>
+                      </div>
+                    ) : loyaltyType === 'original' ? (
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 uppercase">Emoji / Teks Stamp Original</label>
+                        <input
+                          type="text"
+                          placeholder="☕"
+                          value={loyaltyStampContent}
+                          onChange={(e) => setLoyaltyStampContent(e.target.value)}
+                          className="w-full mt-1 p-2 bg-slate-900 border border-slate-800 text-xs text-white rounded-xl"
+                        />
+                      </div>
+                    ) : null}
+
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 uppercase">Kode Loyalty Hari Ini</label>
                       <input
