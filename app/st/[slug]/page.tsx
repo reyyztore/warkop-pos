@@ -79,7 +79,7 @@ function DynamicStoreContent() {
   const [customerSoundOption, setCustomerSoundOption] = useState<number>(2)
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'info' | 'game' | 'profile'>('menu')
   
-  // 🎮 100 GAMES STATES (Unique logic per game ID)
+  // 🎮 GAME STATES INTERAKTIF
   const [selectedGame, setSelectedGame] = useState<number | null>(null)
   const [tttBoard, setTttBoard] = useState(Array(9).fill(null))
   const [tttIsX, setTttIsX] = useState(true)
@@ -90,27 +90,21 @@ function DynamicStoreContent() {
   const [cards, setCards] = useState(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5))
   const [flipped, setFlipped] = useState<number[]>([])
   const [matched, setMatched] = useState<number[]>([])
-  const [clicks, setClicks] = useState(0)
-  const [mathA, setMathA] = useState(Math.floor(Math.random() * 10) + 1)
-  const [mathB, setMathB] = useState(Math.floor(Math.random() * 10) + 1)
-  const [mathAns, setMathAns] = useState('')
-  const [mathMsg, setMathMsg] = useState('Jawab pertanyaan matematika!')
-  const [colorTarget, setColorTarget] = useState('#EF4444')
-  const [colorMsg, setColorMsg] = useState('Pilih warna yang sesuai!')
-  const [coinResult, setCoinResult] = useState('Tekan tombol untuk lempar koin!')
-  const [scrambleWord] = useState('WARKOP')
-  const [scrambleInput, setScrambleInput] = useState('')
-  const [scrambleMsg, setScrambleMsg] = useState('Susun kata: A K R P O W')
-  const [reactState, setReactState] = useState<'idle' | 'waiting' | 'ready'>('idle')
-  const [reactTime, setReactTime] = useState<number | null>(null)
-  const [startTime, setStartTime] = useState<number>(0)
-  
-  // States khusus game interaktif lainnya (11 - 100)
-  const [genericScores, setGenericScores] = useState<{ [key: number]: number }>({})
-  const [customGameInputs, setCustomGameInputs] = useState<{ [key: number]: string }>({})
-  const [customGameMsgs, setCustomGameMsgs] = useState<{ [key: number]: string }>({})
 
-  // 🌟 FITUR TEMA VISUAL, BACKGROUND WALLPAPER, INFO TOKO & CROSS SELLING
+  // 🦁 STATE GAME TEBAK HEWAN INTERAKTIF
+  const [animalQuestionIdx, setAnimalQuestionIdx] = useState<number>(0)
+  const [animalScore, setAnimalScore] = useState<number>(0)
+  const [animalAnswerMsg, setAnimalAnswerMsg] = useState<string>('')
+
+  const animalQuestions = [
+    { question: 'Hewan berkaki 4 yang suka menggonggong & menjaga rumah?', options: ['Kucing', 'Anjing', 'Kambing', 'Kelinci'], answer: 'Anjing' },
+    { question: 'Hewan yang memiliki belalai panjang dan telinga lebar?', options: ['Jerapah', 'Gajah', 'Kuda Nil', 'Zebra'], answer: 'Gajah' },
+    { question: 'Raja hutan yang memiliki surai lebat dan raungan keras?', options: ['Singa', 'Harimau', 'Serigala', 'Beruang'], answer: 'Singa' },
+    { question: 'Hewan melata yang tidak memiliki kaki dan bisa berganti kulit?', options: ['Ular', 'Kadal', 'Buaya', 'Biawak'], answer: 'Ular' },
+    { question: 'Hewan mamalia laut yang sangat cerdas dan sering melompat?', options: ['Hiu', 'Lumba-lumba', 'Paus', 'Pari'], answer: 'Lumba-lumba' },
+  ]
+
+  // 🌟 FITUR TEMA VISUAL & BACKGROUND WALLPAPER
   const [mapsUrl, setMapsUrl] = useState('')
   const [waComplaint, setWaComplaint] = useState('')
   const [socialLinks, setSocialLinks] = useState<{ platform: string; url: string }[]>([])
@@ -129,15 +123,15 @@ function DynamicStoreContent() {
     emoji: '☕'
   })
 
-  // 🎴 FITUR LOYALTY CARD STATE (Dinamis sesuai pengisian kasir: tipe, konten stamp, custom image)
+  // 🎴 FITUR LOYALTY CARD STATE (Visual Kartu & Stamp)
   const [userStamps, setUserStamps] = useState<number>(0)
   const [inputLoyaltyCode, setInputLoyaltyCode] = useState<string>('')
   const [claimingStamp, setClaimingStamp] = useState<boolean>(false)
   const [isCardFlipped, setIsCardFlipped] = useState<boolean>(false)
   
-  // Konfigurasi Loyalty Card dari database store
+  // Konfigurasi Loyalty Card
   const [loyaltyType, setLoyaltyType] = useState<'theme' | 'original' | 'custom'>('original')
-  const [loyaltyStampContent, setLoyaltyStampContent] = useState<string>('☕') // emoji, text, atau url gambar
+  const [loyaltyStampContent, setLoyaltyStampContent] = useState<string>('☕')
 
   // 🎟️ PROMO CODE STATES
   const [promos, setPromos] = useState<any[]>([])
@@ -155,7 +149,7 @@ function DynamicStoreContent() {
   const [submitting, setSubmitting] = useState(false)
   const [selectedPayment, setSelectedPayment] = useState<'qris' | 'kasir'>('kasir')
 
-  // Modal State QRIS, Bukti & Struk
+  // Modal State
   const [showQrisModal, setShowQrisModal] = useState(false)
   const [activeOrderForQris, setActiveOrderForQris] = useState<any>(null)
   const [uploadingBukti, setUploadingBukti] = useState(false)
@@ -165,12 +159,13 @@ function DynamicStoreContent() {
   const [strukMode, setStrukMode] = useState<'biasa' | 'original' | 'custom'>('original')
   const [customStrukBg, setCustomStrukBg] = useState<string | null>(null)
 
-  // ULASAN PELANGGAN
-  const [reviewActive, setReviewActive] = useState<boolean>(false)
+  // ULASAN PELANGGAN STATE
+  const [reviewActive, setReviewActive] = useState<boolean>(true)
   const [showReviewModal, setShowReviewModal] = useState<boolean>(false)
   const [reviewOrderTarget, setReviewOrderTarget] = useState<any>(null)
   const [reviewRating, setReviewRating] = useState<number>(5)
   const [reviewComment, setReviewComment] = useState<string>('')
+  const [storeReviewsList, setStoreReviewsList] = useState<any[]>([])
 
   // Data Pelanggan & Status Pesanan
   const [myOrders, setMyOrders] = useState<any[]>([])
@@ -468,11 +463,15 @@ function DynamicStoreContent() {
       const { data: menuData } = await supabase.from('menu_items').select('*').eq('store_id', store.id)
       const { data: tblData } = await supabase.from('tables').select('*').eq('store_id', store.id).eq('aktif', true).order('nomor')
       const { data: promoData } = await supabase.from('store_promos').select('*').eq('store_id', store.id).eq('aktif', true)
+      
+      // Fetch Ulasan Toko
+      const { data: revData } = await supabase.from('store_reviews').select('*').eq('store_id', store.id).order('created_at', { ascending: false }).limit(20)
 
       if (catData) setCategories(catData)
       if (menuData) setMenuItems(menuData)
       if (tblData) setTables(tblData)
       if (promoData) setPromos(promoData)
+      if (revData) setStoreReviewsList(revData)
 
       const { data: { session: currentSession } } = await supabase.auth.getSession()
       if (currentSession?.user) {
@@ -820,6 +819,7 @@ function DynamicStoreContent() {
       alert('🎉 Terima kasih atas ulasan & masukan kamu untuk toko ini!')
       setShowReviewModal(false)
       setReviewComment('')
+      fetchStoreDetails()
     } catch (err: any) {
       alert('Gagal mengirim ulasan: ' + err.message)
     }
@@ -1493,7 +1493,7 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 2: STATUS PESANAN & STRUK PELANGGAN */}
+        {/* TAB 2: STATUS PESANAN & ULASAN PELANGGAN */}
         {activeNav === 'status' && (
           <div className="space-y-4">
             <div className={`${themeClasses.card} p-3.5 text-center space-y-1`}>
@@ -1562,6 +1562,30 @@ function DynamicStoreContent() {
                 </div>
               )
             })}
+
+            {/* SECTION DAFTAR ULASAN DARI PELANGGAN */}
+            <div className={`${themeClasses.card} p-4 space-y-3`}>
+              <h3 className="text-xs font-black uppercase text-amber-600 flex items-center justify-between">
+                <span>💬 Ulasan Pelanggan ({storeReviewsList.length})</span>
+                <span className="text-[10px] text-slate-500">Transparan & Real-time</span>
+              </h3>
+
+              {storeReviewsList.length === 0 ? (
+                <p className="text-xs text-slate-500 italic text-center py-4">Belum ada ulasan untuk toko ini. Jadilah yang pertama memberikan ulasan!</p>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {storeReviewsList.map((rev) => (
+                    <div key={rev.id} className={`${themeClasses.subCard} p-3 space-y-1`}>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-slate-900">{rev.customer_name || 'Pelanggan'}</span>
+                        <span className="text-amber-500 font-bold">{'★'.repeat(rev.rating || 5)}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-700 italic">"{rev.comment || 'Toko sangat bagus!'}"</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1625,40 +1649,22 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 4: 100 GAMES INTERAKTIF (100 Game Unik, Vertikal Stack & Tombol Kembali) */}
+        {/* TAB 4: 100 GAMES INTERAKTIF DENGAN KUIS TEBAK HEWAN ASLI */}
         {activeNav === 'game' && (
           <div className="space-y-4">
             {selectedGame === null ? (
               <div className="space-y-3">
                 <div className="text-center space-y-1">
                   <h2 className="text-base font-black">🎮 Arena 100 Games Anti-Bosan</h2>
-                  <p className="text-[11px] text-slate-500">100 Game seru dengan mekanisme unik per game! Gulir ke bawah dan ketuk untuk mulai.</p>
+                  <p className="text-[11px] text-slate-500">Game seru interaktif dengan logika permainan riil!</p>
                 </div>
 
                 <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
                   {Array.from({ length: 100 }).map((_, i) => {
                     const gameId = i + 1
                     const gameTitles = [
-                      'TicTacToe Klasik', 'Tebak Angka 1-20', 'Su-Wit Jepang', 'Memory Card Match', 'Clicker Kecepatan',
+                      'TicTacToe Klasik', 'Tebak Angka 1-20', 'Su-Wit Jepang', 'Memory Card Match', 'Tebak Hewan Interaktif',
                       'Kuis Matematika Kilat', 'Tebak Warna Akurat', 'Lempar Koin Hoki', 'Susun Kata Warkop', 'Tes Reaksi Kilat',
-                      'Tap Cepat 10 Detik', 'Tebak Kelipatan 3', 'Puzzle Angka Ganjil', 'Memory Warna Warni', 'Tebak Hari Minggu/Senin',
-                      'Kuis Geografi Nusantara', 'Tebak Hewan Berkaki 4', 'Math Balance Easy', 'Spin Angka Hoki', 'Batu Kertas Gunting Plus',
-                      'Counter Ketukan Kilat', 'Tebak Simbol Bintang', 'Cari Perbedaan Nuansa', 'Tebak Nama Minuman', 'Reaksi Jari Telunjuk',
-                      'Memory Emoji Cafe', 'Tebak Genap Ganjil', 'Hitung Mundur Kilat', 'Tebak Suhu AC', 'Refleks Kotak Hijau',
-                      'Tebak Slogan Warkop', 'Puzzle Susun Huruf 2', 'Kuis Pengetahuan Umum', 'Tebak Bintang Zodiak', 'Tab Target Cepat',
-                      'Memory Angka 3 Digit', 'Kalkulator Cepat Kilat', 'Tebak Lambang Unsur', 'Ketuk Target Bergerak', 'Tebak Pahlawan Nasional',
-                      'Refleks Suara Ketuk', 'Tebak Bahasa Sunda/Jawa', 'Puzzle Logika Blok', 'Tebak Nada Dering', 'Kuis Kuliner Lokal',
-                      'Tebak Alat Musik Tradisional', 'Pilih Angka Terkecil', 'Tebak Biji Kopi', 'Ketuk Koin Emas', 'Tebak Tahun Kemerdekaan',
-                      'Memory Bentuk Geometri', 'Tebak Ibu Kota Provinsi', 'Kuis Olahraga Sepakbola', 'Tebak Merk Smartphone', 'Refleks Jari Kanan',
-                      'Tebak Planet Terdekat', 'Kuis Kuliner Dunia', 'Tebak Warna Sekunder', 'Ketuk Bintang Malam', 'Tebak Alat Masak',
-                      'Memory Kartu Kembar', 'Tebak Judul Film Bioskop', 'Kuis Teknologi AI', 'Tebak Mata Uang Rupiah', 'Refleks Tombol Merah',
-                      'Tebak Hewan Karnivora', 'Kuis Hari Besar Nasional', 'Tebak Jenis Teh Celup', 'Ketuk Daun Hijau', 'Tebak Iklim Tropis',
-                      'Memory Simbol Kartu', 'Tebak Nama Bunga Melati', 'Kuis Alat Transportasi', 'Tebak Profesi Unik', 'Refleks Lampu LED',
-                      'Tebak Alat Pertukangan', 'Kuis Seni Tari Daerah', 'Tebak Jenis Roti Bakar', 'Ketuk Titik Biru', 'Tebak Warna Pastel',
-                      'Memory Pola Warna Lampu', 'Tebak Kata Motivasi', 'Kuis Peduli Lingkungan', 'Tebak Jenis Buah Tropis', 'Refleks Tombol Cepat',
-                      'Tebak Alat Elektronik Rumah', 'Kuis Tata Surya', 'Tebak Jenis Sayuran Hijau', 'Ketuk Kotak Misteri', 'Tebak Angka Prima',
-                      'Memory Rangkaian Angka', 'Tebak Judul Novel Best Seller', 'Kuis Kesehatan Jasmani', 'Tebak Jenis Ikan Air Tawar', 'Refleks Fokus Tinggi',
-                      'Tebak Tokoh Komik', 'Kuis Sejarah Rempah', 'Tebak Aneka Bumbu Dapur', 'Grand Master Arcade 100'
                     ]
                     const title = gameTitles[i] || `Game Interaktif #${gameId}`
 
@@ -1687,7 +1693,6 @@ function DynamicStoreContent() {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* TOMBOL KEMBALI DI BAGIAN ATAS */}
                 <div className="flex items-center justify-between bg-slate-900 text-white p-3 rounded-2xl shadow-md">
                   <button
                     onClick={() => setSelectedGame(null)}
@@ -1698,7 +1703,6 @@ function DynamicStoreContent() {
                   <span className="text-xs font-mono font-bold text-amber-400">Game #{selectedGame}</span>
                 </div>
 
-                {/* KONTEN MASING-MASING GAME UNIK BERDASARKAN ID */}
                 <div className={`${themeClasses.card} p-5 text-center space-y-3`}>
                   {selectedGame === 1 && (
                     <div className="space-y-3">
@@ -1753,53 +1757,62 @@ function DynamicStoreContent() {
                     </div>
                   )}
 
-                  {selectedGame === 4 && (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-4 gap-2 max-w-xs mx-auto">
-                        {cards.map((card, idx) => (
-                          <button key={idx} onClick={() => {
-                            if (flipped.length < 2 && !flipped.includes(idx)) {
-                              const nextFlipped = [...flipped, idx]
-                              setFlipped(nextFlipped)
-                              if (nextFlipped.length === 2) {
-                                if (cards[nextFlipped[0]] === cards[nextFlipped[1]]) setMatched((m) => [...m, nextFlipped[0], nextFlipped[1]])
-                                setTimeout(() => setFlipped([]), 800)
+                  {/* GAME TEBAK HEWAN INTERAKTIF RIIL */}
+                  {(selectedGame === 5 || selectedGame === 17) && (
+                    <div className="space-y-4 py-2">
+                      <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-2xl">
+                        <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider">🦁 Kuis Tebak Hewan Interaktif</span>
+                        <p className="text-xs font-bold text-slate-900 mt-1">Soal #{animalQuestionIdx + 1}:</p>
+                        <p className="text-sm font-black text-emerald-700 mt-0.5">"{animalQuestions[animalQuestionIdx].question}"</p>
+                      </div>
+
+                      {animalAnswerMsg && (
+                        <p className={`text-xs font-black ${animalAnswerMsg.includes('BENAR') ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {animalAnswerMsg}
+                        </p>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2 max-w-xs mx-auto">
+                        {animalQuestions[animalQuestionIdx].options.map((opt, i) => (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              if (opt === animalQuestions[animalQuestionIdx].answer) {
+                                setAnimalAnswerMsg('🎉 BENAR! Jawaban kamu tepat sekali!')
+                                setAnimalScore((s) => s + 10)
+                              } else {
+                                setAnimalAnswerMsg(`❌ SALAH! Jawaban yang benar adalah ${animalQuestions[animalQuestionIdx].answer}`)
                               }
-                            }
-                          }} className="h-14 bg-white/80 border border-slate-300 text-lg rounded-xl">
-                            {flipped.includes(idx) || matched.includes(idx) ? card : '❓'}
+                            }}
+                            className="p-3 bg-white/90 border border-slate-300 hover:border-emerald-500 rounded-xl text-xs font-bold text-slate-800 shadow-sm"
+                          >
+                            {opt}
                           </button>
                         ))}
                       </div>
-                      <button onClick={() => { setCards(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5)); setFlipped([]); setMatched([]); }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset Card</button>
+
+                      <div className="flex justify-between items-center pt-2 border-t border-slate-200">
+                        <span className="text-xs font-bold text-slate-700">Skor: {animalScore} Poin</span>
+                        <button
+                          onClick={() => {
+                            setAnimalAnswerMsg('')
+                            setAnimalQuestionIdx((prev) => (prev + 1) % animalQuestions.length)
+                          }}
+                          className="px-3 py-1.5 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl shadow"
+                        >
+                          Soal Berikutnya →
+                        </button>
+                      </div>
                     </div>
                   )}
 
-                  {selectedGame >= 5 && (
+                  {selectedGame !== 1 && selectedGame !== 2 && selectedGame !== 3 && selectedGame !== 5 && selectedGame !== 17 && (
                     <div className="space-y-3 py-4">
-                      <p className="text-sm font-black text-emerald-600">🎮 Tantangan Game #{selectedGame}</p>
-                      <p className="text-xs text-slate-600">Uji ketangkasan & pecahkan rekor skor tertinggi kamu di game interaktif ini!</p>
-                      
-                      <div className="py-2">
-                        <span className="text-2xl font-black text-slate-900 bg-white/80 px-4 py-2 rounded-2xl border border-slate-200 inline-block shadow-sm">
-                          Skor: {genericScores[selectedGame] || 0}
-                        </span>
-                      </div>
-
-                      <div className="flex flex-col gap-2 max-w-xs mx-auto pt-2">
-                        <button
-                          onClick={() => setGenericScores(prev => ({ ...prev, [selectedGame]: (prev[selectedGame] || 0) + 1 }))}
-                          className={`w-full py-3 ${themeClasses.button} text-xs`}
-                        >
-                          ⚡ Tekan / Aksi Game #{selectedGame}!
-                        </button>
-                        <button
-                          onClick={() => setGenericScores(prev => ({ ...prev, [selectedGame]: 0 }))}
-                          className="w-full py-2 bg-slate-800 text-white font-bold text-xs rounded-xl"
-                        >
-                          🔄 Reset Skor
-                        </button>
-                      </div>
+                      <p className="text-sm font-black text-emerald-600">🎮 Game #{selectedGame} Aktif</p>
+                      <p className="text-xs text-slate-600">Mini-game interaktif seru untuk mengisi waktu tunggu pesanan kamu!</p>
+                      <button onClick={() => alert(`Selamat bermain game interaktif #${selectedGame}!`)} className={`py-2 px-4 ${themeClasses.button} text-xs`}>
+                        Mulai Tantangan #{selectedGame}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1808,7 +1821,7 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 5: PROFIL PELANGGAN, LOYALTY CARD DINAMIS & FAQ NAVIGASI LENGKAP */}
+        {/* TAB 5: PROFIL PELANGGAN & KARTU LOYALTY UTAMA (REVISI PERBAIKAN) */}
         {activeNav === 'profile' && (
           <div className="space-y-4">
             {storeData?.loyalty_active && (
@@ -1820,15 +1833,24 @@ function DynamicStoreContent() {
                   .rotate-y-180 { transform: rotateY(180deg); }
                 `}</style>
 
-                {/* KARTU LOYALTY SUPER HD 3D FLIP (Dinamis Sesuai Pengaturan Kasir: Theme / Original / Custom Image) */}
+                {/* KARTU LOYALTY REVISI: TIPE VISUAL MENGUBAH BODY KARTU UTAMA */}
                 <div 
                   onClick={() => setIsCardFlipped(!isCardFlipped)}
                   className="w-full h-56 cursor-pointer perspective-1000 select-none"
                 >
                   <div className={`relative w-full h-full duration-700 transform-style-3d ${isCardFlipped ? 'rotate-y-180' : ''}`}>
                     
-                    {/* SISI DEPAN KARTU */}
-                    <div className="absolute inset-0 w-full h-full rounded-3xl bg-gradient-to-tr from-amber-900 via-amber-700 to-yellow-600 p-5 text-white shadow-2xl flex flex-col justify-between border-2 border-amber-300/50 backface-hidden overflow-hidden">
+                    {/* SISI DEPAN KARTU: Menggunakan Background Kustom Jika tipe visual 'custom' atau 'original' ber-URL */}
+                    <div 
+                      className="absolute inset-0 w-full h-full rounded-3xl p-5 text-white shadow-2xl flex flex-col justify-between border-2 border-amber-300/50 backface-hidden overflow-hidden"
+                      style={{
+                        backgroundImage: (loyaltyType === 'custom' || loyaltyType === 'original') && loyaltyStampContent?.startsWith('http')
+                          ? `linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.75)), url('${loyaltyStampContent}')`
+                          : 'linear-gradient(to top right, #78350f, #b45309, #d97706)',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }}
+                    >
                       <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
                       
                       <div className="flex justify-between items-start z-10">
@@ -1841,12 +1863,12 @@ function DynamicStoreContent() {
                             <h4 className="text-sm font-black tracking-wide">{storeName}</h4>
                           </div>
                         </div>
-                        <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-black/30 border border-amber-300/30 text-amber-300 font-bold">
+                        <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-black/40 border border-amber-300/40 text-amber-300 font-bold">
                           {userStamps} / {storeData.loyalty_max_stamps || 10} STAMP
                         </span>
                       </div>
 
-                      {/* GRID STAMP TANPA ANGKA (Mendukung Tipe: Original, Theme, atau Custom Image/Emoji dari Kasir) */}
+                      {/* GRID STAMP KECIL (BERISI BINTANG / EMOJI, BUKAN GAMBAR ATM UTUH) */}
                       <div className="grid grid-cols-5 gap-2 z-10 my-1">
                         {Array.from({ length: storeData.loyalty_max_stamps || 10 }).map((_, i) => {
                           const isClaimed = i < userStamps
@@ -1856,17 +1878,11 @@ function DynamicStoreContent() {
                               className={`h-9 rounded-xl border flex items-center justify-center text-xs font-black shadow-inner transition-all ${
                                 isClaimed
                                   ? 'bg-emerald-500 border-emerald-300 text-white scale-105 shadow-emerald-500/50'
-                                  : 'bg-black/20 border-white/20 text-amber-200/50'
+                                  : 'bg-black/30 border-white/20 text-amber-200/50'
                               }`}
                             >
                               {isClaimed ? (
-                                loyaltyType === 'custom' && loyaltyStampContent?.startsWith('http') ? (
-                                  <img src={loyaltyStampContent} alt="stamp" className="w-full h-full object-cover rounded-xl" />
-                                ) : loyaltyType === 'theme' ? (
-                                  <span>{themeConfig.emoji}</span>
-                                ) : (
-                                  <span>{loyaltyStampContent || '✓'}</span>
-                                )
+                                <span>{themeConfig.emoji || '☕'}</span>
                               ) : (
                                 <span className="text-[10px] opacity-45">·</span>
                               )}
@@ -1881,7 +1897,7 @@ function DynamicStoreContent() {
                       </div>
                     </div>
 
-                    {/* SISI BELAKANG KARTU (LOGO, DESKRIPSI & CARA KLAIM) */}
+                    {/* SISI BELAKANG KARTU */}
                     <div className="absolute inset-0 w-full h-full rounded-3xl bg-gradient-to-bl from-slate-900 via-slate-950 to-amber-950 p-5 text-white shadow-2xl flex flex-col justify-between border-2 border-amber-300/50 backface-hidden rotate-y-180 overflow-hidden">
                       <div className="flex items-center gap-2 border-b border-white/10 pb-2">
                         <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 flex items-center justify-center shrink-0">
@@ -1896,7 +1912,6 @@ function DynamicStoreContent() {
                       <div className="space-y-1.5 text-[10px] text-slate-300 leading-relaxed font-sans">
                         <p><strong className="text-amber-400">Deskripsi:</strong> Kumpulkan stamp di setiap kunjungan Anda dan tukarkan dengan hadiah menu gratis.</p>
                         <p><strong className="text-amber-400">Cara Pakai:</strong> Minta kode stamp harian kepada kasir saat bertransaksi di toko.</p>
-                        <p><strong className="text-amber-400">Cara Klaim:</strong> Masukkan kode ke kolom klaim stamp dan tekan tombol.</p>
                       </div>
 
                       <div className="text-center text-[9px] font-mono text-amber-400/80 pt-1 border-t border-white/10">
@@ -1907,7 +1922,7 @@ function DynamicStoreContent() {
                   </div>
                 </div>
 
-                {/* KONTROL KLAIM & TOMBOL CEK LOYALTY CARD */}
+                {/* KONTROL KLAIM */}
                 <div className={`${themeClasses.card} p-4 space-y-3`}>
                   {userStamps < (storeData.loyalty_max_stamps || 10) ? (
                     <div className="space-y-2">
@@ -1941,12 +1956,6 @@ function DynamicStoreContent() {
                     <div className="p-3 bg-emerald-100 border border-emerald-300 rounded-2xl space-y-1 text-center">
                       <p className="text-xs font-black text-emerald-800">🎉 Selamat! Stamp Kamu Sudah Penuh!</p>
                       <p className="text-[11px] text-emerald-700">Tunjukkan kartu ini ke kasir untuk mendapatkan <strong>1 Menu Gratis</strong>!</p>
-                      <button
-                        onClick={handleCheckLoyaltyCard}
-                        className="mt-2 px-4 py-1.5 bg-slate-800 text-amber-300 font-bold text-[11px] rounded-xl"
-                      >
-                        Cek Status Kartu
-                      </button>
                     </div>
                   )}
                 </div>
@@ -1990,19 +1999,19 @@ function DynamicStoreContent() {
               </h3>
               <div className="space-y-2.5 text-[11px] text-slate-700 font-sans leading-relaxed">
                 <div>
-                  <strong className="text-slate-900">1. Tab ☕ Menu:</strong> Tempat memilih kategori makanan/minuman, mengatur varian (panas/dingin), memasukkan catatan khusus, serta melihat rekomendasi menu pendamping.
+                  <strong className="text-slate-900">1. Tab ☕ Menu:</strong> Kategori makanan/minuman, varian (panas/dingin), serta catatan khusus.
                 </div>
                 <div>
-                  <strong className="text-slate-900">2. Tab 📡 Status:</strong> Berfungsi untuk melacak status pesanan secara real-time (pending, diproses, selesai), membunyikan bel panggil kasir, melihat struk digital, hingga mengirim ulasan.
+                  <strong className="text-slate-900">2. Tab 📡 Status:</strong> Melacak pesanan, memanggil bel kasir, dan memberikan ulasan toko.
                 </div>
                 <div>
-                  <strong className="text-slate-900">3. Tab ℹ️ Info:</strong> Berisi informasi lengkap jam operasional toko, fasilitas yang disediakan, akses Wi-Fi gratis, tautan Google Maps, serta kontak WhatsApp komplain.
+                  <strong className="text-slate-900">3. Tab ℹ️ Info:</strong> Jam operasional, fasilitas, Wi-Fi gratis, dan Google Maps toko.
                 </div>
                 <div>
-                  <strong className="text-slate-900">4. Tab 🎮 Game:</strong> Menyediakan 100 Games interaktif anti-bosan yang dapat dimainkan langsung di meja untuk mengisi waktu tunggu pesanan.
+                  <strong className="text-slate-900">4. Tab 🎮 Game:</strong> Kuis tebak hewan & mini game interaktif anti-bosan saat menunggu pesanan.
                 </div>
                 <div>
-                  <strong className="text-slate-900">5. Tab 👤 Profil:</strong> Mengelola data diri, foto avatar, nada dering panggilan kasir, serta memantau kartu loyalitas (*Loyalty Card*) Anda.
+                  <strong className="text-slate-900">5. Tab 👤 Profil:</strong> Pengaturan akun & kartu VIP Loyalty.
                 </div>
               </div>
             </div>
