@@ -10,7 +10,7 @@ export default function LandingPage() {
   const router = useRouter()
   const [selectedArticle, setSelectedArticle] = useState<any | null>(null)
   
-  // State untuk shortcut direct redirect toko & meja
+  // State untuk shortcut direct redirect toko & meja dengan awalan /st/[slug]
   const [targetSlug, setTargetSlug] = useState('')
   const [targetMeja, setTargetMeja] = useState('')
 
@@ -21,7 +21,7 @@ export default function LandingPage() {
       return
     }
     const mejaQuery = targetMeja.trim() ? `?meja=${targetMeja.trim()}` : ''
-    router.push(`/${targetSlug.trim().toLowerCase()}${mejaQuery}`)
+    router.push(`/st/${targetSlug.trim().toLowerCase()}${mejaQuery}`)
   }
 
   const articles = [
@@ -136,13 +136,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FITUR KHUSUS: PENGUNJUNG YANG INGIN MASUK KE TOKO / MEJA TERTENTU */}
+      {/* FITUR KHUSUS: PENGUNJUNG DENGAN AWALAN /st/ [slug] */}
       <section className="max-w-3xl mx-auto px-6 py-8">
         <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-8 space-y-4 shadow-2xl backdrop-blur-xl">
           <div className="space-y-1">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider">Akses Langsung Halaman Toko & Meja</h3>
             <p className="text-xs text-slate-400">
-              Pengunjung yang memindai QR code atau diarahkan ke halaman toko dapat memasukkan Slug Toko dan Nomor Meja di bawah ini untuk langsung menuju menu pesanan:
+              Masukkan Slug Toko dan Nomor Meja di bawah ini untuk langsung menuju menu pesanan (format rute menggunakan awalan <code className="text-red-400 font-mono">/st/</code>):
             </p>
           </div>
 
@@ -150,7 +150,7 @@ export default function LandingPage() {
             <div className="sm:col-span-6">
               <input
                 type="text"
-                placeholder="Nama Toko / Slug (contoh: warkopmaju)"
+                placeholder="Slug Toko (contoh: warkopmaju)"
                 value={targetSlug}
                 onChange={(e) => setTargetSlug(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-600 rounded-xl focus:outline-none focus:border-red-500 transition font-mono"
@@ -174,7 +174,7 @@ export default function LandingPage() {
               </button>
             </div>
           </form>
-          <p className="text-[10px] text-slate-500 font-mono">Format sistem: domain.vercel.app/[slug]?meja=[nomor]</p>
+          <p className="text-[10px] text-slate-500 font-mono">Struktur rute sistem: domain.vercel.app/st/[slug]?meja=[nomor]</p>
         </div>
       </section>
 
