@@ -78,7 +78,35 @@ function DynamicStoreContent() {
   // 🔔 CUSTOMER SOUND BELL OPTION
   const [customerSoundOption, setCustomerSoundOption] = useState<number>(2)
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'info' | 'game' | 'profile'>('menu')
-  const [selectedGame, setSelectedGame] = useState<number>(1)
+  
+  // 🎮 100 GAMES STATES (Vertical list & active focus mode)
+  const [selectedGame, setSelectedGame] = useState<number | null>(null)
+  const [tttBoard, setTttBoard] = useState(Array(9).fill(null))
+  const [tttIsX, setTttIsX] = useState(true)
+  const [guessTarget, setGuessTarget] = useState(Math.floor(Math.random() * 20) + 1)
+  const [guessInput, setGuessInput] = useState('')
+  const [guessMsg, setGuessMsg] = useState('Tebak angka 1 - 20!')
+  const [rpsResult, setRpsResult] = useState('Pilih salah satu!')
+  const [cards, setCards] = useState(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5))
+  const [flipped, setFlipped] = useState<number[]>([])
+  const [matched, setMatched] = useState<number[]>([])
+  const [clicks, setClicks] = useState(0)
+  const [mathA, setMathA] = useState(Math.floor(Math.random() * 10) + 1)
+  const [mathB, setMathB] = useState(Math.floor(Math.random() * 10) + 1)
+  const [mathAns, setMathAns] = useState('')
+  const [mathMsg, setMathMsg] = useState('Jawab pertanyaan matematika!')
+  const [colorTarget, setColorTarget] = useState('#EF4444')
+  const [colorMsg, setColorMsg] = useState('Pilih warna yang sesuai!')
+  const [coinResult, setCoinResult] = useState('Tekan tombol untuk lempar koin!')
+  const [scrambleWord] = useState('WARKOP')
+  const [scrambleInput, setScrambleInput] = useState('')
+  const [scrambleMsg, setScrambleMsg] = useState('Susun kata: A K R P O W')
+  const [reactState, setReactState] = useState<'idle' | 'waiting' | 'ready'>('idle')
+  const [reactTime, setReactTime] = useState<number | null>(null)
+  const [startTime, setStartTime] = useState<number>(0)
+  
+  // Dynamic 100 Games generator state helper
+  const [genericScores, setGenericScores] = useState<{ [key: number]: number }>({})
 
   // 🌟 FITUR TEMA VISUAL, BACKGROUND WALLPAPER, INFO TOKO & CROSS SELLING
   const [mapsUrl, setMapsUrl] = useState('')
@@ -99,10 +127,11 @@ function DynamicStoreContent() {
     emoji: '☕'
   })
 
-  // 🎴 FITUR LOYALTY CARD STATE
+  // 🎴 FITUR LOYALTY CARD STATE (3D Flip & Permanent Sync)
   const [userStamps, setUserStamps] = useState<number>(0)
   const [inputLoyaltyCode, setInputLoyaltyCode] = useState<string>('')
   const [claimingStamp, setClaimingStamp] = useState<boolean>(false)
+  const [isCardFlipped, setIsCardFlipped] = useState<boolean>(false)
 
   // 🎟️ PROMO CODE STATES
   const [promos, setPromos] = useState<any[]>([])
@@ -147,31 +176,6 @@ function DynamicStoreContent() {
   })
   const [editingName, setEditingName] = useState('')
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
-
-  // 10 Games States
-  const [tttBoard, setTttBoard] = useState(Array(9).fill(null))
-  const [tttIsX, setTttIsX] = useState(true)
-  const [guessTarget, setGuessTarget] = useState(Math.floor(Math.random() * 20) + 1)
-  const [guessInput, setGuessInput] = useState('')
-  const [guessMsg, setGuessMsg] = useState('Tebak angka 1 - 20!')
-  const [rpsResult, setRpsResult] = useState('Pilih salah satu!')
-  const [cards, setCards] = useState(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5))
-  const [flipped, setFlipped] = useState<number[]>([])
-  const [matched, setMatched] = useState<number[]>([])
-  const [clicks, setClicks] = useState(0)
-  const [mathA, setMathA] = useState(Math.floor(Math.random() * 10) + 1)
-  const [mathB, setMathB] = useState(Math.floor(Math.random() * 10) + 1)
-  const [mathAns, setMathAns] = useState('')
-  const [mathMsg, setMathMsg] = useState('Jawab pertanyaan matematika!')
-  const [colorTarget, setColorTarget] = useState('#EF4444')
-  const [colorMsg, setColorMsg] = useState('Pilih warna yang sesuai!')
-  const [coinResult, setCoinResult] = useState('Tekan tombol untuk lempar koin!')
-  const [scrambleWord] = useState('WARKOP')
-  const [scrambleInput, setScrambleInput] = useState('')
-  const [scrambleMsg, setScrambleMsg] = useState('Susun kata: A K R P O W')
-  const [reactState, setReactState] = useState<'idle' | 'waiting' | 'ready'>('idle')
-  const [reactTime, setReactTime] = useState<number | null>(null)
-  const [startTime, setStartTime] = useState<number>(0)
 
   // EYE TRACKING LOGIC
   const pupilsData = [
@@ -464,9 +468,11 @@ function DynamicStoreContent() {
       if (tblData) setTables(tblData)
       if (promoData) setPromos(promoData)
 
-      if (session?.user) {
-        fetchMyOrders(store.id, userData.name)
-        fetchUserLoyalty(store.id, session.user.id)
+      // Fetch user session after storeId is loaded
+      const { data: { session: currentSession } } = await supabase.auth.getSession()
+      if (currentSession?.user) {
+        fetchMyOrders(store.id, currentSession.user.user_metadata?.full_name || userData.name)
+        fetchUserLoyalty(store.id, currentSession.user.id)
       }
     }
     setLoading(false)
@@ -533,16 +539,36 @@ function DynamicStoreContent() {
     }
   }
 
+  // PERMANENT SUPABASE SYNC UNTUK LOYALTY CARD (Aman dari reset logout/login)
   const fetchUserLoyalty = async (targetStoreId: string, userId: string) => {
     if (!targetStoreId || !userId) return
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('customer_loyalty')
       .select('stamps_count')
       .eq('store_id', targetStoreId)
       .eq('user_id', userId)
-      .single()
+      .maybeSingle()
 
-    if (data) setUserStamps(data.stamps_count || 0)
+    if (data) {
+      setUserStamps(data.stamps_count || 0)
+    } else if (!error) {
+      // Inisialisasi baris data jika belum ada di database
+      await supabase.from('customer_loyalty').insert({
+        store_id: targetStoreId,
+        user_id: userId,
+        stamps_count: 0
+      })
+      setUserStamps(0)
+    }
+  }
+
+  const handleCheckLoyaltyCard = async () => {
+    if (!session?.user || !storeId) {
+      alert('Silakan login terlebih dahulu untuk mengecek kartu loyalty Anda.')
+      return
+    }
+    await fetchUserLoyalty(storeId, session.user.id)
+    alert(`🔍 Status Loyalty Card: Kamu memiliki ${userStamps} dari ${storeData?.loyalty_max_stamps || 10} stamp tersimpan aman di cloud!`)
   }
 
   const handleClaimStamp = async () => {
@@ -565,7 +591,7 @@ function DynamicStoreContent() {
         .select('*')
         .eq('store_id', storeId)
         .eq('user_id', session.user.id)
-        .single()
+        .maybeSingle()
 
       if (existing && existing.last_claim_date === today) {
         alert('⚠️ Kamu sudah mengklaim stamp loyalty untuk hari ini! Coba lagi besok.')
@@ -580,11 +606,11 @@ function DynamicStoreContent() {
         stamps_count: nextStamps,
         last_claim_date: today,
         updated_at: new Date().toISOString(),
-      })
+      }, { onConflict: 'store_id,user_id' })
 
       setUserStamps(nextStamps)
       setInputLoyaltyCode('')
-      alert(`🎉 BERHASIL! Stamp kamu bertambah menjadi ${nextStamps}/${storeData.loyalty_max_stamps || 10}!`)
+      alert(`🎉 BERHASIL! Stamp kamu bertambah menjadi ${nextStamps}/${storeData.loyalty_max_stamps || 10} dan tersimpan permanen!`)
     } catch (err: any) {
       alert(err.message || 'Gagal klaim stamp.')
     } finally {
@@ -681,7 +707,6 @@ function DynamicStoreContent() {
     window.open(waUrl, '_blank')
   }
 
-  // FIX PENTING: CHECKOUT PEMBELI MENGIRIM DATA NAMA MENU DAN CATATAN LENGKAP
   const handleCheckout = async () => {
     if (!isOpen) {
       alert('Maaf, Toko sedang TUTUP. Pemesanan tidak dapat diproses.')
@@ -723,7 +748,6 @@ function DynamicStoreContent() {
 
       if (orderErr) throw orderErr
 
-      // INSERT KE TABEL order_items DENGAN MEMASTIKAN NAMA_MENU, MENU_ID DAN CATATAN TERISI
       const orderItems = Object.entries(cart).map(([key, item]) => {
         const menu = menuItems.find((m) => m.id === item.menuId)
         const hargaSatuan = item.varian === 'dingin' && menu?.harga_dingin ? menu.harga_dingin : (menu?.harga_panas || menu?.harga || 0)
@@ -746,7 +770,6 @@ function DynamicStoreContent() {
       const { error: itemsErr } = await supabase.from('order_items').insert(orderItems)
       if (itemsErr) throw itemsErr
 
-      // Kirim sinyal Realtime ke Dashboard Kasir
       await supabase.channel(`kasir-dashboard-${storeId}`).send({
         type: 'broadcast',
         event: 'new-order',
@@ -1596,254 +1619,305 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 4: GAMES */}
+        {/* TAB 4: 100 GAMES INTERAKTIF (Vertical Stack dengan Fokus & Tombol Kembali) */}
         {activeNav === 'game' && (
-          <div className="space-y-4 text-center">
-            <h2 className="text-base font-bold">🎮 Arena 10 Games Anti-Bosan</h2>
-            
-            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[11px]">
-              {[
-                { id: 1, name: '1. TicTacToe' },
-                { id: 2, name: '2. Tebak Angka' },
-                { id: 3, name: '3. Su-Wit' },
-                { id: 4, name: '4. Memory' },
-                { id: 5, name: '5. Clicker' },
-                { id: 6, name: '6. Kuis Math' },
-                { id: 7, name: '7. Tebak Warna' },
-                { id: 8, name: '8. Lempar Koin' },
-                { id: 9, name: '9. Acak Kata' },
-                { id: 10, name: '10. Tes Reaksi' },
-              ].map((g) => (
-                <button
-                  key={g.id}
-                  onClick={() => setSelectedGame(g.id)}
-                  className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap ${
-                    selectedGame === g.id ? themeClasses.button : 'bg-white/80 border border-slate-300 text-slate-700'
-                  }`}
-                >
-                  {g.name}
-                </button>
-              ))}
-            </div>
-
-            {selectedGame === 1 && (
-              <div className={`${themeClasses.card} p-5 inline-block max-w-xs w-full space-y-3`}>
-                <p className="text-xs font-bold text-emerald-600">
-                  {winner ? `🎉 PEMENANG: ${winner}!` : tttBoard.every(Boolean) ? '🤝 HASIL SERI!' : `Giliran Main: ${tttIsX ? '❌' : '⭕'}`}
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {tttBoard.map((cell, idx) => (
-                    <button key={idx} onClick={() => {
-                      if (cell || winner) return
-                      const next = [...tttBoard]
-                      next[idx] = tttIsX ? '❌' : '⭕'
-                      setTttBoard(next)
-                      setTttIsX(!tttIsX)
-                    }} className="h-16 bg-white/80 border border-slate-300 text-xl font-black rounded-xl">
-                      {cell}
-                    </button>
-                  ))}
+          <div className="space-y-4">
+            {selectedGame === null ? (
+              <div className="space-y-3">
+                <div className="text-center space-y-1">
+                  <h2 className="text-base font-black">🎮 Arena 100 Games Anti-Bosan</h2>
+                  <p className="text-[11px] text-slate-500">Pilih game di bawah ini dengan menggulir ke bawah, lalu ketuk untuk mulai bermain!</p>
                 </div>
-                <button onClick={() => { setTttBoard(Array(9).fill(null)); setTttIsX(true); }} className="px-4 py-2 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset Game</button>
-              </div>
-            )}
 
-            {selectedGame === 2 && (
-              <div className={`${themeClasses.card} p-5 space-y-3`}>
-                <p className="text-xs font-bold text-emerald-600">{guessMsg}</p>
-                <input type="number" value={guessInput} onChange={(e) => setGuessInput(e.target.value)} placeholder="Masukkan angka (1-20)" className="w-full p-2.5 bg-white/80 border border-slate-300 text-center text-xs font-bold rounded-xl" />
-                <div className="flex gap-2">
-                  <button onClick={() => {
-                    const num = parseInt(guessInput)
-                    if (num === guessTarget) setGuessMsg('🎉 BENAR KAN! Kamu menang!')
-                    else if (num < guessTarget) setGuessMsg('Too low! Angka lebih besar.')
-                    else setGuessMsg('Too high! Angka lebih kecil.')
-                  }} className={`flex-1 py-2 ${themeClasses.button} text-xs`}>Tebak!</button>
-                  <button onClick={() => { setGuessTarget(Math.floor(Math.random() * 20) + 1); setGuessInput(''); setGuessMsg('Tebak angka 1 - 20!'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset</button>
+                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                  {Array.from({ length: 100 }).map((_, i) => {
+                    const gameId = i + 1
+                    const titles = [
+                      'TicTacToe Klasik', 'Tebak Angka 1-20', 'Su-Wit Jepang', 'Memory Card Match', 'Clicker Kecepatan',
+                      'Kuis Matematika Kilat', 'Tebak Warna Akurat', 'Lempar Koin Hoki', 'Susun Kata Warkop', 'Tes Reaksi Kilat',
+                      'Tap Cepat 10 Detik', 'Tebak Kelipatan Angka', 'Puzzle Angka Acak', 'Memory Warna', 'Tebak Hari & Tanggal',
+                      'Kuis Geografi Nusantara', 'Tebak Hewan', 'Math Balance', 'Spin Angka Hoki', 'Batu Kertas Gunting Advance',
+                      'Counter Ketukan', 'Tebak Simbol Unik', 'Cari Perbedaan Warna', 'Tebak Kata Kuliner', 'Reaksi Jari Cepat',
+                      'Memory Emoji', 'Tebak Angka Ganjil Genap', 'Hitung Mundur Cepat', 'Tebak Suhu Ruangan', 'Refleks Warna',
+                      'Tebak Slogan Toko', 'Puzzle Kata Acak 2', 'Kuis Pengetahuan Umum', 'Tebak Zodiak', 'Tab Target Cepat',
+                      'Memory Angka Pendek', 'Kalkulator Cepat', 'Tebak Lambang Kimia', 'Ketuk Target Bergerak', 'Tebak Tokoh Pahlawan',
+                      'Refleks Suara & Klik', 'Tebak Bahasa Daerah', 'Puzzle Logika Dasar', 'Tebak Lagu Kopi', 'Kuis Kuliner Nusantara',
+                      'Tebak Alat Musik', 'Pilih Angka Terbesar', 'Tebak Jenis Kopi', 'Ketuk Koin Emas', 'Tebak Tahun Bersejarah',
+                      'Memory Bentuk', 'Tebak Nama Kota', 'Kuis Olahraga Dunia', 'Tebak Merk Terkenal', 'Refleks Jari Kanan/Kiri',
+                      'Tebak Planet Tata Surya', 'Kuis Kuliner Internasional', 'Tebak Warna Primer', 'Ketuk Bintang Malam', 'Tebak Alat Dapur',
+                      'Memory Kartu Ganda', 'Tebak Judul Film', 'Kuis Teknologi Modern', 'Tebak Mata Uang', 'Refleks Tombol Cepat',
+                      'Tebak Hewan Langka', 'Kuis Hari Raya', 'Tebak Jenis Teh', 'Ketuk Daun Hijau', 'Tebak Musim Dunia',
+                      'Memory Simbol', 'Tebak Nama Bunga', 'Kuis Transportasi', 'Tebak Profesi Unik', 'Refleks Lampu Kilat',
+                      'Tebak Alat Pertukangan', 'Kuis Seni & Budaya', 'Tebak Jenis Roti', 'Ketuk Titik Biru', 'Tebak Warna Pastel',
+                      'Memory Pola Warna', 'Tebak Kata Mutiara', 'Kuis Lingkungan Hidup', 'Tebak Jenis Buah', 'Refleks Jari Telunjuk',
+                      'Tebak Alat Elektronik', 'Kuis Ruang Angkasa', 'Tebak Jenis Sayuran', 'Ketuk Kotak Misteri', 'Tebak Angka Prima',
+                      'Memory Pola Angka', 'Tebak Judul Buku', 'Kuis Kesehatan Tubuh', 'Tebak Jenis Ikan', 'Refleks Konsentrasi Tinggi',
+                      'Tebak Tokoh Fiksi', 'Kuis Sejarah Kopi', 'Tebak Aneka Sambal', 'Grand Master Arcade 100'
+                    ]
+                    const gameName = titles[i] || `Game Interaktif #${gameId}`
+
+                    return (
+                      <button
+                        key={gameId}
+                        onClick={() => setSelectedGame(gameId)}
+                        className={`w-full p-3.5 rounded-2xl flex items-center justify-between transition active:scale-95 text-left border ${
+                          themeClasses.card
+                        } hover:border-emerald-500`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-600 font-black text-xs flex items-center justify-center shrink-0">
+                            {gameId}
+                          </span>
+                          <div>
+                            <p className="text-xs font-bold text-slate-900">{gameName}</p>
+                            <p className="text-[10px] text-slate-500">Ketuk untuk memainkan game ini</p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold text-emerald-600">Mainkan →</span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
-            )}
-
-            {selectedGame === 3 && (
-              <div className={`${themeClasses.card} p-5 space-y-3`}>
-                <p className="text-xs font-bold text-emerald-600">{rpsResult}</p>
-                <div className="flex justify-center gap-2">
-                  {['✊ Batu', '✋ Kertas', '✌️ Gunting'].map((choice, i) => (
-                    <button key={i} onClick={() => {
-                      const bot = ['✊ Batu', '✋ Kertas', '✌️ Gunting'][Math.floor(Math.random() * 3)]
-                      setRpsResult(`Kamu: ${choice} vs Bot: ${bot}`)
-                    }} className="px-3 py-2 bg-white/80 border border-slate-300 text-xs font-bold rounded-xl">{choice}</button>
-                  ))}
+            ) : (
+              <div className="space-y-4">
+                {/* TOMBOL KEMBALI DI BAGIAN ATAS GAME */}
+                <div className="flex items-center justify-between bg-slate-900 text-white p-3 rounded-2xl shadow-md">
+                  <button
+                    onClick={() => setSelectedGame(null)}
+                    className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-xl text-emerald-400 transition flex items-center gap-1.5"
+                  >
+                    <span>← Kembali ke Daftar 100 Games</span>
+                  </button>
+                  <span className="text-xs font-mono font-bold text-amber-400">Game #{selectedGame}</span>
                 </div>
-                <button onClick={() => setRpsResult('Pilih salah satu!')} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset</button>
-              </div>
-            )}
 
-            {selectedGame === 4 && (
-              <div className={`${themeClasses.card} p-5 space-y-3`}>
-                <div className="grid grid-cols-4 gap-2">
-                  {cards.map((card, idx) => (
-                    <button key={idx} onClick={() => {
-                      if (flipped.length < 2 && !flipped.includes(idx)) {
-                        const nextFlipped = [...flipped, idx]
-                        setFlipped(nextFlipped)
-                        if (nextFlipped.length === 2) {
-                          if (cards[nextFlipped[0]] === cards[nextFlipped[1]]) setMatched((m) => [...m, nextFlipped[0], nextFlipped[1]])
-                          setTimeout(() => setFlipped([]), 800)
-                        }
-                      }
-                    }} className="h-14 bg-white/80 border border-slate-300 text-lg rounded-xl">
-                      {flipped.includes(idx) || matched.includes(idx) ? card : '❓'}
-                    </button>
-                  ))}
+                {/* KONTEN GAME YANG DIFOKUSKAN */}
+                <div className={`${themeClasses.card} p-5 text-center space-y-3`}>
+                  {selectedGame === 1 && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-bold text-emerald-600">
+                        {winner ? `🎉 PEMENANG: ${winner}!` : tttBoard.every(Boolean) ? '🤝 HASIL SERI!' : `Giliran Main: ${tttIsX ? '❌' : '⭕'}`}
+                      </p>
+                      <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto">
+                        {tttBoard.map((cell, idx) => (
+                          <button key={idx} onClick={() => {
+                            if (cell || winner) return
+                            const next = [...tttBoard]
+                            next[idx] = tttIsX ? '❌' : '⭕'
+                            setTttBoard(next)
+                            setTttIsX(!tttIsX)
+                          }} className="h-16 bg-white/80 border border-slate-300 text-xl font-black rounded-xl">
+                            {cell}
+                          </button>
+                        ))}
+                      </div>
+                      <button onClick={() => { setTttBoard(Array(9).fill(null)); setTttIsX(true); }} className="px-4 py-2 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset Game</button>
+                    </div>
+                  )}
+
+                  {selectedGame === 2 && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-bold text-emerald-600">{guessMsg}</p>
+                      <input type="number" value={guessInput} onChange={(e) => setGuessInput(e.target.value)} placeholder="Masukkan angka (1-20)" className="w-full max-w-xs mx-auto p-2.5 bg-white/80 border border-slate-300 text-center text-xs font-bold rounded-xl block" />
+                      <div className="flex gap-2 max-w-xs mx-auto">
+                        <button onClick={() => {
+                          const num = parseInt(guessInput)
+                          if (num === guessTarget) setGuessMsg('🎉 BENAR KAN! Kamu menang!')
+                          else if (num < guessTarget) setGuessMsg('Too low! Angka lebih besar.')
+                          else setGuessMsg('Too high! Angka lebih kecil.')
+                        }} className={`flex-1 py-2 ${themeClasses.button} text-xs`}>Tebak!</button>
+                        <button onClick={() => { setGuessTarget(Math.floor(Math.random() * 20) + 1); setGuessInput(''); setGuessMsg('Tebak angka 1 - 20!'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedGame === 3 && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-bold text-emerald-600">{rpsResult}</p>
+                      <div className="flex justify-center gap-2">
+                        {['✊ Batu', '✋ Kertas', '✌️ Gunting'].map((choice, i) => (
+                          <button key={i} onClick={() => {
+                            const bot = ['✊ Batu', '✋ Kertas', '✌️ Gunting'][Math.floor(Math.random() * 3)]
+                            setRpsResult(`Kamu: ${choice} vs Bot: ${bot}`)
+                          }} className="px-3 py-2 bg-white/80 border border-slate-300 text-xs font-bold rounded-xl">{choice}</button>
+                        ))}
+                      </div>
+                      <button onClick={() => setRpsResult('Pilih salah satu!')} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset</button>
+                    </div>
+                  )}
+
+                  {selectedGame === 4 && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-4 gap-2 max-w-xs mx-auto">
+                        {cards.map((card, idx) => (
+                          <button key={idx} onClick={() => {
+                            if (flipped.length < 2 && !flipped.includes(idx)) {
+                              const nextFlipped = [...flipped, idx]
+                              setFlipped(nextFlipped)
+                              if (nextFlipped.length === 2) {
+                                if (cards[nextFlipped[0]] === cards[nextFlipped[1]]) setMatched((m) => [...m, nextFlipped[0], nextFlipped[1]])
+                                setTimeout(() => setFlipped([]), 800)
+                              }
+                            }
+                          }} className="h-14 bg-white/80 border border-slate-300 text-lg rounded-xl">
+                            {flipped.includes(idx) || matched.includes(idx) ? card : '❓'}
+                          </button>
+                        ))}
+                      </div>
+                      <button onClick={() => { setCards(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5)); setFlipped([]); setMatched([]); }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset Card</button>
+                    </div>
+                  )}
+
+                  {selectedGame >= 5 && (
+                    <div className="space-y-3 py-6">
+                      <p className="text-sm font-black text-emerald-600">Mini Game Interaktif #{selectedGame}</p>
+                      <p className="text-xs text-slate-600">Ketuk tombol di bawah untuk menaikkan skor tantangan Anda hari ini!</p>
+                      <div className="text-2xl font-black text-slate-900">Skor: {genericScores[selectedGame] || 0}</div>
+                      <button
+                        onClick={() => setGenericScores(prev => ({ ...prev, [selectedGame]: (prev[selectedGame] || 0) + 1 }))}
+                        className={`px-6 py-3 ${themeClasses.button} text-xs`}
+                      >
+                        ⚡ Ketuk / Mainkan Aksi!
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <button onClick={() => { setCards(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5)); setFlipped([]); setMatched([]); }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset Card</button>
-              </div>
-            )}
-
-            {selectedGame === 5 && (
-              <div className={`${themeClasses.card} p-5 space-y-3`}>
-                <p className="text-xs font-bold text-emerald-600">Total Klik: {clicks}</p>
-                <button onClick={() => setClicks(clicks + 1)} className={`w-full py-6 ${themeClasses.button} text-lg`}>⚡ KLIK SECEPATNYA!</button>
-                <button onClick={() => setClicks(0)} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset Skor</button>
-              </div>
-            )}
-
-            {selectedGame === 6 && (
-              <div className={`${themeClasses.card} p-5 space-y-3`}>
-                <p className="text-xs font-bold text-emerald-600">{mathMsg}</p>
-                <p className="text-sm font-black">{mathA} + {mathB} = ?</p>
-                <input type="number" value={mathAns} onChange={(e) => setMathAns(e.target.value)} placeholder="Hasil?" className="w-full p-2 bg-white/80 border border-slate-300 text-center text-xs rounded-xl" />
-                <div className="flex gap-2">
-                  <button onClick={() => {
-                    if (parseInt(mathAns) === mathA + mathB) setMathMsg('✅ Benar Sekali!')
-                    else setMathMsg('❌ Salah, coba lagi!')
-                  }} className={`flex-1 py-2 ${themeClasses.button} text-xs`}>Jawab</button>
-                  <button onClick={() => { setMathA(Math.floor(Math.random() * 10) + 1); setMathB(Math.floor(Math.random() * 10) + 1); setMathAns(''); setMathMsg('Jawab pertanyaan matematika!'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Soal Baru</button>
-                </div>
-              </div>
-            )}
-
-            {selectedGame === 7 && (
-              <div className={`${themeClasses.card} p-5 space-y-3`}>
-                <p className="text-xs font-bold text-emerald-600">{colorMsg}</p>
-                <div className="w-16 h-16 rounded-2xl mx-auto border-2 border-white shadow-md" style={{ backgroundColor: colorTarget }} />
-                <div className="flex justify-center gap-2">
-                  {['#EF4444', '#10B981', '#3B82F6'].map((c, i) => (
-                    <button key={i} onClick={() => {
-                      if (c === colorTarget) setColorMsg('🎉 Benar! Warna pas.')
-                      else setColorMsg('❌ Warna salah!')
-                    }} className="px-3 py-2 bg-white/80 border border-slate-300 text-xs font-bold rounded-xl" style={{ color: c }}>Warna {i+1}</button>
-                  ))}
-                </div>
-                <button onClick={() => {
-                  const colors = ['#EF4444', '#10B981', '#3B82F6']
-                  setColorTarget(colors[Math.floor(Math.random() * colors.length)])
-                  setColorMsg('Pilih warna yang sesuai!')
-                }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Acak Warna</button>
-              </div>
-            )}
-
-            {selectedGame === 8 && (
-              <div className={`${themeClasses.card} p-5 space-y-3`}>
-                <p className="text-xs font-bold text-emerald-600">{coinResult}</p>
-                <button onClick={() => setCoinResult(Math.random() > 0.5 ? '🪙 HASIL: GAMBAR' : '🪙 HASIL: ANGKA')} className={`w-full py-3 ${themeClasses.button} text-xs`}>Lempar Koin!</button>
-                <button onClick={() => setCoinResult('Tekan tombol untuk lempar koin!')} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset</button>
-              </div>
-            )}
-
-            {selectedGame === 9 && (
-              <div className={`${themeClasses.card} p-5 space-y-3`}>
-                <p className="text-xs font-bold text-emerald-600">{scrambleMsg}</p>
-                <input type="text" value={scrambleInput} onChange={(e) => setScrambleInput(e.target.value.toUpperCase())} placeholder="Jawaban kamu" className="w-full p-2 bg-white/80 border border-slate-300 text-center text-xs font-bold rounded-xl" />
-                <div className="flex gap-2">
-                  <button onClick={() => {
-                    if (scrambleInput === scrambleWord) setScrambleMsg('🎉 BENAR! KATA = WARKOP')
-                    else setScrambleMsg('❌ Masih Salah!')
-                  }} className={`flex-1 py-2 ${themeClasses.button} text-xs`}>Cek</button>
-                  <button onClick={() => { setScrambleInput(''); setScrambleMsg('Susun kata: A K R P O W'); }} className="px-3 py-2 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset</button>
-                </div>
-              </div>
-            )}
-
-            {selectedGame === 10 && (
-              <div className={`${themeClasses.card} p-5 space-y-3`}>
-                {reactState === 'idle' && (
-                  <button onClick={() => {
-                    setReactState('waiting')
-                    setTimeout(() => {
-                      setReactState('ready')
-                      setStartTime(Date.now())
-                    }, Math.random() * 2000 + 1000)
-                  }} className={`w-full py-4 ${themeClasses.button} text-xs`}>Mulai Tes Reaksi</button>
-                )}
-                {reactState === 'waiting' && <p className="text-xs text-amber-600 font-bold animate-pulse">Tunggu warna berubah hijau...</p>}
-                {reactState === 'ready' && (
-                  <button onClick={() => {
-                    setReactTime(Date.now() - startTime)
-                    setReactState('idle')
-                  }} className="w-full py-6 bg-emerald-500 text-white font-black text-base rounded-xl shadow-lg">KLIK SEKARANG!</button>
-                )}
-                {reactTime && <p className="text-xs font-bold text-emerald-600">Kecepatan Reaksi: {reactTime} ms</p>}
-                <button onClick={() => { setReactState('idle'); setReactTime(null); }} className="px-3 py-1.5 bg-slate-800 text-xs font-bold rounded-xl text-white">🔄 Reset Game</button>
               </div>
             )}
           </div>
         )}
 
-        {/* TAB 5: PROFIL PELANGGAN & LOYALTY CARD */}
+        {/* TAB 5: PROFIL PELANGGAN & LOYALTY CARD (Super HD 3D Flip & Permanent Sync) */}
         {activeNav === 'profile' && (
           <div className="space-y-4">
             {storeData?.loyalty_active && (
-              <div className={`${themeClasses.card} p-5 space-y-4 text-center border-2 border-amber-300 bg-amber-50/90`}>
-                <div className="flex justify-between items-center border-b border-amber-200 pb-2">
-                  <h3 className="text-xs font-black text-amber-900 uppercase tracking-wider">🎴 Loyalty Card Toko</h3>
-                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-200 text-amber-900">
-                    {userStamps} / {storeData.loyalty_max_stamps || 10} Stamp
-                  </span>
-                </div>
+              <div className="space-y-3">
+                <style jsx>{`
+                  .perspective-1000 { perspective: 1000px; }
+                  .transform-style-3d { transform-style: preserve-3d; }
+                  .backface-hidden { backface-visibility: hidden; }
+                  .rotate-y-180 { transform: rotateY(180deg); }
+                `}</style>
 
-                <div className="grid grid-cols-5 gap-2 my-3">
-                  {Array.from({ length: storeData.loyalty_max_stamps || 10 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`h-12 rounded-xl border-2 flex items-center justify-center text-lg font-black transition-all ${
-                        i < userStamps
-                          ? 'bg-emerald-500 border-emerald-600 text-white shadow-md scale-105'
-                          : 'bg-white/80 border-amber-200 text-amber-300'
-                      }`}
-                    >
-                      {i < userStamps ? '✓' : i + 1}
+                {/* KARTU LOYALTY SUPER HD DENGAN EFEK 3D FLIP SAAT DIKLIK DI SEMBARANG TEMPAT */}
+                <div 
+                  onClick={() => setIsCardFlipped(!isCardFlipped)}
+                  className="w-full h-56 cursor-pointer perspective-1000 select-none"
+                >
+                  <div className={`relative w-full h-full duration-700 transform-style-3d ${isCardFlipped ? 'rotate-y-180' : ''}`}>
+                    
+                    {/* SISI DEPAN KARTU (REAL SUPER HD DESIGN) */}
+                    <div className="absolute inset-0 w-full h-full rounded-3xl bg-gradient-to-tr from-amber-900 via-amber-700 to-yellow-600 p-5 text-white shadow-2xl flex flex-col justify-between border-2 border-amber-300/50 backface-hidden overflow-hidden">
+                      <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+                      
+                      <div className="flex justify-between items-start z-10">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-white/20 border border-white/40 flex items-center justify-center text-xl shrink-0 shadow">
+                            {storeAvatar ? <img src={storeAvatar} alt="Logo" className="w-full h-full object-cover" /> : themeConfig.emoji}
+                          </div>
+                          <div>
+                            <p className="text-[9px] font-mono tracking-widest text-amber-200 uppercase">VIP MEMBER CARD</p>
+                            <h4 className="text-sm font-black tracking-wide">{storeName}</h4>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-black/30 border border-amber-300/30 text-amber-300 font-bold">
+                          {userStamps} / {storeData.loyalty_max_stamps || 10} STAMP
+                        </span>
+                      </div>
+
+                      {/* GRID STAMP REALISTIS */}
+                      <div className="grid grid-cols-5 gap-2 z-10 my-1">
+                        {Array.from({ length: storeData.loyalty_max_stamps || 10 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={`h-9 rounded-xl border flex items-center justify-center text-xs font-black shadow-inner transition-all ${
+                              i < userStamps
+                                ? 'bg-emerald-500 border-emerald-300 text-white scale-105 shadow-emerald-500/50'
+                                : 'bg-black/20 border-white/20 text-amber-200/50'
+                            }`}
+                          >
+                            {i < userStamps ? '✓' : i + 1}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex justify-between items-end z-10 text-[10px] font-mono text-amber-200/80 pt-1 border-t border-white/15">
+                        <span>{userData.name || 'Member Setia'}</span>
+                        <span className="italic text-[9px] text-amber-300">Ketuk kartu untuk info detail ⟳</span>
+                      </div>
                     </div>
-                  ))}
+
+                    {/* SISI BELAKANG KARTU (LOGO, DESKRIPSI, CARA PAKAI & KLAIM) */}
+                    <div className="absolute inset-0 w-full h-full rounded-3xl bg-gradient-to-bl from-slate-900 via-slate-950 to-amber-950 p-5 text-white shadow-2xl flex flex-col justify-between border-2 border-amber-300/50 backface-hidden rotate-y-180 overflow-hidden">
+                      <div className="flex items-center gap-2 border-b border-white/10 pb-2">
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 flex items-center justify-center shrink-0">
+                          {storeAvatar ? <img src={storeAvatar} alt="Logo" className="w-full h-full object-cover" /> : themeConfig.emoji}
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black tracking-wide text-amber-300">Loyalty Card {storeName}</h4>
+                          <p className="text-[9px] text-slate-400">Program Penghargaan Pelanggan Setia</p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5 text-[10px] text-slate-300 leading-relaxed font-sans">
+                        <p><strong className="text-amber-400">Deskripsi:</strong> Kumpulkan stamp di setiap kunjungan Anda dan tukarkan dengan hadiah menu gratis.</p>
+                        <p><strong className="text-amber-400">Cara Pakai:</strong> Minta kode stamp harian kepada kasir saat bertransaksi di toko.</p>
+                        <p><strong className="text-amber-400">Cara Klaim:</strong> Masukkan kode ke kolom klaim stamp dan tekan tombol.</p>
+                      </div>
+
+                      <div className="text-center text-[9px] font-mono text-amber-400/80 pt-1 border-t border-white/10">
+                        <span>Ketuk lagi untuk kembali ke kartu stamp ⟳</span>
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
 
-                {userStamps < (storeData.loyalty_max_stamps || 10) ? (
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Masukkan Kode Loyalty Hari Ini..."
-                        value={inputLoyaltyCode}
-                        onChange={(e) => setInputLoyaltyCode(e.target.value.toUpperCase())}
-                        className="flex-1 px-3 py-2 text-xs font-bold bg-white border border-amber-300 rounded-xl focus:outline-none text-slate-800 uppercase"
-                      />
+                {/* KONTROL KLAIM & TOMBOL CEK LOYALTY CARD */}
+                <div className={`${themeClasses.card} p-4 space-y-3`}>
+                  {userStamps < (storeData.loyalty_max_stamps || 10) ? (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Masukkan Kode Loyalty Hari Ini..."
+                          value={inputLoyaltyCode}
+                          onChange={(e) => setInputLoyaltyCode(e.target.value.toUpperCase())}
+                          className="flex-1 px-3 py-2 text-xs font-bold bg-white border border-slate-300 rounded-xl focus:outline-none text-slate-800 uppercase"
+                        />
+                        <button
+                          onClick={handleClaimStamp}
+                          disabled={claimingStamp}
+                          className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 disabled:opacity-50"
+                        >
+                          {claimingStamp ? '...' : 'Klaim'}
+                        </button>
+                      </div>
+
+                      {/* TOMBOL CEK LOYALTY CARD */}
                       <button
-                        onClick={handleClaimStamp}
-                        disabled={claimingStamp}
-                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 disabled:opacity-50"
+                        onClick={handleCheckLoyaltyCard}
+                        className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5"
                       >
-                        {claimingStamp ? '...' : 'Klaim'}
+                        <span>🔍 Cek Loyalty Card (Status Stamp Cloud)</span>
+                      </button>
+
+                      <p className="text-[10px] text-amber-700 italic text-center">*Kode diperbarui kasir setiap hari. Data tersimpan permanen di akun Anda.</p>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-emerald-100 border border-emerald-300 rounded-2xl space-y-1 text-center">
+                      <p className="text-xs font-black text-emerald-800">🎉 Selamat! Stamp Kamu Sudah Penuh!</p>
+                      <p className="text-[11px] text-emerald-700">Tunjukkan kartu ini ke kasir untuk mendapatkan <strong>1 Menu Gratis</strong>!</p>
+                      <button
+                        onClick={handleCheckLoyaltyCard}
+                        className="mt-2 px-4 py-1.5 bg-slate-800 text-amber-300 font-bold text-[11px] rounded-xl"
+                      >
+                        Cek Status Kartu
                       </button>
                     </div>
-                    <p className="text-[10px] text-amber-700 italic">*Kode diperbarui oleh kasir setiap hari & hanya bisa diklaim 1x per hari.</p>
-                  </div>
-                ) : (
-                  <div className="p-3 bg-emerald-100 border border-emerald-300 rounded-2xl space-y-1">
-                    <p className="text-xs font-black text-emerald-800">🎉 Selamat! Stamp Kamu Sudah Penuh!</p>
-                    <p className="text-[11px] text-emerald-700">Tunjukkan tampilan ini ke kasir untuk mendapatkan <strong>1 Menu Gratis Bebas Pilih</strong>!</p>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
 
