@@ -79,19 +79,27 @@ function DynamicStoreContent() {
   const [customerSoundOption, setCustomerSoundOption] = useState<number>(2)
   const [activeNav, setActiveNav] = useState<'menu' | 'status' | 'info' | 'game' | 'profile'>('menu')
   
-  // 🎮 GAME STATES INTERAKTIF
+  // 🎮 GAME STATES INTERAKTIF REAL
   const [selectedGame, setSelectedGame] = useState<number | null>(null)
+  
+  // 1. TicTacToe
   const [tttBoard, setTttBoard] = useState(Array(9).fill(null))
   const [tttIsX, setTttIsX] = useState(true)
+
+  // 2. Tebak Angka
   const [guessTarget, setGuessTarget] = useState(Math.floor(Math.random() * 20) + 1)
   const [guessInput, setGuessInput] = useState('')
   const [guessMsg, setGuessMsg] = useState('Tebak angka 1 - 20!')
+
+  // 3. Suwit
   const [rpsResult, setRpsResult] = useState('Pilih salah satu!')
+
+  // 4. Memory Card
   const [cards, setCards] = useState(['☕', '☕', '🥐', '🥐', '🍰', '🍰', '🧃', '🧃'].sort(() => Math.random() - 0.5))
   const [flipped, setFlipped] = useState<number[]>([])
   const [matched, setMatched] = useState<number[]>([])
 
-  // 🦁 GAME TEBAK HEWAN
+  // 5. Tebak Hewan
   const [animalQuestionIdx, setAnimalQuestionIdx] = useState<number>(0)
   const [animalScore, setAnimalScore] = useState<number>(0)
   const [animalAnswerMsg, setAnimalAnswerMsg] = useState<string>('')
@@ -102,54 +110,53 @@ function DynamicStoreContent() {
     { question: 'Raja hutan yang memiliki surai lebat dan raungan keras?', options: ['Singa', 'Harimau', 'Serigala', 'Beruang'], answer: 'Singa' },
     { question: 'Hewan melata yang tidak memiliki kaki dan bisa berganti kulit?', options: ['Ular', 'Kadal', 'Buaya', 'Biawak'], answer: 'Ular' },
     { question: 'Hewan mamalia laut yang sangat cerdas dan sering melompat?', options: ['Hiu', 'Lumba-lumba', 'Paus', 'Pari'], answer: 'Lumba-lumba' },
-    { question: 'Hewan berkantung asli dari Australia yang melompat?', options: ['Koala', 'Kangguru', 'Wombat', 'Platypus'], answer: 'Kangguru' },
-    { question: 'Burung yang tidak bisa terbang dan hidup di daerah es dingin?', options: ['Penguin', 'Kasuari', 'Burung Unta', 'Elang'], answer: 'Penguin' },
   ]
 
-  // 🧮 GAME MATEMATIKA KILAT
+  // 6. Matematika Kilat
   const [mathA, setMathA] = useState(Math.floor(Math.random() * 10) + 1)
   const [mathB, setMathB] = useState(Math.floor(Math.random() * 10) + 1)
   const [mathInput, setMathInput] = useState('')
   const [mathScore, setMathScore] = useState(0)
   const [mathMsg, setMathMsg] = useState('Berapa hasil penjumlahan di atas?')
 
-  // ⏱️ GAME TES REFLEKS
+  // 7. Tes Refleks
   const [refleksState, setRefleksState] = useState<'idle' | 'waiting' | 'click'>('idle')
   const [refleksMsg, setRefleksMsg] = useState('Tekan Mulai untuk menguji refleks kamu!')
   const [refleksTime, setRefleksTime] = useState<number | null>(null)
   const timerRef = useRef<any>(null)
 
-  // 🎯 GAME KETUK TARGET
+  // 8. Ketuk Target
   const [tapScore, setTapScore] = useState(0)
   const [targetPos, setTargetPos] = useState({ top: '40%', left: '40%' })
 
-  // 🎨 GAME TEBAK WARNA
-  const [colorTarget, setColorTarget] = useState('Merah')
-  const [colorMsg, setColorMsg] = useState('Pilih warna yang sesuai!')
-
-  // 🪙 GAME LEMPAR KOIN
-  const [coinResult, setCoinResult] = useState<string | null>(null)
-
-  // 🔠 GAME TEBAK KATA / ANAGRAM
-  const [anagramInput, setAnagramInput] = useState('')
-  const [anagramMsg, setAnagramMsg] = useState('Susun huruf: K-O-P-I')
-
-  // 🦔 GAME WHACK-A-MOLE
+  // 9. Pukul Tikus (Whack-a-Mole)
   const [molePos, setMolePos] = useState<number | null>(null)
   const [moleScore, setMoleScore] = useState(0)
 
-  // DAFTAR 50 JUDUL GAME UNIK
-  const gameTitlesList = [
-    'TicTacToe Klasik ❌⭕', 'Tebak Angka 1-20 🔢', 'Su-Wit Jepang ✊✋✌️', 'Memory Card Match 🃏', 'Tebak Hewan Interaktif 🦁',
-    'Kuis Matematika Kilat 🧮', 'Tes Refleks Waktu ⚡', 'Ketuk Target Cepat 🎯', 'Tebak Warna Akurat 🎨', 'Lempar Koin Hoki 🪙',
-    'Susun Kata Kopi 🔠', 'Pukul Tikus Mondok 🦔', 'Tebak Emoji Makanan 🍕', 'Kliker Poin Cepat 👆', 'Acak Kata Indonesia 📝',
-    'Dadu Pembawa Keberuntungan 🎲', 'Kuis Pengetahuan Umum 🌐', 'Tebak Kota di Indonesia 🇮🇩', 'Gunting Batu Kertas Bot 🤖', 'Latihan Daya Ingat 🧠',
-    'Hitung Mundur Refleks ⏱️', 'Kuis Buah-Buahan 🍎', 'Tebak Negara Bendera 🎌', 'Uji Kecepatan Jari ⚡', 'Kuis Logo Populer 🏷️',
-    'Tebak Varian Kopi ☕', 'Tebak Penyanyi Hits 🎤', 'Kuis Olahraga Dunia ⚽', 'Hitung Cepat Perkalian ✖️', 'Tebak Bumbu Dapur 🌶️',
-    'Tebak Karakter Kartun 🐭', 'Uji Ketangkasan Otak 💡', 'Tebak Alat Transportasi 🚗', 'Kuis Sejarah Singkat 📜', 'Tebak Profesi & Pekerjaan 👨‍🍳',
-    'Tebak Nama Pel planet 🪐', 'Tebak Judul Lagu Hits 🎵', 'Kuis Sains Sederhana 🔬', 'Tebak Bahasa Daerah 🗣️', 'Uji Fokus Visual 👁️',
-    'Tebak Nama Alat Musik 🎸', 'Kuis Tokoh Pahlawan 🇲🇨', 'Tebak Hewan Laut 🐬', 'Tebak Jenis Es Krim 🍦', 'Kuis Teka-Teki Lucu 🤪',
-    'Tebak Snack Jadul 🍿', 'Kuis Film Box Office 🎬', 'Tebak Istilah Catur ♟️', 'Tebak Warna Campuran 🌈', 'Game Keberuntungan Akhir 🎁'
+  // 10. Tebak Kata (Anagram)
+  const [anagramInput, setAnagramInput] = useState('')
+  const [anagramMsg, setAnagramMsg] = useState('Susun huruf: K - O - P - I')
+
+  // 11. Tebak Warna
+  const [colorMsg, setColorMsg] = useState('Pilih warna kotak di atas!')
+
+  // 12. Lempar Koin
+  const [coinResult, setCoinResult] = useState<string | null>(null)
+
+  // DAFTAR MINI-GAMES INTERAKTIF REAL
+  const realGamesList = [
+    { id: 1, title: 'TicTacToe Klasik ❌⭕', desc: 'Permainan silang & lingkaran untuk 2 pemain' },
+    { id: 2, title: 'Tebak Angka 1-20 🔢', desc: 'Tebak angka rahasia acak dari sistem' },
+    { id: 3, title: 'Su-Wit Jepang ✊✋✌️', desc: 'Gunting batu kertas melawan bot otomatis' },
+    { id: 4, title: 'Memory Card Match 🃏', desc: 'Adu daya ingat mencocokkan kartu kembar' },
+    { id: 5, title: 'Tebak Hewan Interaktif 🦁', desc: 'Kuis tebak nama hewan berdasarkan cirinya' },
+    { id: 6, title: 'Kuis Matematika Kilat 🧮', desc: 'Hitung cepat angka penjumlahan & pengurangan' },
+    { id: 7, title: 'Tes Refleks Waktu ⚡', desc: 'Uji kecepatan respon jari dalam milidetik' },
+    { id: 8, title: 'Ketuk Target Cepat 🎯', desc: 'Ketuk target berpindah sebelum hilang' },
+    { id: 9, title: 'Pukul Tikus Mondok 🦔', desc: 'Pukul tikus tanah yang muncul dari lubang' },
+    { id: 10, title: 'Susun Kata Warkop 🔠', desc: 'Tebak dan susun kata teracak tentang warkop' },
+    { id: 11, title: 'Tebak Warna Akurat 🎨', desc: 'Uji penglihatan dan pencocokan warna' },
+    { id: 12, title: 'Lempar Koin Hoki 🪙', desc: 'Simulasi acak lempar koin angka/garuda' },
   ]
 
   // 🌟 FITUR TEMA VISUAL & BACKGROUND WALLPAPER
@@ -1766,42 +1773,35 @@ function DynamicStoreContent() {
           </div>
         )}
 
-        {/* TAB 4: 50 MINI-GAMES INTERAKTIF (PERBAIKAN LOGIKA 50 GAME UNIK) */}
+        {/* TAB 4: MINI-GAMES INTERAKTIF REAL */}
         {activeNav === 'game' && (
           <div className="space-y-4">
             {selectedGame === null ? (
               <div className="space-y-3">
                 <div className="text-center space-y-1">
-                  <h2 className="text-base font-black">🎮 Arena 50 Mini-Games Interaktif</h2>
-                  <p className="text-[11px] text-slate-500">Pilih game di bawah ini untuk dimainkan langsung di HP kamu!</p>
+                  <h2 className="text-base font-black text-slate-900">🎮 Arena Mini-Games Interaktif</h2>
+                  <p className="text-[11px] text-slate-500">Pilih permaianan interaktif di bawah ini sambil menunggu pesanan kamu disajikan!</p>
                 </div>
 
-                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-                  {Array.from({ length: 50 }).map((_, i) => {
-                    const gameId = i + 1
-                    const title = gameTitlesList[i] || `Mini Game Interaktif #${gameId}`
-
-                    return (
-                      <button
-                        key={gameId}
-                        onClick={() => setSelectedGame(gameId)}
-                        className={`w-full p-3.5 rounded-2xl flex items-center justify-between transition active:scale-95 text-left border ${
-                          themeClasses.card
-                        } hover:border-emerald-500`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-600 font-black text-xs flex items-center justify-center shrink-0">
-                            {gameId}
-                          </span>
-                          <div>
-                            <p className="text-xs font-bold text-slate-900">{title}</p>
-                            <p className="text-[10px] text-slate-500">Ketuk untuk memainkan game #{gameId}</p>
-                          </div>
+                <div className="grid grid-cols-1 gap-2.5 max-h-[500px] overflow-y-auto pr-1">
+                  {realGamesList.map((g) => (
+                    <button
+                      key={g.id}
+                      onClick={() => setSelectedGame(g.id)}
+                      className={`w-full p-3.5 rounded-2xl flex items-center justify-between transition active:scale-95 text-left border ${themeClasses.card} hover:border-emerald-500`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-700 font-black text-xs flex items-center justify-center shrink-0">
+                          {g.id}
+                        </span>
+                        <div>
+                          <p className="text-xs font-bold text-slate-900">{g.title}</p>
+                          <p className="text-[10px] text-slate-500 line-clamp-1">{g.desc}</p>
                         </div>
-                        <span className="text-xs font-bold text-emerald-600">Mainkan →</span>
-                      </button>
-                    )
-                  })}
+                      </div>
+                      <span className="text-xs font-bold text-emerald-600 shrink-0">Mainkan →</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             ) : (
@@ -1813,8 +1813,8 @@ function DynamicStoreContent() {
                   >
                     <span>← Kembali ke Daftar Games</span>
                   </button>
-                  <span className="text-xs font-mono font-bold text-amber-400">
-                    Game #{selectedGame}: {gameTitlesList[selectedGame - 1]}
+                  <span className="text-xs font-mono font-bold text-amber-400 line-clamp-1">
+                    Game #{selectedGame}: {realGamesList.find(g => g.id === selectedGame)?.title}
                   </span>
                 </div>
 
@@ -2050,74 +2050,10 @@ function DynamicStoreContent() {
                     </div>
                   )}
 
-                  {/* GAME 9: TEBAK WARNA */}
+                  {/* GAME 9: WHACK A MOLE */}
                   {selectedGame === 9 && (
                     <div className="space-y-3 py-2">
-                      <p className="text-xs font-bold text-slate-800">{colorMsg}</p>
-                      <div className="w-20 h-20 mx-auto rounded-2xl shadow-md bg-rose-500" />
-                      <div className="flex justify-center gap-2">
-                        {['Merah', 'Biru', 'Hijau', 'Kuning'].map((col, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              if (col === 'Merah') setColorMsg('🎉 TEPAT SEKALI! Ini warna Merah!')
-                              else setColorMsg('❌ SALAH! Ini warna Merah.')
-                            }}
-                            className="px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800"
-                          >
-                            {col}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* GAME 10: LEMPAR KOIN */}
-                  {selectedGame === 10 && (
-                    <div className="space-y-3 py-2">
-                      <p className="text-xs font-bold text-slate-800">Hasil Lemparan Koin:</p>
-                      <div className="w-16 h-16 mx-auto rounded-full bg-amber-400 border-4 border-amber-300 flex items-center justify-center text-slate-950 font-black text-sm shadow-md">
-                        {coinResult || '🪙'}
-                      </div>
-                      <button
-                        onClick={() => {
-                          const res = Math.random() > 0.5 ? 'GARUDA' : 'ANGKA'
-                          setCoinResult(res)
-                        }}
-                        className="px-4 py-2 bg-slate-800 text-white font-bold text-xs rounded-xl"
-                      >
-                        🪙 Lempar Koin
-                      </button>
-                    </div>
-                  )}
-
-                  {/* GAME 11: SUSUN KATA KOPI */}
-                  {selectedGame === 11 && (
-                    <div className="space-y-3 py-2">
-                      <p className="text-xs font-bold text-slate-800">{anagramMsg}</p>
-                      <input
-                        type="text"
-                        placeholder="Jawaban..."
-                        value={anagramInput}
-                        onChange={(e) => setAnagramInput(e.target.value.toUpperCase())}
-                        className="w-full max-w-xs mx-auto p-2 bg-white border border-slate-300 text-center text-xs font-bold rounded-xl block text-slate-800 uppercase"
-                      />
-                      <button
-                        onClick={() => {
-                          if (anagramInput.trim() === 'KOPI') setAnagramMsg('🎉 BENAR! Katanya adalah KOPI!')
-                          else setAnagramMsg('❌ Coba lagi!')
-                        }}
-                        className="px-4 py-2 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl"
-                      >
-                        Cek Kata
-                      </button>
-                    </div>
-                  )}
-
-                  {/* GAME 12: WHACK A MOLE */}
-                  {selectedGame === 12 && (
-                    <div className="space-y-3 py-2">
-                      <p className="text-xs font-bold text-slate-800">Skor Tikus: {moleScore}</p>
+                      <p className="text-xs font-bold text-slate-800">Skor Pukul Tikus: {moleScore}</p>
                       <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto">
                         {Array.from({ length: 9 }).map((_, i) => (
                           <button
@@ -2143,24 +2079,70 @@ function DynamicStoreContent() {
                     </div>
                   )}
 
-                  {/* GAME 13 - 50: GAME INTERAKTIF LAINNYA */}
-                  {selectedGame >= 13 && (
-                    <div className="space-y-3 py-4 text-center">
-                      <div className="w-16 h-16 mx-auto rounded-3xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-2xl text-emerald-600">
-                        🎯
-                      </div>
-                      <h4 className="text-sm font-black text-slate-900">{gameTitlesList[selectedGame - 1]}</h4>
-                      <p className="text-xs text-slate-600 max-w-xs mx-auto">
-                        Mini game ini sudah siap dan aktif! Ketuk tombol interaksi di bawah ini untuk menguji skor kamu!
-                      </p>
+                  {/* GAME 10: SUSUN KATA WARKOP */}
+                  {selectedGame === 10 && (
+                    <div className="space-y-3 py-2">
+                      <p className="text-xs font-bold text-slate-800">{anagramMsg}</p>
+                      <input
+                        type="text"
+                        placeholder="Jawaban..."
+                        value={anagramInput}
+                        onChange={(e) => setAnagramInput(e.target.value.toUpperCase())}
+                        className="w-full max-w-xs mx-auto p-2 bg-white border border-slate-300 text-center text-xs font-bold rounded-xl block text-slate-800 uppercase"
+                      />
                       <button
-                        onClick={() => alert(`🎉 Kamu telah berhasil memainkan ${gameTitlesList[selectedGame - 1]}!`)}
-                        className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow transition active:scale-95"
+                        onClick={() => {
+                          if (anagramInput.trim() === 'KOPI') setAnagramMsg('🎉 BENAR! Katanya adalah KOPI!')
+                          else setAnagramMsg('❌ Masih salah, coba susun lagi!')
+                        }}
+                        className="px-4 py-2 bg-emerald-500 text-slate-950 font-black text-xs rounded-xl"
                       >
-                        ⚡ Mainkan & Dapatkan Poin
+                        Cek Kata
                       </button>
                     </div>
                   )}
+
+                  {/* GAME 11: TEBAK WARNA */}
+                  {selectedGame === 11 && (
+                    <div className="space-y-3 py-2">
+                      <p className="text-xs font-bold text-slate-800">{colorMsg}</p>
+                      <div className="w-20 h-20 mx-auto rounded-2xl shadow-md bg-rose-500" />
+                      <div className="flex justify-center gap-2">
+                        {['Merah', 'Biru', 'Hijau', 'Kuning'].map((col, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              if (col === 'Merah') setColorMsg('🎉 TEPAT SEKALI! Ini warna Merah!')
+                              else setColorMsg('❌ SALAH! Ini warna Merah.')
+                            }}
+                            className="px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-800"
+                          >
+                            {col}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* GAME 12: LEMPAR KOIN */}
+                  {selectedGame === 12 && (
+                    <div className="space-y-3 py-2">
+                      <p className="text-xs font-bold text-slate-800">Hasil Lemparan Koin:</p>
+                      <div className="w-16 h-16 mx-auto rounded-full bg-amber-400 border-4 border-amber-300 flex items-center justify-center text-slate-950 font-black text-sm shadow-md">
+                        {coinResult || '🪙'}
+                      </div>
+                      <button
+                        onClick={() => {
+                          const res = Math.random() > 0.5 ? 'GARUDA' : 'ANGKA'
+                          setCoinResult(res)
+                        }}
+                        className="px-4 py-2 bg-slate-800 text-white font-bold text-xs rounded-xl"
+                      >
+                        🪙 Lempar Koin
+                      </button>
+                    </div>
+                  )}
+
                 </div>
               </div>
             )}
@@ -2359,7 +2341,7 @@ function DynamicStoreContent() {
                   <strong className="text-slate-900">3. Tab ℹ️ Info:</strong> Lihat jam operasional toko, fasilitas, password Wi-Fi gratis, Google Maps, dan Kotak Ulasan Pelanggan Mandiri.
                 </div>
                 <div>
-                  <strong className="text-slate-900">4. Tab 🎮 Game:</strong> Kuis tebak hewan & 50 mini games interaktif agar tidak bosan saat menunggu makanan disajikan.
+                  <strong className="text-slate-900">4. Tab 🎮 Game:</strong> Kuis tebak hewan & mini games interaktif agar tidak bosan saat menunggu makanan disajikan.
                 </div>
                 <div>
                   <strong className="text-slate-900">5. Tab 👤 Profil:</strong> Pengaturan profil akun pelanggan, ganti nada dering panggilan, dan klaim stamp Kartu VIP Loyalty.
