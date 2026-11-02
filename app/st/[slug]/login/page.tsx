@@ -6,92 +6,35 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
+// Bentuk kotak dengan sudut terpotong (chamfer) ala desain glassy
+const CHAMFER =
+  'polygon(28px 0, calc(100% - 28px) 0, 100% 28px, 100% calc(100% - 28px), calc(100% - 28px) 100%, 28px 100%, 0 calc(100% - 28px), 0 28px)'
+
+const MailIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="5" width="18" height="14" rx="2.5" />
+    <path d="m3.5 7 8.5 6 8.5-6" />
+  </svg>
+)
+
+const LockIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="4" y="11" width="16" height="10" rx="2.5" />
+    <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+  </svg>
+)
+
+const EyeIcon = ({ off }: { off: boolean }) => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+    <circle cx="12" cy="12" r="3" />
+    {off && <path d="m4 4 16 16" />}
+  </svg>
+)
+
 export default function CustomerLoginPage({ params }: { params: { slug: string } }) {
   const storeSlug = params.slug
   const supabase = createClient()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email || !password) return
-
-    setLoading(true)
-    try {
-      // 🔒 Format Email Terisolasi Khusus Toko Ini
-      const tenantEmail = `${storeSlug.toLowerCase()}_${email.trim().toLowerCase()}`
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: tenantEmail,
-        password: password,
-      })
-
-      if (error) {
-        alert('❌ Email atau password salah untuk toko ini!')
-        setLoading(false)
-        return
-      }
-
-      alert('✅ Login berhasil!')
-      window.location.href = `/st/${storeSlug}`
-    } catch (err: any) {
-      alert(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4 font-sans">
-      <div className="w-full max-w-sm bg-slate-900 border border-slate-800 p-6 rounded-3xl space-y-5 shadow-xl">
-        <div className="text-center space-y-1">
-          <h1 className="text-xl font-black text-emerald-400">🔑 Masuk Akun Pelanggan</h1>
-          <p className="text-xs text-slate-400">Masuk untuk memesan & kumpulkan stamp loyalty toko ini.</p>
-        </div>
-
-        <form onSubmit={handleLogin} className="space-y-3">
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase">Email</label>
-            <input
-              type="email"
-              required
-              placeholder="nama@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white font-bold"
-            />
-          </div>
-
-          <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase">Kata Sandi</label>
-            <input
-              type="password"
-              required
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full mt-1 p-2.5 bg-slate-950 border border-slate-800 text-xs rounded-xl text-white font-bold"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition mt-2"
-          >
-            {loading ? 'Memproses...' : 'Masuk Sekarang'}
-          </button>
-        </form>
-
-        <div className="text-center pt-2 border-t border-slate-800 text-xs text-slate-400">
-          Belum punya akun di toko ini?{' '}
-          <Link href={`/st/${storeSlug}/register`} className="text-emerald-400 font-bold hover:underline">
-            Daftar Baru
-          </Link>
-        </div>
-      </div>
-    </div>
-  )
-}
